@@ -1,0 +1,13 @@
+{
+  "display_name": "Polyglot",
+  "loading_order": 10,
+  "requires": [],
+  "optional": [],
+  "dependencies": [],
+  "js": "dist/index.js",
+  "css": "dist/style.css",
+  "author": "FigCake",
+  "version": "1.4.5",
+  "homePage": "https://github.com/FigCake/ST.Polyglot",
+  "auto_update": true
+}
