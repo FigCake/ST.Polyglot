@@ -1,0 +1,3818 @@
+/* ── themes/theme-dark.css ── */
+/* ════════════════════════════
+   Polyglot — themes/theme-dark.css
+   Dark mode (default) token overrides
+   Applied to :root — active when no data-pg-theme attribute is set.
+   ════════════════════════════ */
+
+:root {
+    /* ST theme tokens (fallback) */
+    --pg-font        : var(--mainFontFamily, sans-serif);
+    --pg-radius      : 16px;
+    --pg-radius-sm   : 8px;
+    --pg-radius-pill : 100px;
+
+    /* Background image support */
+    --pg-panel-bg-image : none;
+
+    /* ── Dark mode defaults ────────────────────────────────────── */
+    --pg-panel-bg-color : rgba(10, 10, 15, 0.68);
+
+    /* Layer 0 — sidebar, tap bubble, sel tooltip, snackbar */
+    --pg-layer-0        : rgba(10, 10, 15, 0.68);
+    --pg-layer-0-blur   : blur(32px) saturate(200%);
+
+    /* Layer 1 — cards/items (near-solid, no blur) */
+    --pg-layer-1        : rgba(255, 255, 255, 0.16);
+
+    /* Layer 2 — elevated/hovered cards */
+    --pg-layer-2        : rgba(255, 255, 255, 0.24);
+
+    /* Layer borders — use sparingly */
+    --pg-border-0       : rgba(255, 255, 255, 0.10);
+    --pg-border-1       : rgba(255, 255, 255, 0.08);
+
+    /* ── Liquid Glass — light reflection & dual shadow ─────────── */
+    /* Inset highlight — glass catching light from above */
+    --pg-glass-highlight:
+        inset 0 1px 1px rgba(255, 255, 255, 0.14),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.20);
+    --pg-glass-highlight-hover:
+        inset 0 1px 1px rgba(255, 255, 255, 0.26),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.10);
+    /* Dual shadow — crisp near + diffuse far */
+    --pg-shadow-card :
+        0 2px 6px  rgba(0, 0, 0, 0.12),
+        0 8px 20px rgba(0, 0, 0, 0.18);
+    --pg-shadow-hover:
+        0 6px 12px rgba(0, 0, 0, 0.18),
+        0 16px 32px rgba(0, 0, 0, 0.28);
+    /* Panel edge — thin light border */
+    --pg-glass-border: 1px solid rgba(255, 255, 255, 0.06);
+
+    /* Text hierarchy — WCAG minimum contrast */
+    --pg-t1: rgba(255, 255, 255, 0.95);
+    --pg-t2: rgba(255, 255, 255, 0.65);
+    --pg-t3: rgba(255, 255, 255, 0.55);  /* min 0.55 — accessibility floor */
+
+    /* Skeleton shimmer — light flicker on dark background */
+    --pg-skeleton-shimmer-start: rgba(255,255,255,0.05);
+    --pg-skeleton-shimmer-peak:  rgba(255,255,255,0.13);
+
+    /* blur shorthand */
+    --pg-blur       : var(--pg-layer-0-blur);
+    --pg-blur-light : blur(16px) saturate(160%);
+
+    /* Legacy aliases */
+    --pg-glass-panel : var(--pg-layer-0);
+    --pg-glass-card  : var(--pg-layer-1);
+    --pg-glass-strong: var(--pg-layer-2);
+    --pg-glass-border: var(--pg-border-0);
+    --pg-bg          : var(--pg-layer-0);
+    --pg-surface     : var(--pg-layer-0);
+
+    /* Semantic colours */
+    --pg-ok  : rgba(110, 212, 140, 0.90);
+    --pg-err : rgba(240, 100, 100, 0.90);
+    --pg-warn: rgba(240, 180, 80,  0.90);
+}
+
+
+/* ── themes/theme-light.css ── */
+/* ════════════════════════════
+   Polyglot — themes/theme-light.css
+   Light mode token overrides
+   Activated by data-pg-theme="light" on #pg-box-pg-learning-panel
+   ════════════════════════════ */
+
+/* ════════════════════════════
+   🌕 Light theme
+   Activated by data-pg-theme="light" on #pg-box-pg-learning-panel
+   ════════════════════════════ */
+
+#pg-box-pg-learning-panel[data-pg-theme="light"],
+.pg-sidebar[data-pg-theme="light"] {
+    /* Layer 0 — sidebar, tap bubble, sel tooltip, snackbar */
+    --pg-layer-0        : rgba(255, 255, 255, 0.72);
+    --pg-layer-0-blur   : blur(40px) saturate(180%);
+
+    /* Layer 1 — cards */
+    --pg-layer-1        : rgba(255, 255, 255, 0.70);
+
+    /* Layer 2 — elevated/hovered cards */
+    --pg-layer-2        : rgba(255, 255, 255, 0.85);
+
+    /* Borders */
+    --pg-border-0       : rgba(0, 0, 0, 0.08);
+    --pg-border-1       : rgba(0, 0, 0, 0.06);
+
+    /* ── Liquid Glass — inverted highlight direction for light mode ── */
+    --pg-glass-highlight:
+        inset 0 1px 1px rgba(255, 255, 255, 0.80),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.06);
+    --pg-glass-highlight-hover:
+        inset 0 1px 1px rgba(255, 255, 255, 0.95),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.04);
+    --pg-shadow-card :
+        0 2px 6px  rgba(0, 0, 0, 0.07),
+        0 8px 20px rgba(0, 0, 0, 0.10);
+    --pg-shadow-hover:
+        0 6px 12px rgba(0, 0, 0, 0.10),
+        0 16px 32px rgba(0, 0, 0, 0.14);
+    --pg-glass-border: 1px solid rgba(0, 0, 0, 0.07);
+    /* Skeleton shimmer — dark flicker on light background */
+    --pg-skeleton-shimmer-start: rgba(0,0,0,0.06);
+    --pg-skeleton-shimmer-peak:  rgba(0,0,0,0.13);
+
+    /* Text — use ST body colour, fallback to dark */
+    --pg-t1: var(--SmartThemeBodyColor, rgba(15, 15, 20, 0.92));
+    --pg-t2: rgba(0, 0, 0, 0.58);
+    --pg-t3: rgba(0, 0, 0, 0.50);  /* min 0.50 */
+
+    /* Update legacy aliases */
+    --pg-glass-panel : var(--pg-layer-0);
+    --pg-glass-card  : var(--pg-layer-1);
+    --pg-glass-strong: var(--pg-layer-2);
+    --pg-glass-border: var(--pg-border-0);
+    --pg-bg          : var(--pg-layer-0);
+    --pg-surface     : var(--pg-layer-0);
+
+    /* Semantic colours (darker in light mode) */
+    --pg-ok  : rgba(30,  140, 70,  0.90);
+    --pg-err : rgba(190, 40,  40,  0.90);
+    --pg-warn: rgba(160, 100, 10,  0.90);
+}
+
+/* Light mode — active tab pill inverted */
+#pg-box-pg-learning-panel[data-pg-theme="light"] .pg-nav-tab.active,
+.pg-sidebar[data-pg-theme="light"] .pg-nav-tab.active {
+    color: rgba(255,255,255,0.95) !important;
+    background: rgba(0,0,0,0.60) !important;
+}
+#pg-box-pg-learning-panel[data-pg-theme="light"] .pg-nav-tab:hover:not(.active),
+.pg-sidebar[data-pg-theme="light"] .pg-nav-tab:hover:not(.active) {
+    color: rgba(0,0,0,0.85) !important;
+}
+#pg-box-pg-learning-panel[data-pg-theme="light"] .pg-nav-menu,
+.pg-sidebar[data-pg-theme="light"] .pg-nav-menu {
+    background: rgba(0,0,0,0.06) !important;
+}
+
+
+/* Light mode — sidebar shadow (dark shadow contrasts with light panel) */
+#pg-box-pg-learning-panel[data-pg-theme="light"],
+.pg-sidebar[data-pg-theme="light"] {
+    box-shadow:
+        -1px 0 0 rgba(0,0,0,0.06),
+        -4px 0 24px rgba(0,0,0,0.12),
+        -16px 0 48px rgba(0,0,0,0.18),
+        -24px 0 32px rgba(0,0,0,0.08) !important;
+}
+
+/* ── Drag handle — title bar in floating mode ── */
+.pg-sidebar-floating .pg-box-tit,
+.pg-sidebar-floating .pg-box-title {
+    cursor: grab;
+    user-select: none;
+}
+.pg-sidebar-floating .pg-box-tit:active,
+.pg-sidebar-floating .pg-box-title:active {
+    cursor: grabbing;
+}
+
+
+/* Background image ::before is defined in style-layout.css (structural rule shared by all themes). */
+
+
+/* ── themes/theme-breeze.css ── */
+/* ════════════════════════════
+   Polyglot — themes/theme-breeze.css
+   Breeze theme
+   ════════════════════════════ */
+
+#pg-box-pg-learning-panel[data-pg-theme="breeze"],
+.pg-sidebar[data-pg-theme="breeze"] {
+
+    /* ── Layers ─────────────────────────────────────────────────── */
+    /* Layer 0 — panel base (#F0EEE9) */
+    --pg-layer-0      : rgba(240, 238, 233, 0.95);
+    --pg-layer-0-blur : blur(40px) saturate(130%);
+
+    /* Layer 1 — cards (#B7D1EA tint) */
+    --pg-layer-1      : rgba(183, 209, 234, 0.82);
+
+    /* Layer 2 — elevated / hovered cards */
+    --pg-layer-2      : rgba(210, 228, 244, 0.94);
+
+    /* ── Borders ─────────────────────────────────────────────────── */
+    --pg-border-0     : rgba(69, 118, 179, 0.18);
+    --pg-border-1     : rgba(69, 118, 179, 0.12);
+    --pg-glass-border : 1px solid rgba(69, 118, 179, 0.18);
+    /* Skeleton shimmer — #4576B3 tint */
+    --pg-skeleton-shimmer-start: rgba(69,118,179,0.07);
+    --pg-skeleton-shimmer-peak:  rgba(69,118,179,0.16);
+
+    /* ── Liquid Glass highlights ─────────────────────────────────── */
+    --pg-glass-highlight:
+        inset 0 1px 1px rgba(255, 255, 255, 0.85),
+        inset 0 -1px 1px rgba(69, 118, 179, 0.10);
+    --pg-glass-highlight-hover:
+        inset 0 1px 1px rgba(255, 255, 255, 0.97),
+        inset 0 -1px 1px rgba(69, 118, 179, 0.07);
+
+    /* ── Shadows ─────────────────────────────────────────────────── */
+    --pg-shadow-card:
+        0 2px 6px  rgba(69, 118, 179, 0.10),
+        0 8px 20px rgba(69, 118, 179, 0.15);
+    --pg-shadow-hover:
+        0 6px 12px rgba(69, 118, 179, 0.16),
+        0 16px 32px rgba(69, 118, 179, 0.22);
+
+    /* ── Text ────────────────────────────────────────────────────── */
+    --pg-t1: rgba(28,  52,  90, 0.94);   /* #1C345A */
+    --pg-t2: rgba(55,  88, 140, 0.72);
+    --pg-t3: rgba(55,  88, 140, 0.52);
+
+    /* ── Legacy aliases ──────────────────────────────────────────── */
+    --pg-glass-panel : var(--pg-layer-0);
+    --pg-glass-card  : var(--pg-layer-1);
+    --pg-glass-strong: var(--pg-layer-2);
+    --pg-bg          : var(--pg-layer-0);
+    --pg-surface     : var(--pg-layer-0);
+
+    /* ── Semantic colours ────────────────────────────────────────── */
+    --pg-ok  : rgba(46,  150, 148, 0.92);   /* #2E9694 */
+    --pg-err : rgba(190,  55,  55, 0.92);
+    --pg-warn: rgba(180, 138,  30, 0.92);
+
+    /* ── Accent ──────────────────────────────────────────────────── */
+    --pg-accent: #4576B3;
+}
+
+/* ── Active tab ── */
+#pg-box-pg-learning-panel[data-pg-theme="breeze"] .pg-nav-tab.active,
+.pg-sidebar[data-pg-theme="breeze"] .pg-nav-tab.active {
+    color: #F0EEE9 !important;
+    background: #4576B3 !important;
+    font-weight: 600 !important;
+}
+#pg-box-pg-learning-panel[data-pg-theme="breeze"] .pg-nav-tab:hover:not(.active),
+.pg-sidebar[data-pg-theme="breeze"] .pg-nav-tab:hover:not(.active) {
+    color: rgba(28, 52, 90, 0.92) !important;
+    background: rgba(69, 118, 179, 0.14) !important;
+}
+#pg-box-pg-learning-panel[data-pg-theme="breeze"] .pg-nav-menu,
+.pg-sidebar[data-pg-theme="breeze"] .pg-nav-menu {
+    background: rgba(183, 209, 234, 0.40) !important;
+}
+
+/* ── Sidebar shadow ── */
+#pg-box-pg-learning-panel[data-pg-theme="breeze"],
+.pg-sidebar[data-pg-theme="breeze"] {
+    box-shadow:
+        -1px 0 0   rgba(69, 118, 179, 0.12),
+        -4px 0 24px rgba(69, 118, 179, 0.20),
+        -16px 0 48px rgba(69, 118, 179, 0.16),
+        -24px 0 32px rgba(69, 118, 179, 0.10) !important;
+}
+
+/* ── Mobile: fully opaque ── */
+@media (pointer: coarse) {
+    #pg-box-pg-learning-panel[data-pg-theme="breeze"],
+    .pg-sidebar[data-pg-theme="breeze"] {
+        --pg-layer-0 : rgba(240, 238, 233, 1.00);
+        --pg-layer-1 : rgba(183, 209, 234, 0.97);
+        --pg-layer-2 : rgba(210, 228, 244, 1.00);
+    }
+}
+
+/* ── Highlight tints ── */
+#pg-box-pg-learning-panel[data-pg-theme="breeze"] .pg-hl-a,
+.pg-sidebar[data-pg-theme="breeze"] .pg-hl-a {
+    background-color: rgba(134, 173, 208, 0.32);  /* #86ADD0 */
+}
+#pg-box-pg-learning-panel[data-pg-theme="breeze"] .pg-hl-b,
+.pg-sidebar[data-pg-theme="breeze"] .pg-hl-b {
+    background-color: rgba(92, 198, 195, 0.30);   /* #5CC6C3 */
+}
+#pg-box-pg-learning-panel[data-pg-theme="breeze"] .pg-hl-c,
+.pg-sidebar[data-pg-theme="breeze"] .pg-hl-c {
+    background-color: rgba(227, 204, 135, 0.40);  /* #E3CC87 */
+}
+#pg-box-pg-learning-panel[data-pg-theme="breeze"] .pg-hl-grammar,
+.pg-sidebar[data-pg-theme="breeze"] .pg-hl-grammar {
+    background-color: rgba(173, 169, 196, 0.38);  /* #ADA9C4 */
+}
+#pg-box-pg-learning-panel[data-pg-theme="breeze"] .pg-hl-idiom,
+.pg-sidebar[data-pg-theme="breeze"] .pg-hl-idiom {
+    background-color: rgba(160, 178, 172, 0.35);  /* #A0B2AC */
+}
+
+
+/* ── themes/theme-milk.css ── */
+/* ════════════════════════════
+   Polyglot — themes/theme-milk.css
+   Milk theme
+   ════════════════════════════ */
+
+#pg-box-pg-learning-panel[data-pg-theme="milk"],
+.pg-sidebar[data-pg-theme="milk"] {
+
+    /* ── Layers ─────────────────────────────────────────────────── */
+    /* Layer 0 — panel base (#FFF8F5) */
+    --pg-layer-0      : rgba(255, 248, 245, 0.96);
+    --pg-layer-0-blur : blur(48px) saturate(160%);
+
+    /* Layer 1 — cards (#FFD6E2 tint) */
+    --pg-layer-1      : rgba(255, 214, 226, 0.78);
+
+    /* Layer 2 — elevated cards (#FFBBD0 tint) */
+    --pg-layer-2      : rgba(255, 187, 208, 0.90);
+
+    /* ── Borders ─────────────────────────────────────────────────── */
+    --pg-border-0     : rgba(201, 64, 112, 0.20);
+    --pg-border-1     : rgba(201, 64, 112, 0.13);
+    --pg-glass-border : 1px solid rgba(201, 64, 112, 0.20);
+
+    /* ── Skeleton shimmer — #C94070 tint ─────────────────────── */
+    --pg-skeleton-shimmer-start: rgba(201, 64, 112, 0.07);
+    --pg-skeleton-shimmer-peak:  rgba(201, 64, 112, 0.18);
+
+    /* ── Liquid Glass — pronounced depth highlights ──────────────── */
+    /* Top edge catches light strongly; bottom edge gets warm rose shadow */
+    --pg-glass-highlight:
+        inset 0 1.5px 2px rgba(255, 255, 255, 0.92),
+        inset 0 -1.5px 2px rgba(201,  64, 112, 0.14),
+        inset 1px 0 1px rgba(255, 255, 255, 0.40),
+        inset -1px 0 1px rgba(201, 64, 112, 0.08);
+    --pg-glass-highlight-hover:
+        inset 0 1.5px 2px rgba(255, 255, 255, 1.00),
+        inset 0 -1.5px 2px rgba(201,  64, 112, 0.10),
+        inset 1px 0 1px rgba(255, 255, 255, 0.55),
+        inset -1px 0 1px rgba(201, 64, 112, 0.05);
+
+    /* ── Shadows — deeper & warmer than Breeze ───────────────────── */
+    --pg-shadow-card:
+        0 1px 3px  rgba(201,  64, 112, 0.12),
+        0 4px 12px rgba(201,  64, 112, 0.16),
+        0 12px 28px rgba(139,  26,  64, 0.10);
+    --pg-shadow-hover:
+        0 4px 8px  rgba(201,  64, 112, 0.20),
+        0 10px 24px rgba(201,  64, 112, 0.26),
+        0 20px 40px rgba(139,  26,  64, 0.16);
+
+    /* ── Text ────────────────────────────────────────────────────── */
+    --pg-t1: rgba(139,  26,  64, 0.94);   /* #8B1A40 */
+    --pg-t2: rgba(168,  48,  96, 0.72);
+    --pg-t3: rgba(192,  96, 128, 0.58);
+
+    /* ── Legacy aliases ──────────────────────────────────────────── */
+    --pg-glass-panel : var(--pg-layer-0);
+    --pg-glass-card  : var(--pg-layer-1);
+    --pg-glass-strong: var(--pg-layer-2);
+    --pg-bg          : var(--pg-layer-0);
+    --pg-surface     : var(--pg-layer-0);
+
+    /* ── Semantic colours ────────────────────────────────────────── */
+    --pg-ok  : rgba( 46, 150,  90, 0.92);
+    --pg-err : rgba(190,  40,  60, 0.92);
+    --pg-warn: rgba(180, 110,  20, 0.92);
+
+    /* ── Accent ──────────────────────────────────────────────────── */
+    --pg-accent: #C94070;
+}
+
+/* ── Active tab ── */
+#pg-box-pg-learning-panel[data-pg-theme="milk"] .pg-nav-tab.active,
+.pg-sidebar[data-pg-theme="milk"] .pg-nav-tab.active {
+    color: #FFF8F5 !important;
+    background: #C94070 !important;
+    font-weight: 600 !important;
+}
+#pg-box-pg-learning-panel[data-pg-theme="milk"] .pg-nav-tab:hover:not(.active),
+.pg-sidebar[data-pg-theme="milk"] .pg-nav-tab:hover:not(.active) {
+    color: rgba(139, 26, 64, 0.92) !important;
+    background: rgba(201, 64, 112, 0.12) !important;
+}
+#pg-box-pg-learning-panel[data-pg-theme="milk"] .pg-nav-menu,
+.pg-sidebar[data-pg-theme="milk"] .pg-nav-menu {
+    background: rgba(255, 214, 226, 0.45) !important;
+}
+
+/* ── Sidebar shadow ── */
+#pg-box-pg-learning-panel[data-pg-theme="milk"],
+.pg-sidebar[data-pg-theme="milk"] {
+    box-shadow:
+        -1px 0 0   rgba(201,  64, 112, 0.14),
+        -4px 0 24px rgba(201,  64, 112, 0.22),
+        -16px 0 48px rgba(139,  26,  64, 0.18),
+        -24px 0 64px rgba(139,  26,  64, 0.10) !important;
+}
+
+/* ── Mobile: fully opaque ── */
+@media (pointer: coarse) {
+    #pg-box-pg-learning-panel[data-pg-theme="milk"],
+    .pg-sidebar[data-pg-theme="milk"] {
+        --pg-layer-0 : rgba(255, 248, 245, 1.00);
+        --pg-layer-1 : rgba(255, 214, 226, 0.97);
+        --pg-layer-2 : rgba(255, 187, 208, 1.00);
+    }
+}
+
+/* ── Highlight tints ── */
+#pg-box-pg-learning-panel[data-pg-theme="milk"] .pg-hl-a,
+.pg-sidebar[data-pg-theme="milk"] .pg-hl-a {
+    background-color: rgba(249, 168, 201, 0.35);  /* #F9A8C9 */
+}
+#pg-box-pg-learning-panel[data-pg-theme="milk"] .pg-hl-b,
+.pg-sidebar[data-pg-theme="milk"] .pg-hl-b {
+    background-color: rgba(255, 187, 208, 0.40);  /* #FFBBD0 */
+}
+#pg-box-pg-learning-panel[data-pg-theme="milk"] .pg-hl-c,
+.pg-sidebar[data-pg-theme="milk"] .pg-hl-c {
+    background-color: rgba(255, 214, 160, 0.42);
+}
+#pg-box-pg-learning-panel[data-pg-theme="milk"] .pg-hl-grammar,
+.pg-sidebar[data-pg-theme="milk"] .pg-hl-grammar {
+    background-color: rgba(201, 168, 210, 0.36);
+}
+#pg-box-pg-learning-panel[data-pg-theme="milk"] .pg-hl-idiom,
+.pg-sidebar[data-pg-theme="milk"] .pg-hl-idiom {
+    background-color: rgba(192, 210, 180, 0.34);
+}
+
+
+/* ── style-base.css ── */
+/* ════════════════════════════
+   Polyglot — style-base.css
+   Shared structure, keyframes, accessibility
+   (Token values live in themes/theme-*.css)
+   ════════════════════════════ */
+
+/* ── Design tokens ────────────────────────────────────────────────────────────
+   Layer system:
+     layer-0 : base panel (sidebar, tap bubble, sel tooltip, snackbar)
+               → all share the same colour; sits above any background image.
+     layer-1 : cards / items (wordbook rows, quiz cards)
+     layer-2 : elevated cards (flashcard, selected items)
+     border  : same thin edge line across all layers
+   ─────────────────────────────────────────────────────────────── */
+
+/* Theme token files are concatenated before this file by build-css.mjs */
+
+
+
+/* ════════════════════════════
+   Keyframes
+   ════════════════════════════ */
+
+@keyframes pg-pulse {
+    0%, 100% { opacity: 0.75; }
+    50%       { opacity: 0.3;  }
+}
+
+@keyframes pg-sidebar-in {
+    from { transform: translateX(100%); opacity: 0.6; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes pg-mic-pulse {
+    0%, 100% { transform: scale(1); }
+    50%       { transform: scale(1.2); }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   Accessibility: respect OS-level "Reduce Motion" preference.
+   Disables all Polyglot animations and transitions globally so
+   users with vestibular disorders or motion sensitivity are not
+   affected by pg-shake, pg-pop, pg-conj-slide-in, etc.
+   The sidebar already has its own override (line ~144); this
+   block covers every other animation/transition in the extension.
+   ════════════════════════════════════════════════════════════════ */
+
+
+/* ── style-layout.css ── */
+/* ════════════════════════════
+   Polyglot — style-layout.css
+   Sidebar, panel, tab structure
+   ════════════════════════════ */
+
+/* ════════════════════════════
+   🗂️ Sidebar panel
+   ════════════════════════════ */
+
+/* ═ Sidebar overlay — transparent, non-blocking (unlike modal pg-dim) */
+#pg-dim-pg-learning-panel {
+    background:      transparent;
+    backdrop-filter: none;
+    pointer-events:  none;          /* clicks pass through to chat */
+    align-items:     flex-start;    /* keep panel flush to edge */
+    justify-content: flex-end;
+}
+#pg-dim-pg-learning-panel > .pg-sidebar {
+    pointer-events: all;            /* sidebar itself stays interactive */
+}
+
+.pg-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    left: auto !important;
+    transform: none !important;
+    width: clamp(260px, 25vw, 380px) !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    border-left: var(--pg-glass-border);
+    background: var(--pg-glass-panel) !important;
+    backdrop-filter: var(--pg-blur);
+    -webkit-backdrop-filter: var(--pg-blur);
+    box-shadow:
+        -1px 0 0 rgba(255,255,255,0.06),
+        -4px 0 24px rgba(0,0,0,0.20),
+        -16px 0 48px rgba(0,0,0,0.35),
+        -32px 0 80px rgba(0,0,0,0.20);
+    z-index: 10000;
+    font-family: var(--pg-font) !important;
+    animation: pg-sidebar-in 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+
+    /* ── Draggable float mode — toggled by JS ──────────────────────────── */
+    &.pg-sidebar-floating {
+        border-radius: 24px !important;
+        border: var(--pg-glass-border) !important;
+        height: min(820px, 90dvh) !important;
+        top: 5dvh !important;
+        right: 16px !important;
+        box-shadow:
+            var(--pg-glass-highlight),
+            0 24px 64px rgba(0, 0, 0, 0.55),
+            0 4px 16px rgba(0, 0, 0, 0.30);
+        animation: none;
+        user-select: none;
+    }
+
+    @media (max-width: 600px) { width: 100% !important; }
+    @media (prefers-reduced-motion: reduce) { animation: none; }
+
+    /* ── Tiimo-style pill tab bar ─────────────────────────────────────────── */
+    .pg-nav {
+        flex: 1 1 0;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Tab bar: pill-shaped container */
+    .pg-nav-menu {
+        display: flex !important;
+        gap: 4px !important;
+        padding: 10px 10px 8px !important;
+        border: none !important;
+        background: transparent !important;
+    }
+
+    /* Outer pill container — wraps all tabs */
+    .pg-nav-menu::before {
+        content: none;
+    }
+
+    /* Individual tab — transparent by default */
+    .pg-nav-tab {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        text-align: center !important;
+        padding: 6px 4px !important;
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        border-radius: 100px !important;
+        font-family: var(--pg-font) !important;
+        color: var(--pg-t3) !important;
+        transition: color 0.18s, background 0.18s !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        border: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        letter-spacing: 0.01em !important;
+        cursor: pointer !important;
+
+        &.active {
+            color: rgba(0,0,0,0.78) !important;
+            background: rgba(255,255,255,0.88) !important;
+            font-weight: 600 !important;
+        }
+        &:hover:not(.active) {
+            color: var(--pg-t1) !important;
+            background: rgba(255,255,255,0.10) !important;
+        }
+    }
+
+    .pg-nav-view {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow-y: auto;
+    }
+}
+
+/* ═ Tiimo-style tab pill container — wraps the entire tab row */
+.pg-sidebar .pg-nav-menu {
+    background: rgba(255,255,255,0.07) !important;
+    border-radius: 100px !important;
+    margin: 10px 10px 8px !important;
+    padding: 3px !important;
+    position: relative !important;
+}
+
+/* Each tab overlaps its neighbors: negative margin pulls them together
+   so the pill shapes ( () () () () ) look continuous rather than spaced out */
+.pg-sidebar .pg-nav-tab {
+    margin-right: 0 !important;
+    position: relative !important;
+    z-index: 0 !important;
+}
+
+/* Active tab sits on top and shows the pill */
+.pg-sidebar .pg-nav-tab.active {
+    z-index: 2 !important;
+    color: rgba(0,0,0,0.78) !important;
+    background: rgba(255,255,255,0.88) !important;
+    font-weight: 600 !important;
+}
+
+/* Hover: text brightens only — no background pill appears */
+.pg-sidebar .pg-nav-tab:hover:not(.active) {
+    color: rgba(255,255,255,0.88) !important;
+    background: transparent !important;
+    z-index: 1 !important;
+}
+
+/* ── Font Awesome glyph fix ──────────────────────────────────────────────────
+   .pg-sidebar sets font-family: var(--pg-font) !important, which cascades into
+   all descendants including <i> elements. FA icons render via ::before content,
+   which inherits font-family from the <i> — so the glyph shows as □.
+   Directly targeting ::before with the FA font stack bypasses the cascade. */
+.pg-sidebar [class*="fa-"]::before {
+    font-family:
+        "Font Awesome 6 Free",
+        "Font Awesome 6 Brands",
+        "Font Awesome 5 Free",
+        "Font Awesome 5 Brands",
+        FontAwesome !important;
+}
+
+.pg-box {
+    position: relative;
+    background: var(--pg-glass-panel);
+    backdrop-filter: var(--pg-blur);
+    -webkit-backdrop-filter: var(--pg-blur);
+    border: none;
+    border-radius: var(--pg-radius);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    min-width: 320px;
+    max-width: 560px;
+    width: 92vw;
+    max-height: 90vh;
+    overflow: hidden;
+    font-family: var(--pg-font);
+    color: var(--pg-t1);
+
+    .pg-box-tit {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px 12px 16px;
+        border-bottom: var(--pg-glass-border);
+        gap: 8px;
+        flex-shrink: 0;
+
+        .pg-box-tit-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            color: var(--pg-t1);
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            letter-spacing: 0.01em;
+        }
+    }
+
+    .pg-box-main {
+        flex: 1 1 auto;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        font-family: var(--pg-font);
+        color: var(--pg-t1);
+    }
+}
+
+/* ═ Close button (also used in #pg-box-pg-learning-panel override) */
+.pg-box-x {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--pg-t2);
+    cursor: pointer;
+    font-size: 1.1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: color 0.15s, background 0.15s;
+    &:hover {
+        color: var(--pg-t1);
+        background: rgba(255,255,255,0.10);
+    }
+}
+
+.pg-box-x-float {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    opacity: 0.5;
+    font-size: 0.9em;
+    align-self: center;
+    margin-right: 2px;
+}
+.pg-box-x-float:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.10);
+}
+
+.pg-box-pane {
+    padding: 14px !important;
+    padding-bottom: 32px !important;
+    font-family: var(--pg-font) !important;
+    color: var(--pg-t1) !important;
+}
+
+/* ════════════════════════════
+   🖼️ Background image — 3-layer liquid glass
+   ════════════════════════════ */
+
+/*
+   Layer model (back → front):
+     ::before  — blurred/darkened background image (the "world behind the glass")
+     .pg-sidebar — backdrop-filter refracts ::before (the glass pane itself)
+     > *       — content floats above the glass (z-index: 1)
+
+   ::before always exists so the transition is smooth;
+   it is invisible when --pg-panel-bg-image is 'none' (the default).
+   The [data-has-bg] attribute is added by _applyPanelTheme() in index.ts
+   when a background image URL is set, and drives all enhanced rules below.
+*/
+
+/* Structural ::before — always present, zero cost when no image is set */
+.pg-sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image: var(--pg-panel-bg-image);
+    background-size: cover;
+    background-position: center;
+    border-radius: inherit;
+    pointer-events: none;
+}
+
+/* ── Layer 0: image is blurred + darkened → "world behind the glass" ── */
+.pg-sidebar[data-has-bg] {
+    overflow: hidden;   /* contain the scale(1.08) bleed from ::before */
+}
+.pg-sidebar[data-has-bg]::before {
+    filter: blur(12px) saturate(130%) brightness(0.75);
+    transform: scale(1.03);   /* compensate for blur edge clipping */
+    transition: filter 0.4s, transform 0.4s;
+}
+
+/* ── Layer 1: stronger backdrop refraction over the blurred image ── */
+.pg-sidebar[data-has-bg] {
+    backdrop-filter: blur(20px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+}
+
+/* ── Layer 2: lift all direct children above ::before ── */
+.pg-sidebar[data-has-bg] > * {
+    position: relative;
+    z-index: 1;
+}
+
+/*
+   Cards gain an extra glass surface when a bg image is active.
+   Each card becomes its own mini liquid-glass element,
+   refracting the blurred image behind it for spatial depth.
+*/
+.pg-sidebar[data-has-bg] .pg-wb-row,
+.pg-sidebar[data-has-bg] .pg-flash-card,
+.pg-sidebar[data-has-bg] .pg-quiz-card,
+.pg-sidebar[data-has-bg] .pg-conj-modal,
+.pg-sidebar[data-has-bg] .pg-speak-card {
+    background: rgba(255, 255, 255, 0.07) !important;
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    box-shadow:
+        inset 0 1.5px 1px rgba(255, 255, 255, 0.18),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.14),
+        0 4px 16px rgba(0, 0, 0, 0.24),
+        0 1px 3px rgba(0, 0, 0, 0.16);
+}
+
+/* ── Light / Breeze / Milk theme overrides: brighter image, less darkening ── */
+.pg-sidebar[data-pg-theme="light"][data-has-bg]::before {
+    filter: blur(12px) saturate(130%) brightness(0.88);
+}
+.pg-sidebar[data-pg-theme="breeze"][data-has-bg]::before,
+.pg-sidebar[data-pg-theme="milk"][data-has-bg]::before {
+    filter: blur(12px) saturate(130%) brightness(0.85);
+}
+
+/* Cards in light themes: higher opacity for readability */
+.pg-sidebar[data-pg-theme="light"][data-has-bg] .pg-wb-row,
+.pg-sidebar[data-pg-theme="light"][data-has-bg] .pg-flash-card,
+.pg-sidebar[data-pg-theme="light"][data-has-bg] .pg-quiz-card,
+.pg-sidebar[data-pg-theme="light"][data-has-bg] .pg-conj-modal,
+.pg-sidebar[data-pg-theme="light"][data-has-bg] .pg-speak-card,
+.pg-sidebar[data-pg-theme="breeze"][data-has-bg] .pg-wb-row,
+.pg-sidebar[data-pg-theme="breeze"][data-has-bg] .pg-flash-card,
+.pg-sidebar[data-pg-theme="breeze"][data-has-bg] .pg-quiz-card,
+.pg-sidebar[data-pg-theme="milk"][data-has-bg] .pg-wb-row,
+.pg-sidebar[data-pg-theme="milk"][data-has-bg] .pg-flash-card,
+.pg-sidebar[data-pg-theme="milk"][data-has-bg] .pg-quiz-card {
+    background: rgba(255, 255, 255, 0.42) !important;
+}
+
+/* Accessibility: disable backdrop-filter on reduced-motion (performance) */
+@media (prefers-reduced-motion: reduce) {
+    .pg-sidebar[data-has-bg]::before { transition: none; }
+}
+
+
+/* ════════════════════════════
+   🎓 Study tab layout
+   ════════════════════════════ */
+
+/* Learn tab root — flex column, scroll handled by children */
+.pg-learn-tab {
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    padding-bottom: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+/* Detail card area — scrollable */
+.pg-learn-detail-area {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 14px 8px;
+}
+
+/* Mode area (active when flash/quiz/match selected) — scrollable */
+.pg-learn-mode-area {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 14px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Back button */
+.pg-learn-back-btn {
+    align-self: flex-start;
+    margin-bottom: 4px;
+    font-size: 13px !important;
+    padding: 4px 16px !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--pg-t2);
+    opacity: 0.7;
+    transition: opacity 0.13s;
+}
+.pg-learn-back-btn:hover {
+    opacity: 1;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Mode inner container */
+.pg-learn-mode-inner {
+    flex: 1 1 0;
+    min-height: 0;
+}
+
+/* Bottom mode selector bar */
+.pg-learn-bar {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 14px 12px;
+    border-top: 0.5px solid var(--pg-border-0);
+}
+
+/* Mode selector buttons — icon only */
+.pg-learn-mode-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--pg-layer-1);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, transform 0.12s;
+    color: var(--pg-t1);
+    flex-shrink: 0;
+}
+.pg-learn-mode-btn:hover {
+    background: var(--pg-layer-2);
+}
+.pg-learn-mode-btn.active {
+    background: var(--pg-layer-2);
+    transform: scale(1.08);
+}
+
+
+/* ════════════════════════════
+   ⚙️ Panel settings tab
+   ════════════════════════════ */
+
+.pg-pset-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--pg-t3);
+    margin-bottom: 10px;
+}
+
+
+/* ── style-components.css ── */
+/* ════════════════════════════
+   Polyglot — style-components.css
+   Buttons, chips, badges, cards
+   ════════════════════════════ */
+
+/* ════════════════════════════
+   🪄 Input toolbar button
+   ════════════════════════════ */
+
+#pg-wand-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--pg-radius);
+    cursor: pointer;
+    font-size: 15px;
+    color: var(--pg-t1);
+    background: var(--pg-layer-0);
+    border: none;
+    transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
+    user-select: none;
+    margin-right: 4px;
+    font-family: var(--pg-font);
+}
+#pg-wand-btn:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.28);
+    color: var(--pg-t1);
+    opacity: 0.95;
+}
+#pg-wand-btn:active { opacity: 0.80; }
+
+/* ═ ST default connection info box */
+.pg-st-info-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    background: rgba(255,255,255,0.08);
+    border-radius: var(--pg-radius, 8px);
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    font-size: 0.84em;
+    line-height: 1.55;
+}
+.pg-st-info-icon { flex-shrink: 0; font-size: 1em; margin-top: 1px; }
+.pg-st-info-text { color: var(--pg-t1, #fff); opacity: 0.85; }
+.pg-st-live      { display: block; margin-top: 3px; opacity: 1; font-size: 0.92em; }
+
+
+/* ════════════════════════════
+   📖 Annotate button states
+   ════════════════════════════ */
+
+.mes_button.pg-annotate-btn.pg-btn-active {
+    color: var(--pg-t1) !important;
+    opacity: 1 !important;
+}
+.mes_button.pg-annotate-btn.pg-btn-busy {
+    opacity: 0.35 !important;
+    pointer-events: none;
+}
+/* ═ 🌍 Open-panel button — highlighted while the panel is open */
+.mes_button.pg-open-btn.pg-btn-active {
+    color: var(--pg-t1) !important;
+    opacity: 1 !important;
+}
+
+
+/* ════════════════════════════
+   📖 Clickable word highlights
+   ════════════════════════════ */
+
+.pg-clickable-word {
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 0 2px;
+    transition: filter 0.15s;
+}
+.pg-clickable-word:hover { filter: brightness(1.5); }
+
+.pg-hl-a       { background-color: rgba(100, 180, 255, 0.25); }
+.pg-hl-b       { background-color: rgba(100, 220, 140, 0.25); }
+.pg-hl-c       { background-color: rgba(255, 175,  90, 0.25); }
+.pg-hl-grammar { background-color: rgba(220, 130, 220, 0.25); }
+.pg-hl-idiom   { background-color: rgba(140, 120, 240, 0.22); }
+
+
+/* ════════════════════════════
+   📝 Word detail view
+   ════════════════════════════ */
+
+.pg-word-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 0.5px solid rgba(255,255,255,0.08);
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+.pg-word-detail-header h2 {
+    margin: 0;
+    color: var(--pg-t1);
+    font-size: 1.2em;
+    font-family: var(--pg-font);
+    font-weight: 600;
+}
+
+.pg-word-meta {
+    margin-bottom: 10px;
+    font-size: 0.88em;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.pg-meta-base {
+    font-weight: 600;
+    color: var(--pg-t1);
+}
+.pg-meta-pos {
+    font-style: italic;
+    color: var(--pg-t1);
+    opacity: 0.65;
+    font-size: 0.92em;
+}
+
+.pg-word-meaning {
+    font-size: 0.93em;
+    line-height: 1.6;
+    color: var(--pg-t1);
+    margin-bottom: 14px;
+    opacity: 0.9;
+}
+
+/* ═ Grammar section */
+.pg-grammar-section {
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    line-height: 1.55;
+    color: var(--pg-t1);
+    opacity: 0.9;
+}
+.pg-g-label {
+    font-weight: 600;
+    color: var(--pg-t1);
+    margin-right: 5px;
+}
+
+/* ═ Shared button base styles */
+.pg-btn-full {
+    width: 100%;
+    padding: 8px 12px !important;
+    font-size: 0.85em !important;
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s !important;
+}
+.pg-btn-full:disabled {
+    opacity: 0.45 !important;
+    cursor: default !important;
+}
+
+/* ═ Small variant — used for wordbook import/export buttons */
+.pg-btn-sm {
+    padding: 4px 8px !important;
+    font-size: 0.8em !important;
+}
+
+/* ═ Uniform height (28px) for controls inside the flashcard control row */
+.pg-flash-controls .pg-btn,
+.pg-flash-controls .pg-icon-btn,
+.pg-wb-set-row .pg-btn,
+.pg-wb-set-row .pg-icon-btn {
+    height: 28px;
+    min-height: 28px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ════════════════════════════
+   🗨️ Dialogs & toasts (showConfirm / showToast)
+   ════════════════════════════ */
+
+/* ═ Overlay backdrop */
+.pg-dim {
+    position: fixed;
+    inset: 0;
+    z-index: 10100;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+
+    /* ═ Dialog box */
+    .pg-dialog {
+        background: var(--pg-surface, #23262e);
+        border: 1px solid var(--pg-border, rgba(255,255,255,0.12));
+        border-radius: calc(var(--pg-radius, 8px) * 1.5);
+        padding: 24px 24px 16px;
+        min-width: 280px;
+        max-width: 440px;
+        width: 90vw;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+
+        /* ═ Message text */
+        .pg-dialog-txt {
+            margin: 0;
+            font-size: 0.95em;
+            line-height: 1.5;
+            color: var(--pg-t1, #e0e0e0);
+            white-space: pre-wrap;
+        }
+
+        /* ═ Label */
+        .pg-field-lbl {
+            font-size: 0.9em;
+            color: var(--pg-t1, #e0e0e0);
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        /* ═ Input field */
+        .pg-field-inp {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px 12px;
+            border-radius: var(--pg-radius-sm);
+            border: 1px solid var(--pg-border, rgba(255,255,255,0.15));
+            background: rgba(0,0,0,0.25);
+            color: var(--pg-t1, #e0e0e0);
+            font-size: 0.9em;
+            outline: none;
+            transition: border-color 0.15s;
+
+            &:focus { border-color: var(--pg-t1, #7c9ef5); }
+        }
+
+        /* ═ Button row */
+        .pg-dialog-row {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+    }
+}
+
+/* ─ Icon-style buttons that inherit .pg-btn — strip border/bg entirely ─ */
+.pg-learn-back-btn,
+/* ═ Base button styles */
+.pg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    height: auto;
+    border-radius: var(--pg-radius-pill);
+    font-size: 0.83em;
+    font-weight: 500;
+    font-family: var(--pg-font) !important;
+    cursor: pointer;
+    border: 0.5px solid var(--pg-border-0);
+    background: rgba(255,255,255,0.09);
+    color: var(--pg-t1);
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    letter-spacing: 0.01em;
+    user-select: none;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+.pg-btn:hover        { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.28); }
+.pg-btn:active       { opacity: 0.80; }
+.pg-btn:focus-visible { outline: 1.5px solid rgba(255,255,255,0.5); outline-offset: 2px; }
+.pg-wordbook-item:focus-visible,
+.pg-flash-card:focus-visible,
+.pg-match-card:focus-visible,
+.pg-quiz-mode-btn:focus-visible {
+    outline: 1.5px solid rgba(255,255,255,0.5);
+    outline-offset: 2px;
+}
+
+.pg-btn-primary {
+    background: rgba(255,255,255,0.90);
+    color: rgba(0,0,0,0.82);
+    border-color: transparent;
+    font-weight: 600;
+}
+.pg-btn-primary:hover  { background: rgba(255,255,255,1); }
+.pg-btn-primary:disabled { opacity: 0.32; cursor: default; pointer-events: none; }
+
+.pg-btn-secondary {
+    background: rgba(255,255,255,0.07);
+    color: var(--pg-t1);
+    border-color: rgba(255,255,255,0.14);
+}
+.pg-btn-secondary:hover { background: rgba(255,255,255,0.13); }
+
+/* ═ Toast notifications */
+#pg-notis {
+    position: fixed;
+    bottom: 24px;
+    right: 20px;
+    z-index: 10200;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+
+    .pg-noti {
+        padding: 10px 16px;
+        border-radius: var(--pg-radius, 8px);
+        font-size: 0.88em;
+        font-weight: 500;
+        color: #fff;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+        opacity: 1;
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        transform: translateY(0);
+        max-width: 320px;
+        word-break: break-word;
+
+        &.pg-noti-info { background: rgba( 80, 140, 255, 0.92); }
+        &.pg-noti-ok   { background: rgba( 50, 190, 100, 0.92); }
+        &.pg-noti-err  { background: rgba(220,  70,  70, 0.92); }
+        &.pg-noti-warn { background: rgba(230, 160,  40, 0.92); }
+
+        &.pg-noti-out {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+    }
+}
+
+/* ═ CEFR level badge */
+.pg-level-badge {
+    padding: 4px 8px;
+    border-radius: var(--pg-radius-pill);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    color: rgba(255,255,255,0.90);
+    border: 0.5px solid rgba(255,255,255,0.20);
+}
+.level-A1, .level-A2 { background: rgba( 80, 155, 255, 0.28); }
+.level-B1, .level-B2 { background: rgba( 55, 195, 115, 0.28); }
+.level-C1, .level-C2 { background: rgba(240, 155,  50, 0.28); }
+.level-grammar        { background: rgba(185,  90, 195, 0.28); }
+.level-sentence       { background: rgba(145,  90, 215, 0.25); }
+.level-idiom          { background: rgba(240, 110,  75, 0.28); }
+
+
+/* ════════════════════════════
+   🏷️ POS badge chip (clickable filter)
+   ════════════════════════════ */
+
+.pg-pos-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: var(--pg-radius-pill);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 0.5px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.09);
+    color: var(--pg-t3);
+    transition: background 0.13s, opacity 0.13s;
+    font-family: var(--pg-font);
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.6;
+}
+.pg-pos-chip:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.16);
+}
+.pg-pos-chip.pg-pos-chip-active {
+    background: rgba(255,255,255,0.20);
+    border-color: rgba(255,255,255,0.40);
+    color: var(--pg-t1);
+    opacity: 1;
+}
+
+
+/* ════════════════════════════
+   🔤 IPA chip (display only)
+   ════════════════════════════ */
+
+.pg-ipa-chip {
+    display: inline-block;
+    font-size: max(12px, 0.70em);
+    font-family: "Noto Serif", "Palatino Linotype", Georgia, serif;
+    color: var(--pg-t3);
+    padding: 0 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1.6;
+}
+
+
+/* ════════════════════════════
+   🔗 Collocations chip row
+   ════════════════════════════ */
+
+
+/* ── Wordbook item secondary info — hidden by default, expanded on tap ── */
+.pg-wb-secondary {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.22s ease, opacity 0.18s ease;
+    pointer-events: none;
+}
+.pg-wordbook-item.pg-wb-expanded .pg-wb-secondary {
+    max-height: 200px;
+    opacity: 1;
+    pointer-events: auto;
+    margin-top: 6px;
+}
+/* Expand hint — small chevron at bottom-right of item */
+.pg-wordbook-item::after {
+    content: '';
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-right: 1.5px solid var(--pg-t3);
+    border-bottom: 1.5px solid var(--pg-t3);
+    transform: rotate(45deg);
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    opacity: 0.4;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+    pointer-events: none;
+}
+.pg-wordbook-item.pg-wb-expanded::after {
+    transform: rotate(-135deg);
+    opacity: 0.7;
+}
+.pg-wordbook-item {
+    position: relative;
+}
+
+.pg-colloc-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+}
+
+.pg-colloc-chip {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: var(--pg-radius-pill);
+    font-size: 0.75em;
+    color: var(--pg-t2);
+    background: rgba(255,255,255,0.07);
+    border: none;
+    white-space: nowrap;
+    font-family: var(--pg-font);
+    line-height: 1.4;
+}
+
+
+/* ════════════════════════════
+   📝 pos_info row
+   ════════════════════════════ */
+
+.pg-wb-pos-info {
+    font-size: 0.75em;
+    color: var(--pg-t2);
+    line-height: 1.4;
+    margin: 2px 0 3px;
+}
+
+
+/* ════════════════════════════
+   ⏳ Loading — skeleton shimmer
+   ════════════════════════════ */
+
+@keyframes pg-shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position:  200% center; }
+}
+
+/* Generic "analysing" text indicator */
+.pg-annotating {
+    font-size: 0.82em;
+    color: var(--pg-t2);
+    padding: 8px 0;
+    animation: pg-pulse 1.4s ease-in-out infinite;
+    font-family: var(--pg-font);
+}
+
+/* Skeleton block — use as inline placeholder while loading */
+.pg-skeleton {
+    border-radius: var(--pg-radius-sm);
+    background: linear-gradient(
+        90deg,
+        var(--pg-skeleton-shimmer-start) 25%,
+        var(--pg-skeleton-shimmer-peak)  50%,
+        var(--pg-skeleton-shimmer-start) 75%
+    );
+    background-size: 200% 100%;
+    animation: pg-shimmer 1.6s ease-in-out infinite;
+}
+
+/* Skeleton wordbook row */
+.pg-skeleton-wb-item {
+    border-radius: var(--pg-radius);
+    padding: 16px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.pg-skeleton-line {
+    height: 12px;
+    border-radius: 6px;
+}
+.pg-skeleton-line-sm {
+    height: 9px;
+    border-radius: 5px;
+    width: 65%;
+}
+
+/* Skeleton quiz card */
+.pg-skeleton-quiz {
+    border-radius: var(--pg-radius);
+    padding: 16px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.pg-skeleton-q   { height: 14px; border-radius: 6px; }
+.pg-skeleton-opt { height: 32px; border-radius: var(--pg-radius-sm); }
+
+
+/* ════════════════════════════
+   🔔 Progress snackbar
+   ════════════════════════════ */
+
+.pg-snackbar {
+    position: fixed;
+    top: 70px;
+    bottom: auto;
+    left: 50%;
+    transform: translateX(-50%) translateY(-13px);
+    opacity: 0;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 100228;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--pg-layer-0);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: none;
+    border-radius: var(--pg-radius-pill);
+    padding: 8px 8px 8px 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.40);
+    pointer-events: auto;
+    white-space: nowrap;
+    font-family: var(--pg-font);
+}
+.pg-snackbar.pg-snackbar-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.pg-snackbar-text {
+    font-size: 13px;
+    color: var(--pg-t1);
+}
+
+.pg-snackbar-stop {
+    background: rgba(255,255,255,0.10);
+    border: 0.5px solid rgba(255,255,255,0.20);
+    border-radius: var(--pg-radius-pill);
+    color: var(--pg-t1);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    transition: background 0.13s;
+    font-family: var(--pg-font);
+    letter-spacing: 0.02em;
+}
+.pg-snackbar-stop:hover {
+    background: rgba(255,255,255,0.18);
+}
+
+
+/* ════════════════════════════
+   Settings panel — ST native inline form overrides
+   ════════════════════════════ */
+
+
+/* ── style-features.css ── */
+/* ════════════════════════════
+   Polyglot — style-features.css
+   Feature-specific styles
+   ════════════════════════════ */
+
+/* ════════════════════════════
+   📚 Wordbook tab
+   ════════════════════════════ */
+
+.pg-wordbook-item {
+    background: var(--pg-layer-1);
+    border: var(--pg-glass-border);
+    border-radius: var(--pg-radius);
+    padding: 16px;
+    margin-bottom: 8px;
+    box-shadow: var(--pg-glass-highlight), var(--pg-shadow-card);
+    transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+    cursor: pointer;
+}
+.pg-wordbook-item:hover {
+    background: var(--pg-layer-2);
+    box-shadow: var(--pg-glass-highlight-hover), var(--pg-shadow-hover);
+    transform: translateY(-2px);
+}
+
+.pg-wb-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 0.93em;
+    color: var(--pg-t1);
+    font-weight: 500;
+}
+.pg-wb-mean {
+    font-size: 0.82em;
+    color: var(--pg-t2);
+    line-height: 1.4;
+}
+
+.pg-wb-date {
+    font-size: 0.75em;
+    color: var(--pg-t3);
+    line-height: 1.4;
+    margin-top: 4px;
+}
+
+/* Row 2: IPA + level badge + conj/note buttons + date */
+.pg-wb-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+.pg-wb-meta .pg-wb-date {
+    margin-top: 0;
+    margin-left: auto;
+}
+.pg-wb-meta .pg-icon-btn {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+}
+
+/* Settings tab — 3-column icon button row */
+.pg-pset-icon-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.pg-pset-icon-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 8px;
+    border-radius: var(--pg-radius-sm);
+    border: var(--pg-glass-border);
+    background: var(--pg-layer-1);
+    box-shadow: var(--pg-glass-highlight), var(--pg-shadow-card);
+    color: var(--pg-t2);
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    font-family: var(--pg-font);
+}
+/* Label text hidden — icon + title tooltip is sufficient */
+.pg-pset-icon-btn span {
+    display: none;
+}
+.pg-pset-icon-btn i {
+    font-size: 20px;
+    color: var(--pg-t1);
+    opacity: 0.7;
+}
+.pg-pset-icon-btn:hover {
+    background: var(--pg-layer-2);
+}
+.pg-pset-icon-btn:hover i {
+    opacity: 1;
+}
+
+
+/* ════════════════════════════
+   🎯 Quiz tab
+   ════════════════════════════ */
+
+/* ═ Quiz mode selector grid */
+.pg-quiz-modes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.pg-quiz-mode-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 12px 10px;
+    border-radius: var(--pg-radius);
+    border: var(--pg-glass-border);
+    background: var(--pg-layer-1);
+    box-shadow: var(--pg-glass-highlight), var(--pg-shadow-card);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+    font-family: var(--pg-font);
+    min-width: 0;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+.pg-quiz-mode-btn:hover {
+    background: var(--pg-layer-2);
+    box-shadow: var(--pg-glass-highlight-hover), var(--pg-shadow-hover);
+    transform: translateY(-2px);
+}
+
+.pg-qmode-icon  { font-size: 16px; line-height: 1; }
+.pg-qmode-title { font-size: 12px; font-weight: 600; color: var(--pg-t1); line-height: 1.3; word-break: break-word; overflow-wrap: break-word; }
+.pg-qmode-desc  { font-size: 11px; color: var(--pg-t3); line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
+
+/* ═ Reading passage block */
+.pg-quiz-passage {
+    background: rgba(255,255,255,0.06);
+    border: none;
+    border-radius: var(--pg-radius);
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 0.83em;
+    line-height: 1.75;
+    color: var(--pg-t1);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* ═ Reading exam header */
+.pg-exam-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border-radius: var(--pg-radius);
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.14);
+}
+.pg-exam-title { font-size: 0.85em; font-weight: 600; color: var(--pg-t1); }
+.pg-exam-level {
+    font-size: max(12px, 0.78em); font-weight: 700;
+    padding: 2px 8px; border-radius: 4px;
+    background: rgba(255,255,255,0.18);
+    color: var(--pg-t1);
+}
+
+.pg-quiz-card {
+    background: rgba(255,255,255,0.06);
+    border: none;
+    border-radius: var(--pg-radius);
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.pg-quiz-q {
+    font-weight: 500;
+    font-size: 0.88em;
+    margin-bottom: 10px;
+    line-height: 1.5;
+    color: var(--pg-t1);
+}
+
+.pg-quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pg-opt-btn {
+    font-size: 0.83em !important;
+    padding: 8px 12px !important;
+    text-align: left !important;
+    border-radius: var(--pg-radius-sm) !important;
+    color: var(--pg-t1) !important;
+    border: none !important;
+    background: rgba(255,255,255,0.05) !important;
+    transition: background 0.12s, border-color 0.12s !important;
+    font-family: var(--pg-font) !important;
+}
+.pg-opt-btn:hover {
+    background: rgba(255,255,255,0.12) !important;
+    border-color: rgba(255,255,255,0.25) !important;
+}
+
+.pg-quiz-exp {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: none;
+    font-size: 0.82em;
+    line-height: 1.5;
+    color: var(--pg-t2);
+}
+
+
+/* ════════════════════════════
+   🔍 Text-selection quick-lookup tooltip
+   ════════════════════════════ */
+
+.pg-sel-tooltip {
+    position: absolute;
+    z-index: 10201;
+    background: var(--pg-layer-0);
+    backdrop-filter: var(--pg-blur-light);
+    -webkit-backdrop-filter: var(--pg-blur-light);
+    border: 0.5px solid var(--pg-border-0);
+    border-radius: var(--pg-radius-pill);
+    padding: 3px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.40);
+    pointer-events: auto;
+}
+
+.pg-sel-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.10);
+    border: none;
+    border-radius: var(--pg-radius-pill);
+    color: var(--pg-t1);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 8px 16px;
+    white-space: nowrap;
+    transition: background 0.12s;
+    user-select: none;
+    font-family: var(--pg-font);
+}
+.pg-sel-btn:hover {
+    background: rgba(255,255,255,0.18);
+}
+.pg-sel-btn:active { transform: scale(0.96); }
+
+
+/* ════════════════════════════
+   💬 Tap-to-translate bubble
+   ════════════════════════════ */
+
+.pg-tap-bubble {
+    display: block;
+    margin: 5px 0 3px;
+    position: relative;
+    animation: pg-bubble-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes pg-bubble-in {
+    from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+.pg-tap-bubble-inner {
+    background: var(--pg-layer-0);
+    backdrop-filter: var(--pg-blur);
+    -webkit-backdrop-filter: var(--pg-blur);
+    border: 0.5px solid rgba(255,255,255,0.13);
+    border-radius: var(--pg-radius);
+    padding: 12px 32px 12px 16px;
+    position: relative;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.35);
+}
+
+/* ═ Loading state */
+.pg-tap-loading {
+    color: var(--pg-t1);
+    opacity: 0.55;
+    font-size: 0.84em;
+    padding-right: 13px !important;
+}
+
+/* ═ Error state */
+.pg-tap-error {
+    color: var(--pg-err);
+    font-size: 0.82em;
+    padding-right: 13px !important;
+}
+
+/* ═ Main translation text */
+.pg-tap-translation {
+    font-size: 0.91em;
+    font-weight: 500;
+    color: var(--pg-t1);
+    line-height: 1.55;
+    margin-bottom: 2px;
+}
+
+/* ═ Literal translation (shown only when it differs from the natural translation) */
+.pg-tap-literal {
+    font-size: max(12px, 0.77em);
+    color: var(--pg-t1);
+    opacity: 0.45;
+    font-style: italic;
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+/* ═ Key verb chip row */
+.pg-tap-verbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+}
+
+.pg-tap-verb-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255,255,255,0.14);
+    border: none;
+    border-radius: var(--pg-radius-pill);
+    padding: 4px 8px;
+    font-size: max(12px, 0.75em);
+    line-height: 1.5;
+    white-space: nowrap;
+}
+.pg-tap-verb-chip b {
+    color: var(--pg-t1);
+    font-weight: 700;
+}
+.pg-tap-verb-arrow {
+    opacity: 0.35;
+    font-size: 0.85em;
+}
+.pg-tap-verb-meaning {
+    opacity: 0.65;
+    font-style: italic;
+}
+
+/* ═ Close button — small square with a CSS × */
+.pg-tap-close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.10);
+    border: none !important;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0;
+    color: transparent;
+    opacity: 0.50;
+    padding: 0;
+    transition: opacity 0.12s, background 0.12s;
+}
+.pg-tap-close::before,
+.pg-tap-close::after {
+    content: '';
+    position: absolute;
+    width: 9px;
+    height: 1.5px;
+    background: rgba(255,255,255,0.85);
+    border-radius: 2px;
+    top: 50%;
+    left: 50%;
+}
+.pg-tap-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.pg-tap-close::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+.pg-tap-close:hover {
+    opacity: 0.9;
+    background: rgba(255,255,255,0.20);
+}
+
+/* ═ 📊 Conjugation-table button (inside verb chip) */
+.pg-tap-conj-btn {
+    background: none !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    padding: 0 0 0 3px;
+    font-size: 0.85em;
+    line-height: 1;
+    opacity: 0.55;
+    transition: opacity 0.12s, transform 0.1s;
+    vertical-align: middle;
+}
+.pg-tap-conj-btn:hover {
+    opacity: 1;
+}
+
+/* ════════════════════════════
+   Verb conjugation popup
+   ════════════════════════════ */
+
+.pg-conj-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10400;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: pg-conj-fade-in 0.15s ease;
+    cursor: pointer; /* iOS touch delegation fix */
+}
+@keyframes pg-conj-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.pg-conj-modal {
+    background: var(--pg-bg, var(--pg-surface, #23262e));
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.10);
+    max-width: 720px;
+    width: 100%;
+    max-height: calc(100dvh - 32px); /* dvh: accounts for mobile address bar */
+    margin: auto; /* prevents top clipping when content overflows on mobile */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: default; /* restore cursor inside modal */
+    animation: pg-conj-slide-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes pg-conj-slide-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+/* ═ Header */
+.pg-conj-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    flex-shrink: 0;
+}
+.pg-conj-base {
+    font-size: 1.25em;
+    font-weight: 700;
+    color: var(--pg-t1, #7b9ef0);
+    font-style: italic;
+    flex-shrink: 0;
+}
+.pg-conj-meaning {
+    font-size: 0.85em;
+    color: var(--pg-t1, #fff);
+    opacity: 0.55;
+    font-style: italic;
+    flex-shrink: 0;
+}
+.pg-conj-lang-badge {
+    font-size: max(12px, 0.72em);
+    background: rgba(255,255,255,0.14);
+    color: var(--pg-t1, #7b9ef0);
+    padding: 2px 8px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+.pg-conj-close {
+    margin-left: auto;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: none !important;
+    background: rgba(255,255,255,0.10) !important;
+    cursor: pointer;
+    opacity: 0.5;
+    flex-shrink: 0;
+    position: relative;
+    transition: opacity 0.12s, background 0.12s;
+}
+.pg-conj-close::before,
+.pg-conj-close::after {
+    content: '';
+    position: absolute;
+    width: 11px;
+    height: 1.5px;
+    background: rgba(255,255,255,0.90);
+    border-radius: 2px;
+    top: 50%;
+    left: 50%;
+}
+.pg-conj-close::before { transform: translate(-50%, -50%) rotate(45deg); }
+.pg-conj-close::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+.pg-conj-close:hover {
+    opacity: 1;
+    background: rgba(255,255,255,0.18) !important;
+}
+
+/* ═ Body */
+.pg-conj-body {
+    overflow-y: auto;
+    padding: 16px;
+    flex: 1;
+    -webkit-overflow-scrolling: touch; /* smooth momentum scrolling on iOS */
+}
+.pg-conj-loading {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--pg-t1, #fff);
+    opacity: 0.5;
+    font-size: 0.9em;
+}
+.pg-conj-error {
+    text-align: center;
+    padding: 24px 16px;
+    color: var(--pg-err);
+    font-size: 0.86em;
+}
+
+/* ═ 3-column tense grid */
+.pg-conj-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+@media (max-width: 520px) {
+    .pg-conj-grid { grid-template-columns: 1fr; }
+}
+
+.pg-conj-tense-col {
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.pg-conj-tense-head {
+    padding: 7px 10px 6px;
+    background: rgba(255,255,255,0.12);
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+.pg-conj-tense-name {
+    font-weight: 600;
+    font-size: 0.85em;
+    color: var(--pg-t1, #7b9ef0);
+}
+.pg-conj-tense-ko {
+    font-size: max(12px, 0.72em);
+    color: var(--pg-t1, #fff);
+    opacity: 0.5;
+}
+
+.pg-conj-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84em;
+}
+.pg-conj-table tr {
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    transition: background 0.1s;
+}
+.pg-conj-table tr:last-child { border-bottom: none; }
+.pg-conj-table tr:hover {
+    background: rgba(255,255,255,0.05);
+}
+.pg-conj-person {
+    padding: 8px 8px 8px 12px;
+    color: var(--pg-t1, #fff);
+    opacity: 0.45;
+    font-size: 0.88em;
+    white-space: nowrap;
+    width: 40%;
+}
+.pg-conj-form {
+    padding: 8px 12px 8px 4px;
+    font-weight: 600;
+    color: var(--pg-t1, #fff);
+    font-style: italic;
+}
+
+#pg-box-pg-learning-panel:not(#_):not(#__),
+#pg-box-pg-learning-panel:not(#_):not(#__) * {
+    font-family: var(--pg-font) !important;
+}
+
+
+/* ════════════════════════════
+   Wordbook — filters + set management
+   ════════════════════════════ */
+
+.pg-wb-filters {
+    margin-bottom: 10px;
+}
+
+.pg-filter-pills {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.pg-filter-pill {
+    padding: 4px 8px;
+    border-radius: var(--pg-radius-pill);
+    font-size: max(12px, 0.75em);
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--pg-t1);
+    opacity: 0.65;
+    transition: background 0.13s, opacity 0.13s, border-color 0.13s;
+    font-family: var(--pg-font);
+}
+.pg-filter-pill:hover {
+    opacity: 0.9;
+    border-color: rgba(255,255,255,0.20);
+}
+.pg-filter-pill.active {
+    background: rgba(255,255,255,0.17);
+    border-color: rgba(255,255,255,0.30);
+    color: var(--pg-t1);
+    opacity: 1;
+}
+
+/* ═ ② Word count label */
+.pg-wb-count {
+    font-size: max(12px, 0.75em);
+    color: var(--pg-t1);
+    opacity: 0.45;
+    margin-bottom: 8px;
+    text-align: right;
+}
+
+.pg-wb-set-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pg-set-select {
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    border: none;
+    border-radius: var(--pg-radius-sm);
+    color: var(--pg-t1);
+    font-family: var(--pg-font);
+    font-size: 0.83em;
+    padding: 0 7px;
+    height: 28px;
+    box-sizing: border-box;
+    cursor: pointer;
+}
+
+.pg-icon-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--pg-radius-sm);
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--pg-t1);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    opacity: 0.45;
+    transition: opacity 0.13s;
+    flex-shrink: 0;
+    padding: 0;
+}
+.pg-icon-btn:hover {
+    opacity: 1;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.pg-icon-btn.pg-speak-btn {
+    width: auto;
+    padding: 0 4px;
+}
+
+.pg-wb-head-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.pg-wb-del {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+}
+.pg-wb-del:hover {
+    opacity: 1;
+    color: var(--pg-err) !important;
+}
+
+.pg-set-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 5px;
+}
+
+.pg-set-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: max(12px, 0.75em);
+    color: var(--pg-t1);
+    opacity: 0.65;
+    cursor: pointer;
+}
+.pg-set-check input { cursor: pointer; }
+.pg-set-check:hover { opacity: 1; }
+
+/* ═ Top import / export button row */
+/* ═ Wordbook search bar */
+.pg-wb-search-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.pg-wb-search-icon {
+    position: absolute;
+    left: 10px;
+    font-size: 0.85em;
+    pointer-events: none;
+    opacity: 0.55;
+    z-index: 1;
+}
+.pg-wb-search-inp {
+    width: 100%;
+    padding: 5px 28px 5px 10px;
+    border-radius: var(--pg-radius-sm);
+    border: 1px solid var(--SmartThemeBorderColor, #555);
+    background: var(--SmartThemeBlurTintColor, #1a1a2e);
+    color: inherit;
+    font-size: 0.88em;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.15s;
+}
+.pg-wb-search-inp:focus {
+    border-color: var(--SmartThemeQuoteColor, rgba(255,255,255,0.35));
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.10);
+    outline: none;
+}
+/* Hide the browser's built-in ✕ for search inputs */
+.pg-wb-search-inp::-webkit-search-cancel-button { display: none; }
+.pg-wb-search-clear {
+    position: absolute;
+    right: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.45;
+    font-size: 0.85em;
+    padding: 2px 4px;
+    color: inherit;
+    line-height: 1;
+}
+.pg-wb-search-clear:hover { opacity: 0.85; }
+
+/* ═ Search match highlight */
+mark.pg-wb-hl {
+    background: rgba(255, 220, 80, 0.35);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+
+.pg-set-manager {
+    margin-top: 12px;
+    border-top: none;
+    padding-top: 10px;
+}
+.pg-set-manager-title {
+    font-size: max(12px, 0.78em);
+    font-weight: 600;
+    color: var(--pg-t1);
+    opacity: 0.55;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+.pg-set-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 0.5px solid rgba(255,255,255,0.06);
+}
+.pg-set-name {
+    font-size: 0.85em;
+    color: var(--pg-t1);
+    opacity: 0.8;
+}
+
+.pg-empty-hint {
+    font-size: 0.85em;
+    color: var(--pg-t3);
+    text-align: center;
+    padding: 20px 0;
+    line-height: 1.6;
+}
+
+.pg-error-msg {
+    font-size: 0.85em;
+    color: var(--pg-err);
+    padding: 8px 0;
+    line-height: 1.5;
+}
+
+
+/* ════════════════════════════
+   Quiz — question-type badges, correct/wrong colours, score
+   ════════════════════════════ */
+
+.pg-quiz-type-badge {
+    display: inline-block;
+    font-size: max(12px, 0.7em);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--pg-t1);
+    opacity: 0.75;
+    margin-bottom: 4px;
+    font-family: var(--pg-font);
+}
+
+.pg-opt-correct {
+    background: rgba(60, 180, 100, 0.3) !important;
+    border-color: rgba(60, 180, 100, 0.6) !important;
+    color: var(--pg-t1) !important;
+}
+.pg-opt-wrong {
+    background: rgba(220, 60, 60, 0.25) !important;
+    border-color: rgba(220, 60, 60, 0.5) !important;
+    color: var(--pg-t1) !important;
+}
+.pg-quiz-card.pg-answered .pg-opt-btn:not(.pg-opt-correct):not(.pg-opt-wrong) {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.pg-quiz-correct-label {
+    font-weight: 700;
+    color: var(--pg-t1);
+}
+
+.pg-quiz-score {
+    background: rgba(255,255,255,0.09);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: var(--pg-radius);
+    padding: 12px;
+    text-align: center;
+    margin-top: 6px;
+}
+.pg-score-text {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--pg-t1);
+}
+.pg-score-perfect {
+    font-size: 1em;
+    color: var(--pg-t1);
+    margin-top: 4px;
+}
+
+/* Conjugation drill — verb header */
+.pg-quiz-drill-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 6px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--pg-border-0);
+}
+.pg-quiz-drill-verb {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--pg-t1);
+}
+
+/* Targeted exam — wrong-answer count header */
+.pg-quiz-targeted-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0 10px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--pg-border-0);
+    font-size: 0.85em;
+    color: var(--pg-t2);
+}
+
+/* Per-card wrong-answer save button */
+.pg-quiz-save-btn {
+    opacity: 0.75;
+    transition: opacity 0.15s;
+}
+.pg-quiz-save-btn:disabled {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.pg-quiz-retry-header {
+    font-size: 0.83em;
+    font-weight: 600;
+    color: var(--pg-t1);
+    opacity: 0.6;
+    margin-bottom: 10px;
+    letter-spacing: 0.03em;
+}
+
+
+/* ════════════════════════════
+   Matching game
+   ════════════════════════════ */
+
+.pg-match-setup {
+    padding: 4px 0 10px;
+}
+.pg-match-setup-title {
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--pg-t1);
+    margin-bottom: 10px;
+}
+.pg-match-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.pg-match-count {
+    font-size: 0.8em;
+    color: var(--pg-t3);
+    min-height: 1.4em;
+}
+
+.pg-match-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 0.5px solid rgba(255,255,255,0.08);
+}
+#pg-match-score {
+    font-size: 0.95em;
+    font-weight: 700;
+    color: var(--pg-t1);
+}
+
+.pg-match-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.pg-match-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pg-match-card {
+    padding: 12px 8px;
+    border-radius: var(--pg-radius);
+    border: var(--pg-glass-border);
+    background: var(--pg-layer-1);
+    box-shadow: var(--pg-glass-highlight), var(--pg-shadow-card);
+    font-size: 0.82em;
+    color: var(--pg-t1);
+    cursor: pointer;
+    transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+    line-height: 1.35;
+    font-family: var(--pg-font);
+    user-select: none;
+    word-break: break-word;
+}
+.pg-match-card:hover:not(.pg-match-correct) {
+    background: var(--pg-layer-2);
+    box-shadow: var(--pg-glass-highlight-hover), var(--pg-shadow-hover);
+    transform: translateY(-2px);
+}
+.pg-match-card.pg-match-selected {
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.35);
+    color: var(--pg-t1);
+    transform: scale(1.02);
+}
+.pg-match-card.pg-match-correct {
+    background: rgba(60, 180, 100, 0.2);
+    border-color: rgba(60, 180, 100, 0.5);
+    color: rgba(100,210,140,0.95);
+    cursor: default;
+    opacity: 0.7;
+}
+.pg-match-card.pg-match-wrong {
+    background: rgba(220, 60, 60, 0.2);
+    border-color: rgba(220, 60, 60, 0.5);
+    animation: pg-shake 0.35s ease;
+}
+
+.pg-match-complete {
+    text-align: center;
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--pg-t1);
+    padding: 24px 0;
+    animation: pg-pop 0.4s ease;
+}
+
+@keyframes pg-shake {
+    0%,100% { transform: translateX(0); }
+    25%      { transform: translateX(-4px); }
+    75%      { transform: translateX(4px); }
+}
+@keyframes pg-pop {
+    0%   { transform: scale(0.85); opacity: 0; }
+    100% { transform: scale(1);    opacity: 1; }
+}
+
+
+/* ═ Override ST's default close-button styles */
+#pg-box-pg-learning-panel .pg-box-x {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(255,255,255,0.08) !important;
+    border: none !important;
+    border-radius: 50% !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    opacity: 0.5 !important;
+    cursor: pointer !important;
+    transition: opacity 0.13s, background 0.13s !important;
+    flex-shrink: 0 !important;
+    position: relative !important;
+}
+#pg-box-pg-learning-panel .pg-box-x::before,
+#pg-box-pg-learning-panel .pg-box-x::after {
+    content: '' !important;
+    position: absolute !important;
+    width: 11px !important;
+    height: 1.5px !important;
+    background: rgba(255,255,255,0.85) !important;
+    border-radius: 2px !important;
+    top: 50% !important;
+    left: 50% !important;
+}
+#pg-box-pg-learning-panel .pg-box-x::before {
+    transform: translate(-50%, -50%) rotate(45deg) !important;
+}
+#pg-box-pg-learning-panel .pg-box-x::after {
+    transform: translate(-50%, -50%) rotate(-45deg) !important;
+}
+#pg-box-pg-learning-panel .pg-box-x:hover {
+    opacity: 0.9 !important;
+    background: rgba(255,255,255,0.16) !important;
+}
+
+/* title bar omitted when title='' — handled in ui.manager.js */
+
+
+/* ════════════════════════════
+   🔊 Pronunciation buttons
+   ════════════════════════════ */
+
+.pg-speak-btn {
+    background: none !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    font-size: 0.95em;
+    padding: 2px 4px;
+    border-radius: var(--pg-radius-sm);
+    opacity: 0.55;
+    transition: opacity 0.15s, transform 0.1s;
+    line-height: 1;
+    vertical-align: middle;
+}
+.pg-speak-btn:hover { opacity: 1; }
+
+/* ═ Pronunciation button inside the detail tab header */
+.pg-word-detail-header .pg-speak-btn,
+.pg-word-detail-header .pg-dict-btn {
+    font-size: 1.05em;
+    margin-left: 4px;
+    background: none !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    opacity: 0.55;
+    transition: opacity 0.15s;
+    cursor: pointer;
+    border-radius: var(--pg-radius-sm);
+    padding: 2px 4px;
+}
+.pg-word-detail-header .pg-speak-btn:hover,
+.pg-word-detail-header .pg-dict-btn:hover {
+    opacity: 1;
+}
+
+/* ═ Wordbook list — fix head layout */
+.pg-wb-head-left {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+
+/* ════════════════════════════
+   🃏 Flashcard
+   ════════════════════════════ */
+
+.pg-flash-controls {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    align-items: center;
+}
+.pg-flash-controls select {
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    box-sizing: border-box;
+}
+
+.pg-flash-progress {
+    text-align: center;
+    font-size: max(12px, 0.78em);
+    color: var(--pg-t1);
+    opacity: 0.45;
+    margin-bottom: 8px;
+    letter-spacing: 0.03em;
+}
+
+.pg-flash-card {
+    background: var(--pg-layer-1);
+    border: var(--pg-glass-border);
+    border-radius: var(--pg-radius);
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    box-shadow: var(--pg-glass-highlight), var(--pg-shadow-card);
+    transition: background 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+    user-select: none;
+    margin-bottom: 8px;
+}
+.pg-flash-card:hover {
+    background: var(--pg-layer-2);
+    box-shadow: var(--pg-glass-highlight-hover), var(--pg-shadow-hover);
+    transform: translateY(-2px);
+}
+
+.pg-flash-front,
+.pg-flash-back {
+    text-align: center;
+    padding: 32px 24px 16px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.pg-flash-back  { display: none; }
+.pg-flash-flipped .pg-flash-front { display: none; }
+.pg-flash-flipped .pg-flash-back  { display: flex; }
+
+.pg-flash-word {
+    font-size: 2.0em;
+    font-weight: 700;
+    color: var(--pg-t1);
+    margin-bottom: 10px;
+    letter-spacing: -0.01em;
+    line-height: 1.15;
+}
+.pg-flash-meaning {
+    font-size: 1.25em;
+    color: var(--pg-t1);
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+.pg-flash-pos {
+    font-size: 13px;
+    color: var(--pg-t3);
+    font-style: italic;
+}
+/* ═ TTS + pronunciation-check button row — pushed to bottom via flex flow */
+.pg-flash-btn-row {
+    margin-top: auto;
+    padding-top: 12px;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+}
+
+.pg-flash-speak {
+    font-size: 0.9em;
+}
+
+/* ═ 🎤 Pronunciation check button */
+.pg-flash-mic {
+    background: none !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 2px 3px;
+    border-radius: var(--pg-radius-sm);
+    opacity: 0.5;
+    transition: opacity 0.15s, transform 0.1s;
+    line-height: 1;
+}
+.pg-flash-mic:hover { opacity: 1; }
+.pg-flash-mic[data-active="true"] {
+    opacity: 1;
+    animation: pg-mic-pulse 1s ease-in-out infinite;
+}
+
+/* ═ Pronunciation evaluation result area */
+.pg-pronun-result {
+    min-height: 0;
+    overflow: hidden;
+    transition: padding 0.2s ease, background 0.2s ease, opacity 0.2s ease;
+    margin-bottom: 4px;
+    border-radius: var(--pg-radius);
+    font-size: 0.82em;
+    text-align: center;
+}
+.pg-pronun-result:empty { margin-bottom: 0; }
+
+.pg-pronun-listening {
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.06);
+    color: var(--pg-t1);
+    opacity: 0.6;
+}
+
+.pg-pronun-error {
+    padding: 6px 10px;
+    background: rgba(240,100,100,0.10);
+    color: var(--pg-err);
+}
+
+/* ═ Score-based background colours */
+.pg-pronun-excellent { padding: 8px 12px; background: rgba(110,212,140,0.14); }
+.pg-pronun-good      { padding: 8px 12px; background: color-mix(in srgb, #7cb4e0 14%, transparent); }
+.pg-pronun-fair      { padding: 8px 12px; background: color-mix(in srgb, #e0a040 14%, transparent); }
+.pg-pronun-poor      { padding: 8px 12px; background: rgba(240,100,100,0.14); }
+
+.pg-pronun-score {
+    font-size: 1.4em;
+    font-weight: 700;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.pg-pronun-excellent .pg-pronun-score { color: var(--pg-ok); }
+.pg-pronun-good      .pg-pronun-score { color: #7cb4e0; }
+.pg-pronun-fair      .pg-pronun-score { color: #e0a040; }
+.pg-pronun-poor      .pg-pronun-score { color: var(--pg-err); }
+
+.pg-pronun-label {
+    font-weight: 500;
+    color: var(--pg-t1);
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.pg-pronun-heard {
+    font-style: italic;
+    opacity: 0.55;
+    font-size: 0.9em;
+    vertical-align: middle;
+}
+.pg-flash-hint {
+    text-align: center;
+    font-size: max(12px, 0.73em);
+    color: var(--pg-t1);
+    opacity: 0.3;
+    min-height: 1.2em;
+    margin-bottom: 10px;
+}
+.pg-flash-nav {
+    display: flex;
+    gap: 8px;
+}
+.pg-flash-nav .pg-btn {
+    flex: 1;
+    font-size: 0.85em !important;
+    padding: 5px 8px !important;
+}
+
+/* ═ Contextual meaning — shown below meaning when different from base meaning */
+.pg-flash-ctx {
+    font-size: max(12px, 0.78em);
+    color: var(--pg-t1);
+    opacity: 0.45;
+    font-style: italic;
+    margin-top: 4px;
+}
+
+/* ═ User note — shown on card back when a note exists */
+.pg-flash-notes {
+    font-size: max(12px, 0.75em);
+    color: var(--pg-t1);
+    opacity: 0.5;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-left: 2px solid rgba(255,255,255,0.18);
+    border-radius: 0 4px 4px 0;
+    text-align: left;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+}
+
+/* ════ Flashcard example sentence ════ */
+.pg-flash-example-wrap {
+    margin-top: 10px;
+    padding: 6px 10px;
+    border-left: 3px solid var(--SmartThemeQuoteColor, #7a9ec2);
+    background: rgba(122, 158, 194, 0.08);
+    border-radius: 0 4px 4px 0;
+}
+.pg-flash-example {
+    font-size: 0.83em;
+    color: var(--pg-t1);
+    opacity: 0.85;
+    font-style: italic;
+    line-height: 1.5;
+    min-height: 1.4em;
+}
+.pg-flash-example-trans {
+    font-size: max(12px, 0.75em);
+    color: var(--pg-t1);
+    opacity: 0.45;
+    margin-top: 3px;
+    line-height: 1.4;
+}
+.pg-flash-example-loading {
+    opacity: 0.3;
+    text-align: center;
+}
+.pg-flash-example-err { opacity: 0.2; }
+
+
+
+/* ════════════════════════════
+   🔁 SRS toggle button & badge
+   ════════════════════════════ */
+
+.pg-srs-toggle {
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.pg-srs-toggle.pg-srs-active {
+    background: rgba(255,255,255,0.18) !important;
+    border-color: rgba(255,255,255,0.38) !important;
+    color: var(--pg-t1) !important;
+}
+
+.pg-srs-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: var(--pg-radius-pill);
+    background: rgba(220,80,80,0.75);
+    color: rgba(255,255,255,0.95);
+    font-size: max(12px, 0.72em);
+    font-weight: 700;
+    line-height: 1;
+    vertical-align: middle;
+    margin-left: 2px;
+}
+
+/* ════════════════════════════
+   🎯 SRS rating buttons — pill style
+   ════════════════════════════ */
+
+.pg-srs-rating {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.pg-srs-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 4px 7px;
+    border-radius: var(--pg-radius-pill);
+    border: none;
+    cursor: pointer;
+    font-family: var(--pg-font);
+    transition: transform 0.12s, background 0.12s;
+    user-select: none;
+}
+.pg-srs-btn:hover  { transform: translateY(-2px); }
+.pg-srs-btn:active { transform: translateY(0); }
+
+.pg-srs-label {
+    font-size: 0.82em;
+    font-weight: 600;
+    line-height: 1;
+}
+.pg-srs-preview {
+    font-size: 12px;
+    opacity: 0.65;
+    line-height: 1;
+    font-weight: 400;
+}
+
+.pg-srs-again {
+    background: rgba(215, 65, 65, 0.22);
+    border-color: rgba(215, 65, 65, 0.35);
+    color: rgba(255,130,130,0.95);
+}
+.pg-srs-hard {
+    background: rgba(215, 135, 35, 0.22);
+    border-color: rgba(215, 135, 35, 0.35);
+    color: rgba(255,175,80,0.95);
+}
+.pg-srs-good {
+    background: rgba(50, 185, 95, 0.22);
+    border-color: rgba(50, 185, 95, 0.35);
+    color: rgba(100,210,140,0.95);
+}
+.pg-srs-easy {
+    background: rgba(75, 135, 250, 0.22);
+    border-color: rgba(75, 135, 250, 0.35);
+    color: rgba(130,170,255,0.95);
+}
+
+/* ════════════════════════════
+   🎉 SRS session-complete screen
+   ════════════════════════════ */
+
+.pg-srs-complete {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 16px;
+    text-align: center;
+    animation: pg-pop 0.4s ease;
+}
+.pg-srs-complete-icon {
+    font-size: 2.8em;
+    margin-bottom: 12px;
+}
+.pg-srs-complete-title {
+    font-size: 1.15em;
+    font-weight: 700;
+    color: var(--pg-t1);
+    margin-bottom: 8px;
+}
+.pg-srs-complete-sub {
+    font-size: 0.82em;
+    color: var(--pg-t1);
+    opacity: 0.6;
+    line-height: 1.6;
+    margin-bottom: 18px;
+}
+
+
+/* ════════════════════════════
+   Context popover (wordbook original_form click)
+   ════════════════════════════ */
+
+.pg-wb-ctx-btn {
+    display: block;
+    background: none !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    font-size: 0.82em;
+    color: var(--pg-t2);
+    opacity: 0.75;
+    padding: 0;
+    margin: 1px 0 3px;
+    font-style: italic;
+    font-family: var(--pg-font);
+    transition: opacity 0.15s;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+    text-align: left;
+}
+.pg-wb-ctx-btn:hover { opacity: 1; }
+
+.pg-wb-popover {
+    position: fixed;
+    z-index: 10300;
+    background: var(--pg-layer-0);
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: var(--pg-radius);
+    padding: 12px;
+    width: 200px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.15s, transform 0.15s;
+    pointer-events: none;
+}
+.pg-wb-popover.pg-wb-popover-visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.pg-wb-popover-word {
+    font-size: 1em;
+    font-weight: 600;
+    color: var(--pg-t1);
+    margin-bottom: 4px;
+}
+.pg-wb-popover-meaning {
+    font-size: 0.85em;
+    color: var(--pg-t1);
+    line-height: 1.45;
+    opacity: 0.85;
+}
+
+/* ════════════════════════════
+   🔤 Detail tab — word family section
+   ════════════════════════════ */
+
+.pg-det-family {
+    margin: 10px 0 8px;
+}
+
+.pg-det-family-label {
+    display: block;
+    font-size: max(12px, 0.72em);
+    font-weight: 600;
+    color: var(--pg-t1);
+    opacity: 0.45;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+
+.pg-det-family-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.pg-det-family-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: var(--pg-radius-sm);
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.08);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+    font-family: var(--pg-font);
+}
+.pg-det-family-chip:hover {
+    background: rgba(255,255,255,0.16);
+    border-color: rgba(255,255,255,0.28);
+}
+
+.pg-det-family-form {
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--pg-t1);
+}
+
+.pg-det-family-pos {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--pg-t1);
+    opacity: 0.4;
+    padding: 1px 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+}
+
+/* ═ Note button — accent highlight when the word already has a note */
+.pg-wb-note-btn {
+    font-size: 12px;
+    border: none !important;
+    background: transparent !important;
+    opacity: 0.35;
+    transition: opacity 0.13s;
+}
+.pg-wb-note-btn:hover,
+.pg-wb-note-btn-has {
+    opacity: 1;
+}
+
+/* ═ Notes preview — shown below meaning when a note exists */
+.pg-wb-notes-preview {
+    font-size: max(12px, 0.78em);
+    color: var(--pg-t1);
+    opacity: 0.55;
+    margin-top: 4px;
+    line-height: 1.45;
+    cursor: pointer;
+    /* Clamp to 2 lines with ellipsis */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    border-left: 2px solid rgba(255,255,255,0.18);
+    padding-left: 7px;
+    transition: opacity 0.13s;
+}
+.pg-wb-notes-preview:hover { opacity: 0.85; }
+
+/* ═ Inline editor container */
+.pg-wb-note-editor {
+    margin-top: 6px;
+    animation: pg-bubble-in 0.15s ease;
+}
+
+/* ═ Textarea */
+.pg-wb-note-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    border-radius: var(--pg-radius-sm);
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.06);
+    color: var(--pg-t1);
+    font-size: 0.83em;
+    font-family: var(--pg-font);
+    line-height: 1.55;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+    display: block;
+}
+.pg-wb-note-textarea:focus {
+    border-color: rgba(255,255,255,0.35);
+}
+
+/* ═ Action row below textarea */
+.pg-wb-note-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+}
+.pg-wb-note-hint {
+    flex: 1;
+    font-size: max(12px, 0.7em);
+    color: var(--pg-t1);
+    opacity: 0.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pg-wb-note-save-btn {
+    border-color: rgba(255,255,255,0.20) !important;
+    color: var(--pg-t1) !important;
+}
+.pg-wb-note-save-btn:hover {
+    background: rgba(255,255,255,0.12) !important;
+}
+
+
+/* ════════════════════════════
+   📝 Detail tab — notes section
+   ════════════════════════════ */
+
+.pg-det-notes-wrap {
+    margin: 12px 0;
+    padding: 10px 12px;
+    border-radius: var(--pg-radius);
+    background: rgba(255,255,255,0.06);
+    border: none;
+}
+
+.pg-det-notes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.pg-det-notes-label {
+    font-size: max(12px, 0.75em);
+    font-weight: 600;
+    color: var(--pg-t1);
+    opacity: 0.5;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pg-det-note-edit {
+    font-size: 12px;
+    opacity: 0.45;
+    transition: opacity 0.13s;
+}
+.pg-det-note-edit:hover { opacity: 1; }
+
+.pg-det-notes-text {
+    font-size: 0.85em;
+    color: var(--pg-t1);
+    opacity: 0.8;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.pg-det-notes-empty {
+    font-size: 0.82em;
+    color: var(--pg-t1);
+    opacity: 0.3;
+    font-style: italic;
+}
+
+.pg-reanalysis-bar {
+    margin: 0 0 10px;
+    border-radius: var(--pg-radius);
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.20);
+    padding: 8px 12px 8px;
+    animation: pg-bubble-in 0.18s ease;
+}
+
+.pg-reanalysis-progress {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.pg-reanalysis-text {
+    font-size: 0.8em;
+    color: var(--pg-t1);
+    opacity: 0.75;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pg-reanalysis-stop {
+    flex-shrink: 0;
+    padding: 2px 9px;
+    font-size: max(12px, 0.75em);
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.10);
+    color: var(--pg-t1);
+    cursor: pointer;
+    transition: background 0.12s;
+    font-family: var(--pg-font);
+}
+.pg-reanalysis-stop:hover {
+    background: rgba(255,255,255,0.20);
+}
+
+.pg-reanalysis-track {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.12);
+    overflow: hidden;
+}
+
+.pg-reanalysis-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.70);
+    transition: width 0.3s ease;
+    min-width: 4px;
+}
+
+.pg-box-main::-webkit-scrollbar,
+.pg-nav-view::-webkit-scrollbar {
+    width: 5px;
+}
+.pg-box-main::-webkit-scrollbar-track,
+.pg-nav-view::-webkit-scrollbar-track {
+    background: transparent;
+}
+.pg-box-main::-webkit-scrollbar-thumb,
+.pg-nav-view::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.14);
+    border-radius: 99px;
+}
+.pg-box-main::-webkit-scrollbar-thumb:hover,
+.pg-nav-view::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.30);
+}
+
+/* ════════════════════════════
+   ☑ Wordbook bulk select
+   ════════════════════════════ */
+
+.pg-wb-count-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px 8px;
+    font-size: max(12px, 0.75em);
+    color: var(--pg-t1);
+    opacity: 0.45;
+}
+.pg-wb-count-spacer { flex: 1; }
+/* Select all / Deselect all / Delete — identical ghost pill style */
+.pg-wb-row-btn {
+    flex-shrink: 0;
+    padding: 4px 8px;
+    font-size: max(12px, 0.75em);
+    line-height: 1.6;
+    border-radius: var(--pg-radius-sm);
+    border: none;
+    background: transparent;
+    color: var(--pg-t2);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+
+    &:hover {
+        background: rgba(255,255,255,0.07);
+        color: var(--pg-t1);
+    }
+
+    &.pg-wb-row-btn-danger {
+        border-color: rgba(220, 60, 60, 0.4);
+        color: var(--pg-err);
+
+        &:hover {
+            background: rgba(220, 60, 60, 0.12);
+        }
+    }
+}
+.pg-wb-row-chk {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: var(--pg-t1);
+    margin-right: 4px;
+}
+
+/* ════════════════════════════
+   📖 Tap bubble save buttons
+   ════════════════════════════ */
+
+.pg-tap-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 6px;
+    gap: 4px;
+}
+
+/* ═ Deep Analysis button — matches save-sentence exactly */
+.pg-tap-deep {
+    font-size: max(12px, 0.70em);
+    padding: 2px 7px;
+    border-radius: var(--pg-radius-pill);
+    border: none;
+    background: rgba(255,255,255,0.09);
+    color: var(--pg-t2);
+    cursor: pointer;
+    transition: color 0.12s;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.pg-tap-deep:hover    { color: var(--pg-t1); background: rgba(255,255,255,0.09); }
+.pg-tap-deep:disabled { opacity: 0.40; cursor: default; }
+
+.pg-tap-save-sentence {
+    font-size: max(12px, 0.70em);
+    padding: 2px 7px;
+    border-radius: var(--pg-radius-pill);
+    border: none;
+    background: rgba(255,255,255,0.09);
+    color: var(--pg-t2);
+    cursor: pointer;
+    transition: color 0.12s;
+    white-space: nowrap;
+}
+.pg-tap-save-sentence:hover    { color: var(--pg-t1); background: rgba(255,255,255,0.09); }
+.pg-tap-save-sentence:disabled { opacity: 0.40; cursor: default; }
+
+/* ═ ＋ Save word button — icon only, no border, scale on hover */
+.pg-tap-save-btn {
+    border: none;
+    background: transparent;
+    color: var(--pg-t1);
+    font-size: 0.88em;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+    opacity: 0.55;
+    transition: opacity 0.12s, transform 0.12s;
+}
+.pg-tap-save-btn:hover    { opacity: 1; background: transparent; }
+.pg-tap-save-btn:disabled { opacity: 0.30; cursor: default; }
+
+/* ════════════════════════════
+   🔍 Deep Analysis result panel
+   ════════════════════════════ */
+
+.pg-deep-area {
+    margin-top: 8px;
+    border-top: none;
+    padding-top: 8px;
+}
+.pg-deep-loading,
+.pg-deep-error {
+    font-size: 0.8em;
+    color: var(--pg-t1);
+    opacity: 0.5;
+    padding: 4px 0;
+}
+.pg-deep-error { opacity: 0.85; }
+
+/* ═ Dependency arc SVG container */
+.pg-deep-arc-wrap {
+    margin-bottom: 4px;
+    padding-bottom: 2px;
+}
+
+/* ═ Token strip */
+.pg-deep-tokens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.pg-deep-token {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 3px 7px 4px;
+    border-radius: var(--pg-radius-sm);
+    border: 1px solid transparent;
+    line-height: 1.25;
+    cursor: default;
+    transition: opacity 0.12s;
+}
+.pg-deep-token[title]       { cursor: help; }
+.pg-deep-token[title]:hover { opacity: 0.75; }
+.pg-deep-token-text {
+    font-size: 0.9em;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+.pg-deep-token-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+    margin-top: 2px;
+}
+
+/* Role colours — adaptive via color-mix, work in both light and dark mode */
+.pg-deep-role-subj { background: color-mix(in srgb, #4f9cf9 18%, transparent); border-color: color-mix(in srgb, #4f9cf9 35%, transparent); }
+.pg-deep-role-verb { background: color-mix(in srgb, #e07b3a 18%, transparent); border-color: color-mix(in srgb, #e07b3a 35%, transparent); }
+.pg-deep-role-obj  { background: color-mix(in srgb, #5bc47a 18%, transparent); border-color: color-mix(in srgb, #5bc47a 35%, transparent); }
+.pg-deep-role-comp { background: color-mix(in srgb, #b07de0 18%, transparent); border-color: color-mix(in srgb, #b07de0 35%, transparent); }
+.pg-deep-role-mod  { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); }
+.pg-deep-role-conj { background: color-mix(in srgb, #f0c040 15%, transparent); border-color: color-mix(in srgb, #f0c040 32%, transparent); }
+.pg-deep-role-part { background: color-mix(in srgb, #e06090 15%, transparent); border-color: color-mix(in srgb, #e06090 32%, transparent); }
+.pg-deep-role-art  { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.10); opacity: 0.7; }
+.pg-deep-role-prep { background: color-mix(in srgb, #50b8c8 15%, transparent); border-color: color-mix(in srgb, #50b8c8 30%, transparent); }
+.pg-deep-role-pron { background: color-mix(in srgb, #f08050 15%, transparent); border-color: color-mix(in srgb, #f08050 30%, transparent); }
+
+/* ═ Grammar points */
+.pg-deep-grammar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+.pg-deep-gram-item {
+    font-size: max(12px, 0.8em);
+    line-height: 1.55;
+    padding: 12px;
+    border-radius: var(--pg-radius);
+    background: var(--pg-layer-1);
+    border: var(--pg-glass-border);
+    box-shadow: var(--pg-glass-highlight), var(--pg-shadow-card);
+}
+.pg-deep-gram-point {
+    display: block;
+    font-weight: 600;
+    font-size: 0.88em;
+    color: var(--pg-t1);
+    margin-bottom: 2px;
+}
+.pg-deep-gram-exp {
+    color: var(--pg-t2);
+}
+
+/* ═ Summary */
+.pg-deep-summary {
+    font-size: max(12px, 0.78em);
+    color: var(--pg-t1);
+    opacity: 0.55;
+    font-style: italic;
+    line-height: 1.5;
+    padding-top: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pg-snackbar,
+    .pg-conj-overlay,
+    .pg-conj-modal,
+    .pg-tap-bubble,
+    .pg-sel-tooltip,
+    .pg-box,
+    .pg-srs-badge,
+    .pg-match-card,
+    .pg-flash-card,
+    [class*="pg-"] {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Mobile: increase panel and card opacity by 0.15 for better readability */
+@media (pointer: coarse) {
+    :root {
+        --pg-layer-0 : rgba(10, 10, 15, 0.83);   /* dark: 0.68 + 0.15 */
+        --pg-layer-1 : rgba(255, 255, 255, 0.31); /* dark: 0.16 + 0.15 */
+        --pg-layer-2 : rgba(255, 255, 255, 0.39); /* dark: 0.24 + 0.15 */
+    }
+}
+/* Light mode mobile override */
+@media (pointer: coarse) {
+    #pg-box-pg-learning-panel[data-pg-theme="light"],
+    .pg-sidebar[data-pg-theme="light"] {
+        --pg-layer-0 : rgba(255, 255, 255, 0.87); /* light: 0.72 + 0.15 */
+        --pg-layer-1 : rgba(255, 255, 255, 0.85); /* light: 0.70 + 0.15 */
+        --pg-layer-2 : rgba(255, 255, 255, 0.95); /* light: 0.80 + 0.15 */
+    }
+}
+
+/* ════════════════════════════
+   🎤 Speaking tab (Dictation / Shadowing)
+   ════════════════════════════ */
+
+.pg-speak-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.pg-speak-mode-group {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.pg-speak-mode-btn {
+    font-size: 0.78em;
+    padding: 4px 10px;
+    border-radius: var(--pg-radius-pill);
+    border: var(--pg-glass-border);
+    background: transparent;
+    color: var(--pg-t2);
+    cursor: pointer;
+    font-family: var(--pg-font);
+    transition: background 0.15s, color 0.15s;
+}
+.pg-speak-mode-btn.active,
+.pg-speak-mode-btn:hover {
+    background: var(--pg-layer-1);
+    color: var(--pg-t1);
+}
+
+.pg-speak-progress {
+    font-size: 0.78em;
+    color: var(--pg-t3);
+    white-space: nowrap;
+}
+
+/* Card */
+.pg-speak-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 16px;
+    border-radius: var(--pg-radius);
+    border: var(--pg-glass-border);
+    background: var(--pg-layer-1);
+    box-shadow: var(--pg-glass-highlight), var(--pg-shadow-card);
+}
+
+.pg-speak-card-badge {
+    font-size: 0.75em;
+    color: var(--pg-t3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    align-self: flex-start;
+}
+
+.pg-speak-play-btn {
+    font-size: 2.2em;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+    transition: opacity 0.15s;
+    opacity: 0.85;
+    line-height: 1;
+}
+.pg-speak-play-btn:hover  { transform: none !important; opacity: 1 !important; background: none !important; border: none !important; box-shadow: none !important; outline: none !important; }
+.pg-speak-play-btn:active { transform: none !important; background: none !important; border: none !important; box-shadow: none !important; }
+
+.pg-speak-hint {
+    font-size: 0.82em;
+    color: var(--pg-t2);
+    text-align: center;
+}
+
+.pg-speak-textarea {
+    width: 100%;
+    resize: none;
+    box-sizing: border-box;
+}
+
+/* Mic button */
+.pg-speak-mic-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    justify-content: center;
+}
+
+.pg-speak-mic-btn {
+    font-size: 1.8em;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    transition: opacity 0.15s;
+    opacity: 0.8;
+    line-height: 1;
+}
+.pg-speak-mic-btn:hover  { transform: none !important; opacity: 1 !important; background: none !important; border: none !important; box-shadow: none !important; outline: none !important; }
+.pg-speak-mic-btn[data-active="true"] { animation: pg-pulse 1s ease-in-out infinite; }
+
+@keyframes pg-pulse {
+    0%, 100% { transform: scale(1);    opacity: 0.9; }
+    50%       { transform: scale(1.12); opacity: 1;   }
+}
+
+/* Reveal area */
+.pg-speak-reveal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px;
+    border-radius: var(--pg-radius-sm);
+    background: var(--pg-layer-2);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pg-speak-answer {
+    font-size: 1.05em;
+    font-weight: 600;
+    color: var(--pg-t1);
+}
+
+.pg-speak-meaning {
+    font-size: 0.82em;
+    color: var(--pg-t2);
+}
