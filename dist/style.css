@@ -985,9 +985,7 @@
     border-radius: var(--pg-radius);
     cursor: pointer;
     font-size: 15px;
-    color: var(--pg-t1);
-    background: var(--pg-layer-0);
-    border: none;
+    border: none !important;
     transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
     user-select: none;
     margin-right: 4px;
