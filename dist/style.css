@@ -984,7 +984,6 @@
     height: 40px;
     border-radius: var(--pg-radius);
     cursor: pointer;
-    font-size: 15px;
     border: none !important;
     transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
     user-select: none;
@@ -992,9 +991,6 @@
     font-family: var(--pg-font);
 }
 #pg-wand-btn:hover {
-    background: rgba(255,255,255,0.15);
-    border-color: rgba(255,255,255,0.28);
-    color: var(--pg-t1);
     opacity: 0.95;
 }
 #pg-wand-btn:active { opacity: 0.80; }
