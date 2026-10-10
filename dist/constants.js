@@ -124,6 +124,7 @@ export const KEY = {
     // chatMetadata keys
     wordbook: 'pg_wordbook',
     annotations: 'pg_annotations',
+    furigana: 'pg_furigana',
     // IndexedDB — conjugation cache
     conjDB: 'pg_conj_cache',
     conjStore: 'tables',
@@ -136,10 +137,6 @@ export const DELAY = {
     /** Delay before showing a tooltip or selection popup.
      *  Mobile browsers need extra time to finalise the selection range. */
     tooltipShow: 50,
-    /** Long-press threshold for mobile tap-to-translate. */
-    longPress: 500,
-    /** Ghost-click suppression window after a long-press fires. */
-    ghostClick: 300,
     /** Debounce window for chat-switch events before re-restoring annotations. */
     chatSwitch: 300,
     /** Maximum wall-clock time (ms) to keep retrying annotation restore. */

@@ -129,47 +129,35 @@ export async function clearConjCacheStore() {
         console.warn('[Polyglot] conj-cache: clearConjCacheStore failed', e);
     }
 }
-/**
- * Returns every cached conjugation entry from IDB as a flat array.
- * Entries whose lang differs from `currentLang` are excluded (stale cache).
- *
- * Used by exportToPDF to collect conjugation tables for the print section.
- */
-export async function getAllConjEntries(currentLang) {
+/** Every well-formed cached table, in all languages (for backups). */
+export async function listConjCache() {
     try {
         const db = await _getConjDB();
         return await new Promise((resolve, reject) => {
-            const tx = db.transaction(KEY.conjStore, 'readonly');
-            const store = tx.objectStore(KEY.conjStore);
             const out = [];
-            const allReq = store.getAll();
-            const keyReq = store.getAllKeys();
-            let allDone = false, keyDone = false;
-            let allValues = [];
-            let allKeys = [];
-            const tryResolve = () => {
-                if (!allDone || !keyDone)
+            const req = db.transaction(KEY.conjStore, 'readonly').objectStore(KEY.conjStore).openCursor();
+            req.onsuccess = () => {
+                const cursor = req.result;
+                if (!cursor) {
+                    db.close();
+                    resolve(out);
                     return;
-                allKeys.forEach((key, i) => {
-                    const entry = allValues[i];
-                    if (!entry)
-                        return;
-                    if (entry.lang !== currentLang)
-                        return; // stale — skip
-                    if (!entry.data?.tenses?.length)
-                        return; // malformed — skip
-                    out.push({ word: String(key), data: entry.data });
-                });
-                db.close();
-                resolve(out);
+                }
+                const entry = cursor.value;
+                if (entry?.data?.tenses?.length)
+                    out.push({ word: String(cursor.key), lang: entry.lang, data: entry.data });
+                cursor.continue();
             };
-            allReq.onsuccess = () => { allValues = allReq.result; allDone = true; tryResolve(); };
-            keyReq.onsuccess = () => { allKeys = keyReq.result; keyDone = true; tryResolve(); };
-            allReq.onerror = () => { db.close(); reject(allReq.error); };
-            keyReq.onerror = () => { db.close(); reject(keyReq.error); };
+            req.onerror = () => { db.close(); reject(req.error); };
         });
     }
     catch {
         return [];
     }
+}
+/** Cached tables for the current study language (stale languages are skipped). Used by the PDF export and verb drill. */
+export async function getAllConjEntries(currentLang) {
+    return (await listConjCache())
+        .filter(e => e.lang === currentLang)
+        .map(({ word, data }) => ({ word, data }));
 }

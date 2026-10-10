@@ -25,47 +25,13 @@ export function getLangFromSettings(s) {
 export function getNativeLangFromSettings(s) {
     return resolveNativeLang(s?.native_lang ?? 'en', s?.native_lang_custom ?? '');
 }
-// ── JSON parsing ──────────────────────────────────────────────────────────────
-/**
- * Robustly parses an AI model response as JSON.
- *
- * Pass 1 — strip markdown code fences (```json … ```) then parse directly.
- * Pass 2 — extract the outermost { } or [ ] using indexOf/lastIndexOf.
- *           O(N) and safe — no catastrophic-backtracking risk.
- *
- * Throws SyntaxError if all passes fail.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function parseJSON(raw) {
-    const s = String(raw).trim();
-    // Pass 1: strip markdown fences, then attempt a direct parse
-    const cleaned = s.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
-    try {
-        return JSON.parse(cleaned);
-    }
-    catch (_) { /* fall through */ }
-    // Pass 2 & 3: extract outermost { } or [ ] from both the original and cleaned strings
-    for (const src of [s, cleaned]) {
-        const fb = src.indexOf('{'), lb = src.lastIndexOf('}');
-        const fa = src.indexOf('['), la = src.lastIndexOf(']');
-        const isObj = fb !== -1 && lb > fb;
-        const isArr = fa !== -1 && la > fa;
-        try {
-            if (isObj && (!isArr || fb < fa))
-                return JSON.parse(src.substring(fb, lb + 1));
-            if (isArr)
-                return JSON.parse(src.substring(fa, la + 1));
-        }
-        catch (_) { /* fall through */ }
-    }
-    console.error('[Polyglot] JSON parse failed. Raw response:', s.slice(0, 400));
-    throw new SyntaxError('Failed to parse AI response as JSON. The model did not return valid JSON.');
-}
 // ── Array utilities ───────────────────────────────────────────────────────────
 /**
  * Fisher-Yates shuffle — unbiased O(n), returns a new array (non-mutating).
  * Use instead of .sort(() => Math.random() - 0.5) which is biased and O(n log n).
  */
+/** Whether a study-language name is Japanese. */
+export const isJapanese = (lang) => /japanese|日本語/i.test(lang);
 export function shuffleArray(arr) {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -99,4 +65,63 @@ export function levelLabel(level) {
     if (level === 'idiom')
         return 'Idiom';
     return level; // A1–C2 as-is
+}
+// ── String similarity ──────────────────────────────────────────────────────────
+/** Levenshtein edit distance (rolling single-row DP — O(min) memory). */
+export function levenshtein(a, b) {
+    if (!a.length)
+        return b.length;
+    if (!b.length)
+        return a.length;
+    let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+        const curr = [i];
+        for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+        }
+        prev = curr;
+    }
+    return prev[b.length];
+}
+/** Similarity of two strings as a 0–100 score, based on Levenshtein distance. */
+export function similarityScore(a, b) {
+    if (a === b)
+        return 100;
+    const dist = levenshtein(a, b);
+    return Math.max(0, Math.round(100 * (1 - dist / Math.max(a.length, b.length))));
+}
+// ── Finding a word in running text ────────────────────────────────────────────
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+/** Scripts written without spaces: words sit side by side, so a letter next door is no boundary. */
+const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}ー]/u;
+const HANGUL = /\p{Script=Hangul}/u;
+/** Whether `neighbor` glues onto the word whose edge character is `edge` (so it is not a match). */
+function glued(neighbor, edge, after) {
+    if (!neighbor || !WORD_CHAR.test(neighbor))
+        return false;
+    if (UNSPACED.test(neighbor) || UNSPACED.test(edge))
+        return false;
+    // Korean particles and endings follow the word: 학교 in 학교에
+    if (after && HANGUL.test(neighbor) && HANGUL.test(edge))
+        return false;
+    return true;
+}
+/**
+ * Index of the first occurrence of `word` in `text` at or after `from` that
+ * stands as a word: not part of a longer word in a spaced script ("art" is
+ * not found in "start"), while Japanese, Chinese, Thai… and Korean particles
+ * need no spaces around it. -1 when there is none.
+ */
+export function findWord(text, word, from = 0) {
+    if (!word)
+        return -1;
+    for (let at = text.indexOf(word, from); at !== -1; at = text.indexOf(word, at + 1)) {
+        if (glued(text[at - 1], word[0], false))
+            continue;
+        if (glued(text[at + word.length], word[word.length - 1], true))
+            continue;
+        return at;
+    }
+    return -1;
 }

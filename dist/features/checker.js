@@ -6,15 +6,13 @@
 // the corrected version + explanation if a correction was made.
 //
 // Design rules:
-//   • No direct ST state reads — settings, lang, and callModel are injected.
+//   • No direct ST state reads — settings, lang, and the AI client are injected.
 //   • setWandBusy is injected so this module has no dependency on index.ts.
-//   • notify and parseJSON are imported directly (no side effects).
 //
-// Dependencies: constants.ts, prompts.ts, utils.ts, ui.manager.ts
-import { API } from '../constants.js';
+// Dependencies: prompts.ts, ui.manager.ts, ai/client.ts
 import { checkerPrompt } from '../prompts.js';
-import { parseJSON } from '../utils.js';
 import { notify } from '../ui.manager.js';
+import { acceptObject } from '../ai/client.js';
 import { t } from '../i18n.js';
 // ── Module-level abort tracker ────────────────────────────────────────────────
 let _checkerAbort = null;
@@ -40,7 +38,11 @@ export async function runChecker(deps) {
     _checkerAbort = abort;
     deps.setWandBusy(true);
     try {
-        const result = parseJSON(await deps.callModel(API.sysJson, checkerPrompt(text, deps.getLang(), s.cefr_level, deps.getNativeLang()), abort.signal));
+        const { data: result } = await deps.ai.json({
+            prompt: checkerPrompt(text, deps.getLang(), s.cefr_level, deps.getNativeLang()),
+            signal: abort.signal,
+            accept: (acceptObject),
+        });
         if (abort.signal.aborted)
             return;
         const corrected = result.corrected_text?.trim() ?? '';

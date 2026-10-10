@@ -1,215 +1,194 @@
 // ════════════════════════════
 // Polyglot  features/speaking.ts
 // ════════════════════════════
-// Blind Dictation and Shadowing mode — flashcard-style listening/speaking drills.
+// Listening / speaking drill over the wordbook, one card at a time:
 //
-// Two sub-modes per card (randomly assigned or user-selected):
-//   Dictation  — hear the audio, type what you heard → compare against original
-//   Shadowing  — hear the audio, speak it back → pronunciation score via SpeechRecognition
+//   Dictation  hear the word, type it → similarity score
+//   Shadowing  hear the word, say it  → speech-recognition match score
+//   Random     either, per card (dictation when speech recognition is unavailable)
 //
 // Design rules:
-//   • Pure feature module — no direct ST state reads.
 //   • speak / runPronunciationCheck are injected via SpeakingDeps.
-//   • Card pool = all wordbook entries with a non-empty word field.
-import { shuffleArray } from '../utils.js';
-import { escapeHtml } from '../ui.manager.js';
-import { loadWordbook } from '../wordbook.js';
+//   • Card pool = every wordbook entry with a word.
+//
+// Dependencies: utils.ts, html.ts, i18n.ts, wordbook.ts
+import { shuffleArray, similarityScore } from '../utils.js';
+import { html, setHtml } from '../html.js';
+import { scopedWordbook } from '../wordbook.js';
 import { t } from '../i18n.js';
-// ── Internal state ─────────────────────────────────────────────────────────────
-let _currentRecog = null;
-/** Tracks the active shadowing MutationObserver so it can be disconnected on card change. */
-let _currentObserver = null;
-// ── Helpers ────────────────────────────────────────────────────────────────────
-export function _levenshtein(a, b) {
-    const m = a.length, n = b.length;
-    const dp = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
-    for (let i = 1; i <= m; i++)
-        for (let j = 1; j <= n; j++)
-            dp[i][j] = a[i - 1] === b[j - 1]
-                ? dp[i - 1][j - 1]
-                : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-    return dp[m][n];
-}
+const MODE_CHOICES = [
+    { mode: 'random', key: 'speak.modeRandom' },
+    { mode: 'dictation', key: 'speak.modeDictation' },
+    { mode: 'shadowing', key: 'speak.modeShadowing' },
+];
+// ── Scoring ───────────────────────────────────────────────────────────────────
+/** Re-exported under its historical name (used by speaking.test.ts). */
+export { levenshtein as _levenshtein } from '../utils.js';
+// eslint-disable-next-line no-misleading-character-class
+const NOT_TEXT = /[^a-z0-9À-žЀ-ӿ؀-ۿऀ-ॿ぀-ヿ一-鿿가-힣ᄀ-ᇿ ]/gu;
+const comparable = (s) => s.toLowerCase().trim().replace(NOT_TEXT, '');
+/** Similarity (0–100) of a typed answer to the target, ignoring case and punctuation. */
 export function _dictationScore(target, input) {
-    // eslint-disable-next-line no-misleading-character-class
-    const a = target.toLowerCase().trim().replace(/[^a-z0-9\u00c0-\u017e\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u3040-\u30ff\u4e00-\u9fff\uAC00-\uD7A3\u1100-\u11FF ]/gu, '');
-    // eslint-disable-next-line no-misleading-character-class
-    const b = input.toLowerCase().trim().replace(/[^a-z0-9\u00c0-\u017e\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u3040-\u30ff\u4e00-\u9fff\uAC00-\uD7A3\u1100-\u11FF ]/gu, '');
+    const a = comparable(target), b = comparable(input);
     if (!a)
         return 100;
     if (!b)
         return 0;
-    const dist = _levenshtein(a, b);
-    return Math.max(0, Math.round(100 * (1 - dist / Math.max(a.length, b.length))));
+    return similarityScore(a, b);
 }
-function _scoreLabel(score) {
-    if (score >= 95)
-        return { label: t('tts.perfect'), cls: 'pg-pronun-perfect' };
-    if (score >= 75)
-        return { label: t('tts.great'), cls: 'pg-pronun-great' };
-    if (score >= 50)
-        return { label: t('tts.keep'), cls: 'pg-pronun-ok' };
-    return { label: t('tts.tryAgain'), cls: 'pg-pronun-tryagain' };
+const DICTATION_GRADES = [
+    { min: 95, key: 'tts.perfect', cls: 'pg-pronun-perfect' },
+    { min: 75, key: 'tts.great', cls: 'pg-pronun-great' },
+    { min: 50, key: 'tts.keep', cls: 'pg-pronun-ok' },
+    { min: 0, key: 'tts.tryAgain', cls: 'pg-pronun-tryagain' },
+];
+const gradeOf = (score) => DICTATION_GRADES.find(g => score >= g.min) ?? DICTATION_GRADES[DICTATION_GRADES.length - 1];
+// ── Views ─────────────────────────────────────────────────────────────────────
+const revealView = (w) => html `
+    <span class="pg-speak-answer">${w.word}</span>
+    ${w.meaning && html `<span class="pg-speak-meaning">${w.meaning}</span>`}`;
+function cardView(mode) {
+    const isDictation = mode === 'dictation';
+    return html `
+        <div class="pg-speak-card">
+            <div class="pg-speak-card-badge">${t(isDictation ? 'speak.modeDictation' : 'speak.modeShadowing')}</div>
+            <button class="pg-speak-play-btn" data-action="play" title="${t('speak.play')}" aria-label="${t('speak.play')}">🔊</button>
+            <div class="pg-speak-hint">${t(isDictation ? 'speak.dictHint' : 'speak.shadHint')}</div>
+            ${isDictation ? html `
+            <textarea class="pg-speak-textarea text_pole" placeholder="${t('speak.dictPh')}" rows="2"
+                      autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+            <button class="pg-btn pg-btn-primary pg-btn-full" data-action="check">${t('speak.check')}</button>
+            <div class="pg-pronun-result"></div>` : html `
+            <div class="pg-speak-mic-row">
+                <button class="pg-speak-mic-btn" data-action="mic" title="${t('speak.mic')}" aria-label="${t('speak.mic')}">🎤</button>
+                <div class="pg-pronun-result"></div>
+            </div>`}
+            <div class="pg-speak-reveal" hidden></div>
+            <button class="pg-btn pg-btn-secondary pg-btn-full pg-speak-next" data-action="next" hidden>${t('speak.next')}</button>
+        </div>`;
 }
-// ── Main renderer ─────────────────────────────────────────────────────────────
-export function renderSpeaking(container, deps) {
-    const wb = loadWordbook().filter(e => e.word?.trim());
-    const lang = deps.getLang();
-    if (wb.length === 0) {
-        container.innerHTML = `<div class="pg-error-msg">${t('speak.noEntries')}</div>`;
-        return;
-    }
-    let pool = shuffleArray([...wb]);
-    let idx = 0;
-    let subMode = 'random';
-    // ── Shell ─────────────────────────────────────────────────────────────────
-    container.innerHTML = `
-        <div class="pg-speak-controls">
-            <div class="pg-speak-mode-group">
-                <button class="pg-speak-mode-btn active" data-mode="random">${t('speak.modeRandom')}</button>
-                <button class="pg-speak-mode-btn" data-mode="dictation">${t('speak.modeDictation')}</button>
-                <button class="pg-speak-mode-btn" data-mode="shadowing">${t('speak.modeShadowing')}</button>
+// ── Session ───────────────────────────────────────────────────────────────────
+class SpeakingSession {
+    root;
+    words;
+    deps;
+    pool = [];
+    index = 0;
+    choice = 'random';
+    recognition = null;
+    area;
+    constructor(root, words, deps) {
+        this.root = root;
+        this.words = words;
+        this.deps = deps;
+        setHtml(root, html `
+            <div class="pg-speak-controls">
+                <div class="pg-speak-mode-group" role="group">${MODE_CHOICES.map(c => html `
+                    <button class="pg-speak-mode-btn ${c.mode === this.choice && 'active'}" data-action="mode" data-mode="${c.mode}">${t(c.key)}</button>`)}
+                </div>
+                <span class="pg-speak-progress"></span>
             </div>
-            <span class="pg-speak-progress" id="pg-speak-progress">1 / ${pool.length}</span>
-        </div>
-        <div id="pg-speak-card-area"></div>`;
-    // Mode switcher
-    container.querySelectorAll('.pg-speak-mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            container.querySelectorAll('.pg-speak-mode-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            subMode = btn.dataset.mode;
-            pool = shuffleArray([...wb]);
-            idx = 0;
-            renderCard();
-        });
-    });
-    // ── Card renderer ─────────────────────────────────────────────────────────
-    function renderCard() {
-        if (_currentRecog) {
-            try {
-                _currentRecog.abort();
-            }
-            catch { /* ignore */ }
-            _currentRecog = null;
-        }
-        // Disconnect any live shadowing observer so it doesn't fire on the DOM
-        // of a card that is about to be replaced (prevents stale-closure callbacks
-        // and eliminates the observer leak when cards are flipped rapidly).
-        if (_currentObserver) {
-            _currentObserver.disconnect();
-            _currentObserver = null;
-        }
-        const progressEl = container.querySelector('#pg-speak-progress');
-        if (progressEl)
-            progressEl.textContent = `${idx + 1} / ${pool.length}`;
-        if (idx >= pool.length) {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            container.querySelector('#pg-speak-card-area').innerHTML =
-                `<div class="pg-score-perfect">${t('speak.done')}</div>
-                 <button id="pg-speak-restart" class="pg-btn pg-btn-secondary pg-btn-full" style="margin-top:12px;">${t('speak.restart')}</button>`;
-            container.querySelector('#pg-speak-restart')?.addEventListener('click', () => {
-                pool = shuffleArray([...wb]);
-                idx = 0;
-                renderCard();
-            });
+            <div class="pg-speak-card-area"></div>`);
+        this.area = root.querySelector('.pg-speak-card-area');
+        root.addEventListener('click', e => this.onClick(e));
+        this.restart();
+    }
+    get entry() { return this.pool[this.index]; }
+    restart() {
+        this.pool = shuffleArray(this.words);
+        this.index = 0;
+        this.render();
+    }
+    modeFor() {
+        const mode = this.choice === 'random' ? (Math.random() < 0.5 ? 'dictation' : 'shadowing') : this.choice;
+        return mode === 'shadowing' && !this.deps.hasSpeechRecognition() ? 'dictation' : mode;
+    }
+    render() {
+        this.recognition?.abort();
+        this.recognition = null;
+        const progress = this.root.querySelector('.pg-speak-progress');
+        if (progress)
+            progress.textContent = `${Math.min(this.index + 1, this.pool.length)} / ${this.pool.length}`;
+        const w = this.entry;
+        if (!w) {
+            setHtml(this.area, html `
+                <div class="pg-score-perfect">${t('speak.done')}</div>
+                <button class="pg-btn pg-btn-secondary pg-btn-full pg-speak-restart" data-action="restart">${t('speak.restart')}</button>`);
             return;
         }
-        const entry = pool[idx];
-        const mode = subMode === 'random' ? (Math.random() < 0.5 ? 'dictation' : 'shadowing') : subMode;
-        // Fall back to dictation if SpeechRecognition unavailable
-        const effectiveMode = (mode === 'shadowing' && !deps.hasSpeechRecognition()) ? 'dictation' : mode;
-        const modeLabel = effectiveMode === 'dictation' ? t('speak.modeDictation') : t('speak.modeShadowing');
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const area = container.querySelector('#pg-speak-card-area');
-        if (effectiveMode === 'dictation') {
-            area.innerHTML = `
-                <div class="pg-speak-card">
-                    <div class="pg-speak-card-badge">${escapeHtml(modeLabel)}</div>
-                    <button class="pg-speak-play-btn" id="pg-speak-play" title="${t('speak.play')}">🔊</button>
-                    <div class="pg-speak-hint">${t('speak.dictHint')}</div>
-                    <textarea id="pg-speak-input" class="pg-speak-textarea text_pole"
-                        placeholder="${t('speak.dictPh')}" rows="2" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
-                    <button id="pg-speak-check" class="pg-btn pg-btn-primary pg-btn-full">${t('speak.check')}</button>
-                    <div id="pg-speak-result" class="pg-pronun-result"></div>
-                    <div id="pg-speak-reveal" style="display:none;" class="pg-speak-reveal"></div>
-                    <button id="pg-speak-next" class="pg-btn pg-btn-secondary pg-btn-full" style="display:none;margin-top:8px;">${t('speak.next')}</button>
-                </div>`;
-            area.querySelector('#pg-speak-play')?.addEventListener('click', () => {
-                deps.speak(entry.word, lang);
-            });
-            area.querySelector('#pg-speak-check')?.addEventListener('click', () => {
-                const input = (area.querySelector('#pg-speak-input')?.value ?? '').trim();
-                if (!input)
-                    return;
-                const score = _dictationScore(entry.word, input);
-                const { label, cls } = _scoreLabel(score);
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                const resultEl = area.querySelector('#pg-speak-result');
-                resultEl.className = `pg-pronun-result ${cls}`;
-                resultEl.textContent = `${score}% — ${label}`;
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                const revealEl = area.querySelector('#pg-speak-reveal');
-                revealEl.style.display = '';
-                revealEl.innerHTML = `<span class="pg-speak-answer">${escapeHtml(entry.word)}</span>
-                    ${entry.meaning ? `<span class="pg-speak-meaning">${escapeHtml(entry.meaning)}</span>` : ''}`;
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                area.querySelector('#pg-speak-next').style.display = '';
-                area.querySelector('#pg-speak-check').style.display = 'none';
-            });
-        }
-        else {
-            // Shadowing
-            area.innerHTML = `
-                <div class="pg-speak-card">
-                    <div class="pg-speak-card-badge">${escapeHtml(modeLabel)}</div>
-                    <button class="pg-speak-play-btn" id="pg-speak-play" title="${t('speak.play')}">🔊</button>
-                    <div class="pg-speak-hint">${t('speak.shadHint')}</div>
-                    <div class="pg-speak-mic-row">
-                        <button id="pg-speak-mic" class="pg-speak-mic-btn" title="${t('speak.mic')}">🎤</button>
-                        <div id="pg-speak-result" class="pg-pronun-result"></div>
-                    </div>
-                    <div id="pg-speak-reveal" style="display:none;" class="pg-speak-reveal"></div>
-                    <button id="pg-speak-next" class="pg-btn pg-btn-secondary pg-btn-full" style="display:none;margin-top:8px;">${t('speak.next')}</button>
-                </div>`;
-            area.querySelector('#pg-speak-play')?.addEventListener('click', () => {
-                deps.speak(entry.word, lang);
-            });
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const micBtn = area.querySelector('#pg-speak-mic');
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            const resultEl = area.querySelector('#pg-speak-result');
-            micBtn.addEventListener('click', () => {
-                if (micBtn.dataset.active === 'true') {
-                    _currentRecog?.abort();
-                    return;
-                }
-                _currentRecog = deps.runPronunciationCheck(entry.word, micBtn, resultEl);
-                // Show reveal + next after result
-                const observer = new MutationObserver(() => {
-                    if (resultEl.textContent && resultEl.textContent !== t('tts.listening')) {
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        const revealEl = area.querySelector('#pg-speak-reveal');
-                        revealEl.style.display = '';
-                        revealEl.innerHTML = `<span class="pg-speak-answer">${escapeHtml(entry.word)}</span>
-                            ${entry.meaning ? `<span class="pg-speak-meaning">${escapeHtml(entry.meaning)}</span>` : ''}`;
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        area.querySelector('#pg-speak-next').style.display = '';
-                        observer.disconnect();
-                        _currentObserver = null; // release module-level ref after natural completion
-                    }
-                });
-                _currentObserver = observer; // register so renderCard() can disconnect early
-                observer.observe(resultEl, { childList: true, characterData: true, subtree: true });
-            });
-        }
-        // Auto-play on card open
-        deps.speak(entry.word, lang);
-        // Next button
-        area.querySelector('#pg-speak-next')?.addEventListener('click', () => {
-            idx++;
-            renderCard();
-        });
+        setHtml(this.area, cardView(this.modeFor()));
+        this.deps.speak(w.word, this.deps.getLang(), w.audio); // play on open
     }
-    renderCard();
+    /** Shows the answer and the Next button. */
+    reveal() {
+        const w = this.entry;
+        const reveal = this.area.querySelector('.pg-speak-reveal');
+        if (!w || !reveal)
+            return;
+        setHtml(reveal, revealView(w));
+        reveal.hidden = false;
+        const next = this.area.querySelector('.pg-speak-next');
+        if (next)
+            next.hidden = false;
+    }
+    check(button) {
+        const w = this.entry;
+        const input = this.area.querySelector('textarea')?.value.trim();
+        const out = this.area.querySelector('.pg-pronun-result');
+        if (!w || !input || !out)
+            return;
+        const score = _dictationScore(w.word, input);
+        const grade = gradeOf(score);
+        out.className = `pg-pronun-result ${grade.cls}`;
+        out.textContent = `${score}% — ${t(grade.key)}`;
+        button.hidden = true;
+        this.reveal();
+    }
+    listen(mic) {
+        if (mic.dataset.active === 'true') {
+            this.recognition?.abort();
+            return;
+        }
+        const out = this.area.querySelector('.pg-pronun-result');
+        const w = this.entry;
+        if (w && out)
+            this.recognition = this.deps.runPronunciationCheck(w.word, mic, out, () => this.reveal());
+    }
+    onClick(e) {
+        const el = e.target.closest('[data-action]');
+        if (!el)
+            return;
+        switch (el.dataset.action) {
+            case 'mode':
+                this.root.querySelectorAll('.pg-speak-mode-btn').forEach(b => b.classList.toggle('active', b === el));
+                this.choice = el.dataset.mode;
+                this.restart();
+                break;
+            case 'play':
+                if (this.entry)
+                    this.deps.speak(this.entry.word, this.deps.getLang(), this.entry.audio);
+                break;
+            case 'check':
+                this.check(el);
+                break;
+            case 'mic':
+                this.listen(el);
+                break;
+            case 'next':
+                this.index++;
+                this.render();
+                break;
+            case 'restart':
+                this.restart();
+                break;
+        }
+    }
+}
+export function renderSpeaking(container, deps) {
+    const words = scopedWordbook().filter(e => e.word?.trim());
+    if (!words.length) {
+        setHtml(container, html `<div class="pg-error-msg">${t('speak.noEntries')}</div>`);
+        return;
+    }
+    new SpeakingSession(container, words, deps);
 }

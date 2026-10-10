@@ -47,38 +47,74 @@ export function notify(message, level = 'info', ms = 3000) {
         setTimeout(() => item.remove(), 320);
     }, ms);
 }
-// ── Modal dialogs ─────────────────────────────────────────────────────────────
-export function askConfirm(question, { yes: yesLabel = 'Confirm', no: noLabel = 'Cancel' } = {}) {
+/**
+ * Shows a question with one button per choice. Resolves with the chosen value,
+ * or null on Escape / backdrop tap.
+ */
+export function askChoice(question, choices) {
     return new Promise((resolve) => {
         let settled = false;
         const finish = (result) => {
             if (settled)
                 return;
             settled = true;
-            document.removeEventListener('keydown', onKey);
+            window.removeEventListener('keydown', onKey, true);
             wrap.remove();
             resolve(result);
         };
         const wrap = el('div', { className: 'pg-dim' }, [
-            el('div', { className: 'pg-dialog' }, [
+            el('div', { className: 'pg-dialog', attrs: { role: 'dialog', 'aria-modal': 'true' } }, [
                 el('p', { className: 'pg-dialog-txt', textContent: question }),
-                el('div', { className: 'pg-dialog-row' }, [
-                    el('button', { className: 'pg-btn pg-btn-secondary', textContent: noLabel, onclick: () => finish(false) }),
-                    el('button', { className: 'pg-btn pg-btn-primary', textContent: yesLabel, onclick: () => finish(true) }),
-                ]),
+                el('div', { className: 'pg-dialog-row' }, choices.map(c => el('button', {
+                    className: `pg-btn ${c.primary ? 'pg-btn-primary' : 'pg-btn-secondary'}`,
+                    textContent: c.label,
+                    onclick: () => finish(c.value),
+                }))),
             ]),
         ]);
         // Backdrop tap closes the dialog (mobile UX)
         wrap.addEventListener('pointerdown', (e) => { if (e.target === wrap)
-            finish(false); });
+            finish(null); });
         document.body.appendChild(wrap);
-        // stopPropagation prevents ESC from bubbling up to a parent PgPanel and closing it too
+        // stopPropagation keeps ESC from also closing a parent PgPanel
         const onKey = (e) => { if (e.key === 'Escape') {
             e.stopPropagation();
-            finish(false);
+            finish(null);
         } };
-        document.addEventListener('keydown', onKey);
+        window.addEventListener('keydown', onKey, true); // capture: runs before the panel's own Escape
+        wrap.querySelector('.pg-btn-primary')?.focus();
     });
+}
+/** A read-only document in a scrollable dialog (Close, Escape or a backdrop tap closes it). */
+export function showDocument(title, body) {
+    const close = () => {
+        window.removeEventListener('keydown', onKey, true);
+        wrap.remove();
+    };
+    const wrap = el('div', { className: 'pg-dim' }, [
+        el('div', { className: 'pg-dialog pg-doc-dialog', attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': title } }, [
+            el('h3', { className: 'pg-doc-title', textContent: title }),
+            Object.assign(body, { className: `${body.className} pg-doc-body`.trim() }),
+            el('div', { className: 'pg-dialog-row' }, [
+                el('button', { className: 'pg-btn pg-btn-primary', textContent: '✕', onclick: close, attrs: { 'aria-label': 'Close' } }),
+            ]),
+        ]),
+    ]);
+    wrap.addEventListener('pointerdown', e => { if (e.target === wrap)
+        close(); });
+    const onKey = (e) => { if (e.key === 'Escape') {
+        e.stopPropagation();
+        close();
+    } };
+    window.addEventListener('keydown', onKey, true); // capture: runs before the panel's own Escape
+    document.body.appendChild(wrap);
+    wrap.querySelector('.pg-btn-primary')?.focus();
+}
+export async function askConfirm(question, { yes = 'Confirm', no = 'Cancel' } = {}) {
+    return (await askChoice(question, [
+        { value: 'no', label: no },
+        { value: 'yes', label: yes, primary: true },
+    ])) === 'yes';
 }
 export function askInput(question, { initial = '', hint = '' } = {}) {
     return new Promise((resolve) => {
@@ -90,7 +126,7 @@ export function askInput(question, { initial = '', hint = '' } = {}) {
             if (settled)
                 return;
             settled = true;
-            document.removeEventListener('keydown', onKey);
+            window.removeEventListener('keydown', onKey, true);
             wrap.remove();
             resolve(result);
         };
@@ -119,7 +155,7 @@ export function askInput(question, { initial = '', hint = '' } = {}) {
             if (e.key === 'Enter')
                 finish(field.value);
         };
-        document.addEventListener('keydown', onKey);
+        window.addEventListener('keydown', onKey, true); // capture: runs before the panel's own Escape
         field.focus();
     });
 }

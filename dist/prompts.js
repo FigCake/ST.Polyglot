@@ -27,6 +27,12 @@ export function baseFormRule(lang) {
         return 'dictionary form — verbs/adjectives ending in 다 (e.g. "먹다", "예쁘다"), nouns as-is';
     return 'dictionary/infinitive form — verbs as base infinitive (e.g. "run", not "ran"), nouns in singular (e.g. "book"), adjectives in base form (e.g. "good")';
 }
+/** An extra JSON field asking for the hiragana reading (Japanese only), as [rule line, schema snippet]. */
+function readingField(lang, of) {
+    return /japanese|日本語/i.test(lang)
+        ? [`- "reading": hiragana reading of ${of} (e.g. "たべる")\n`, ', "reading": "..."']
+        : ['', ''];
+}
 // ── Prompt builders ───────────────────────────────────────────────────────────
 /**
  * @param text       Text to check / translate
@@ -61,6 +67,7 @@ Text:
  */
 export function annotatorPrompt(text, lang, level, nativeLang) {
     const rule = baseFormRule(lang);
+    const reading = readingField(lang, 'the BASE FORM');
     return `You are a meticulous language tutor. Analyze the following ${lang} text for a CEFR ${level} learner.
 IMPORTANT: Analyze the ENTIRE text. Identify AT LEAST 30 items if the text is long enough.
 
@@ -71,7 +78,7 @@ Task 1: Words/verbs/adjectives/phrases harder than or equal to ${level}.
 - "meaning": dictionary meaning of the BASE FORM in ${nativeLang}
 - "context_meaning": meaning of THIS SPECIFIC WORD as used in this sentence in ${nativeLang}
 - "level": A1-C2
-
+${reading[0]}
 Task 2: Key grammar patterns.
 - "pattern": exact substring
 - "meaning": meaning in ${nativeLang}
@@ -90,7 +97,7 @@ Exclude single words already covered in Task 1.
 
 Return ONLY:
 {
-  "hard_words": [{ "word":"","base_form":"","pos_info":"","meaning":"","context_meaning":"","level":"" }],
+  "hard_words": [{ "word":"","base_form":"","pos_info":"","meaning":"","context_meaning":"","level":""${reading[1]} }],
   "grammar_patterns": [{ "pattern":"","meaning":"","structure":"","words_used":"" }],
   "idioms": [{ "phrase":"","base_form":"","meaning":"","context_meaning":"" }]
 }
@@ -233,6 +240,7 @@ For Section B questions set "passage" to the reading text. For Section A set "pa
  */
 export function quickLookupPrompt(word, context, lang, level, nativeLang) {
     const rule = baseFormRule(lang);
+    const reading = readingField(lang, 'the BASE FORM');
     return `You are a language tutor for ${lang} learners at CEFR level ${level}.
 Analyze: "${word}"
 ${context ? `Context: "${context}"` : ''}
@@ -242,7 +250,7 @@ ${context ? `Context: "${context}"` : ''}
 - "meaning": dictionary meaning of the BASE FORM in ${nativeLang}
 - "context_meaning": meaning of this word in the given context in ${nativeLang}. If no context, same as meaning.
 - "level": A1|A2|B1|B2|C1|C2
-- "word_family": array of up to 3 closely related forms from the same root/family.
+${reading[0]}- "word_family": array of up to 3 closely related forms from the same root/family.
   Each item: { "form": "...", "pos": "<one of: verb|noun|adj|adv|phrase>", "meaning": "<1-3 words in ${nativeLang}>" }
   Examples: for "bellezza" (noun) → [{"form":"bello","pos":"adj","meaning":"beautiful"},{"form":"abbellire","pos":"verb","meaning":"to beautify"}]
   Empty array [] if the word has no notable family members or is already a base form with no derivatives.
@@ -253,7 +261,7 @@ Return ONLY:
   "pos_info": "...",
   "meaning": "...",
   "context_meaning": "...",
-  "level": "A1|A2|B1|B2|C1|C2",
+  "level": "A1|A2|B1|B2|C1|C2"${reading[1]},
   "word_family": [{ "form": "...", "pos": "...", "meaning": "..." }]
 }`;
 }
@@ -264,6 +272,7 @@ Return ONLY:
  * @param nativeLang Target language (the user's native language)
  */
 export function tapTranslatePrompt(sentence, lang, nativeLang) {
+    const reading = readingField(lang, 'the base form');
     return `You are a ${lang}-to-${nativeLang} translation assistant.
 Translate the following ${lang} sentence for a ${nativeLang} learner.
 
@@ -275,13 +284,13 @@ Rules:
     "base": dictionary/infinitive form
     "meaning": ${nativeLang} meaning of the BASE form (1-3 words)
     "level": CEFR level of the BASE form ("A1","A2","B1","B2","C1","C2")
-  Maximum 3 items. Empty array [] if none notable.
+    ${reading[0]}  Maximum 3 items. Empty array [] if none notable.
 
 Return ONLY valid JSON:
 {
   "translation": "...",
   "literal": "...",
-  "key_verbs": [{ "form": "...", "base": "...", "meaning": "...", "level": "..." }]
+  "key_verbs": [{ "form": "...", "base": "...", "meaning": "...", "level": "..."${reading[1]} }]
 }
 
 Sentence: "${sentence}"`;
@@ -418,9 +427,13 @@ Return ONLY valid JSON — no preamble, no markdown fences:
  * Batch reanalysis — analyses up to BATCH_SIZE words in a single API call.
  * Returns a JSON array in the same order as the input words.
  */
+/** Field rules for "meaning" / "level", asked only for entries that lack them. */
+const FILL_RULES = (nativeLang) => `- "meaning": ONLY for words marked [needs meaning] — the dictionary meaning of the base form in ${nativeLang}, short (1–6 words). Otherwise "".
+- "level": ONLY for words marked [needs level] — CEFR level A1|A2|B1|B2|C1|C2. Otherwise "".`;
+const needs = (w) => `${w.needsMeaning ? ' [needs meaning]' : ''}${w.needsLevel ? ' [needs level]' : ''}`;
 export function batchReanalysisPrompt(words, lang, nativeLang) {
     const wordList = words
-        .map((w, i) => `${i + 1}. word: "${w.word}", base_form: "${w.base_form}"`)
+        .map((w, i) => `${i + 1}. word: "${w.word}", base_form: "${w.base_form}"${needs(w)}`)
         .join('\n');
     return `You are a precise ${lang} linguistics assistant.
 Analyse the following ${lang} words for a language learner.
@@ -435,7 +448,9 @@ One object per word, in the same order, each with these fields:
   "pos": "...",
   "pos_label": "...",
   "ipa": "...",
-  "collocations": ["...", "..."]
+  "collocations": ["...", "..."],
+  "meaning": "",
+  "level": ""
 }
 
 Field rules (apply to EVERY word):
@@ -458,7 +473,8 @@ Field rules (apply to EVERY word):
     Examples for a verb: ["dipendere da qc/qn", "non dipende da me — 나에게 달려있지 않다"]
     Examples for a noun: ["fare una domanda", "rispondere a una domanda"]
     If there are no notable collocations, return [].
-    Each string: max 40 characters. ${nativeLang} glosses allowed after " — ".`;
+    Each string: max 40 characters. ${nativeLang} glosses allowed after " — ".
+${FILL_RULES(nativeLang)}`;
 }
 /**
  * Single-word re-analysis — enriches an existing wordbook entry with
@@ -471,11 +487,11 @@ Field rules (apply to EVERY word):
  * @param lang       Learning language (e.g. "Italian")
  * @param nativeLang User's native language name (e.g. "English", "Spanish")
  */
-export function reanalysisPrompt(word, base_form, lang, nativeLang) {
+export function reanalysisPrompt(word, base_form, lang, nativeLang, fill = {}) {
     return `You are a precise ${lang} linguistics assistant.
 Analyse the following ${lang} word for a language learner.
 
-Word (surface form): "${word}"
+Word (surface form): "${word}"${needs(fill)}
 Stored base form: "${base_form}"
 
 Return ONLY valid JSON — no preamble, no markdown fences:
@@ -484,7 +500,9 @@ Return ONLY valid JSON — no preamble, no markdown fences:
   "pos": "...",
   "pos_label": "...",
   "ipa": "...",
-  "collocations": ["...", "..."]
+  "collocations": ["...", "..."],
+  "meaning": "",
+  "level": ""
 }
 
 Field rules:
@@ -513,7 +531,8 @@ Field rules:
     Examples for a noun: ["fare una domanda", "rispondere a una domanda"]
     Examples for an adjective: ["essere + ${word}", "${word} + noun (agreement)"]
     If there are no notable collocations, return [].
-    Each string: max 40 characters. ${nativeLang} glosses allowed after " — ".`;
+    Each string: max 40 characters. ${nativeLang} glosses allowed after " — ".
+${FILL_RULES(nativeLang)}`;
 }
 /**
  * Generates a conjugation drill quiz from cached conjugation table data.
@@ -580,4 +599,25 @@ Return ONLY valid JSON — no preamble, no fences:
     { "type": "...", "question": "...", "options": ["...","...","...","..."], "answer": "...", "explanation": "..." }
   ]
 }`;
+}
+/**
+ * Furigana: readings of every kanji word in numbered Japanese passages.
+ * The word list is one compact string ("surface=reading" separated by spaces):
+ * a fraction of the output tokens of nested JSON arrays.
+ */
+export function furiganaPrompt(passages) {
+    const blocks = passages.map(p => `<passage i="${p.i}">${p.text}</passage>`).join('\n');
+    return `You add furigana to Japanese text. For each passage, list EVERY word that contains kanji, in the order the words appear.
+
+Rules:
+- Write each word as surface=reading, separated by single spaces, all in one string.
+- surface: the word exactly as written, with its okurigana (食べた, 取り扱い, 対する, 分かり).
+- reading: hiragana for the whole surface, as read IN THIS CONTEXT (今日=きょう or 今日=こんにち).
+- Repeat a word each time it appears. Skip words without kanji. Names: most likely reading.
+- Every kanji must be inside some surface — none may be left out.
+
+Return ONLY:
+{ "passages": [ { "i": 0, "words": "暗闇=くらやみ 中=なか 放たれる=はなたれる" } ] }
+
+${blocks}`;
 }

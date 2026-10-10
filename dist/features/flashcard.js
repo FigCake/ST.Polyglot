@@ -1,390 +1,303 @@
 // ════════════════════════════
 // Polyglot  features/flashcard.ts
 // ════════════════════════════
-// Flashcard tab — normal browse mode + SM-2 SRS mode.
+// Flashcards: browse mode, or SM-2 spaced repetition (SRS) mode.
 //
-// Front:  word + part-of-speech + 🔊 TTS + 🎤 pronunciation check
-// Back:   meaning + base form + example sentence
+//   front  word · part of speech · 🔊 · 🎤 pronunciation check
+//   back   meaning · base form · meaning in context · example sentence · note
 //
-// Example sentence lifecycle:
-//   1. If entry.example already exists  → show immediately (no AI call).
-//   2. Else if entry.context_meaning    → derive from that (no AI call).
-//   3. Else                             → call AI once on first flip,
-//                                         persist to wordbook so it's
-//                                         never regenerated.
+// Example sentences are generated once, on the first flip of a card without
+// one, and saved to the entry.
 //
 // Design rules:
-//   • All ST state / index.ts functions are injected via FlashDeps.
-//   • _activeRecognition is returned to index.ts so onDismiss can abort it.
-//   • No direct imports from index.ts.
+//   • ST state and runtime helpers come in through FlashDeps.
+//   • One delegated click handler per session; re-rendering a card never re-binds.
 //
-// Dependencies: constants.ts, types.ts, prompts.ts, utils.ts,
-//               ui.manager.ts, wordbook.ts, srs.ts
-import { API } from '../constants.js';
+// Dependencies: types.ts, prompts.ts, utils.ts, html.ts, i18n.ts, wordbook.ts,
+//               srs.ts, ai/client.ts
 import { exampleSentencePrompt } from '../prompts.js';
-import { parseJSON, shuffleArray } from '../utils.js';
-import { escapeHtml } from '../ui.manager.js';
-import { loadWordbook, saveWordbook } from '../wordbook.js';
-import { getSets } from '../wordbook.js';
-import { srsRate, srsDueCount, srsPreview } from '../srs.js';
+import { shuffleArray } from '../utils.js';
+import { rubyWord, shownReading } from '../furigana/word.js';
+import { html, setHtml, raw } from '../html.js';
 import { t } from '../i18n.js';
-// ── Module-level abort for example generation ─────────────────────────────────
-let _exampleAbort = null;
-// ── Public API ────────────────────────────────────────────────────────────────
-/**
- * Renders the full flashcard tab (set selector + SRS toggle + card area)
- * into `container`, then starts the first card.
- */
-export function renderFlashcard(container, deps) {
-    const sets = getSets();
-    const setOptions = `
-        <option value="all">${t('fl.allWords')}</option>
-        ${sets.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}`;
-    container.innerHTML = `
-        <div class="pg-flash-controls">
-            <select id="pg-flash-set" class="pg-set-select">${setOptions}</select>
-            <button id="pg-flash-srs-toggle" class="pg-btn pg-btn-secondary pg-srs-toggle"
-                    title="${t('fl.srsTitle')}">
-                🔁 SRS <span id="pg-srs-badge" class="pg-srs-badge" style="display:none">0</span>
-            </button>
-            <button id="pg-flash-shuffle" class="pg-btn pg-btn-secondary" title="${t('fl.shuffle')}">🔀</button>
-        </div>
-        <div id="pg-flash-area"></div>`;
-    const setEl = container.querySelector('#pg-flash-set');
-    const srsToggle = container.querySelector('#pg-flash-srs-toggle');
-    const srsBadge = container.querySelector('#pg-srs-badge');
-    const shuffleEl = container.querySelector('#pg-flash-shuffle');
-    const areaEl = container.querySelector('#pg-flash-area');
-    let deck = [];
-    let idx = 0;
-    let flipped = false;
-    let srsMode = false;
-    let srsSessionDone = 0;
-    // ── Pool helpers ──────────────────────────────────────────────────────────
-    function _getPool() {
-        const wb = loadWordbook();
-        const setId = setEl.value;
-        // Grammar patterns and full sentences are excluded from flashcard review —
-        // they are stored for quiz/annotation context only.
-        const vocab = wb.filter(w => w.level !== 'grammar' && w.level !== 'sentence');
-        return setId === 'all' ? vocab : vocab.filter(w => (w.setIds ?? []).includes(setId));
-    }
-    function updateBadge(pool = _getPool()) {
-        const due = srsDueCount(pool);
-        if (srsBadge) {
-            srsBadge.textContent = String(due);
-            srsBadge.style.display = due > 0 ? '' : 'none';
-        }
-        srsToggle.classList.toggle('pg-srs-active', srsMode);
-        if (shuffleEl)
-            shuffleEl.disabled = srsMode;
-    }
-    function buildDeck(pool = _getPool()) {
-        if (srsMode) {
-            const now = Date.now();
-            deck = pool
-                .filter(w => (w.srs_due ?? 0) <= now)
-                .sort((a, b) => (a.srs_due ?? 0) - (b.srs_due ?? 0));
-        }
-        else {
-            deck = pool.slice();
-        }
-        idx = 0;
-        flipped = false;
-        srsSessionDone = 0;
-    }
-    // ── Card renderer ─────────────────────────────────────────────────────────
-    function renderCard() {
-        _exampleAbort?.abort();
-        _exampleAbort = null;
-        if (deck.length === 0) {
-            if (srsMode) {
-                areaEl.innerHTML = `
-                    <div class="pg-srs-complete">
-                        <div class="pg-srs-complete-icon">🎉</div>
-                        <div class="pg-srs-complete-title">${t('fl.allDone')}</div>
-                        <div class="pg-srs-complete-sub">
-                            ${t('fl.allDoneSub', { n: srsSessionDone })}
-                        </div>
-                        <button id="pg-srs-back-all" class="pg-btn pg-btn-secondary pg-btn-full">
-                            ${t('fl.backAll')}
-                        </button>
-                    </div>`;
-                areaEl.querySelector('#pg-srs-back-all')?.addEventListener('click', () => {
-                    srsMode = false;
-                    const pool = _getPool();
-                    buildDeck(pool);
-                    updateBadge(pool);
-                    renderCard();
-                });
-            }
-            else {
-                areaEl.innerHTML = `<div class="pg-empty-hint">${t('fl.noWords').replace(/\n/g, '<br>')}</div>`;
-            }
+import { loadWordbook, saveWordbook, scopedWordbook, getSets } from '../wordbook.js';
+import { srsRate, srsDueCount, srsPreview } from '../srs.js';
+import { acceptObject } from '../ai/client.js';
+import { userFileUrl } from '../user-files.js';
+const RATINGS = [
+    { rating: 0, key: 'fl.again', cls: 'pg-srs-again' },
+    { rating: 1, key: 'fl.hard', cls: 'pg-srs-hard' },
+    { rating: 2, key: 'fl.good', cls: 'pg-srs-good' },
+    { rating: 3, key: 'fl.easy', cls: 'pg-srs-easy' },
+];
+/** Grammar patterns and sentences are review material for quizzes, not cards. */
+const isCard = (w) => w.level !== 'grammar' && w.level !== 'sentence';
+const multiline = (text) => html `${text.split('\n').map((line, i) => html `${i > 0 && raw('<br>')}${line}`)}`;
+// ── Example sentences ─────────────────────────────────────────────────────────
+let exampleRequest = null;
+function exampleView(w) {
+    if (!w.example)
+        return html `
+        <div class="pg-flash-example-wrap">
+            <div class="pg-flash-example pg-flash-example-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
+        </div>`;
+    return html `
+        <div class="pg-flash-example-wrap">
+            <div class="pg-flash-example">${w.example}</div>
+            ${w.example_translation && html `<div class="pg-flash-example-trans">${w.example_translation}</div>`}
+        </div>`;
+}
+/** Generates and saves an example for `w`, then updates the card's example slot in place. */
+async function loadExample(w, card, deps) {
+    exampleRequest?.abort();
+    const request = new AbortController();
+    exampleRequest = request;
+    const slot = card.querySelector('.pg-flash-example-wrap');
+    try {
+        const { data } = await deps.ai.json({
+            prompt: exampleSentencePrompt(w.base_form || w.word, deps.getLang(), deps.getSettings().cefr_level, deps.getNativeLang()),
+            signal: request.signal,
+            accept: (acceptObject),
+        });
+        const sentence = data.sentence?.trim();
+        if (request.signal.aborted || !sentence)
             return;
+        // Re-read so concurrent SRS updates are not overwritten
+        const wordbook = loadWordbook();
+        const entry = wordbook.find(e => e.word === w.word);
+        const translation = data.translation?.trim() || undefined;
+        if (entry) {
+            Object.assign(entry, { example: sentence, example_translation: translation ?? entry.example_translation });
+            saveWordbook(wordbook);
         }
-        const w = deck[idx];
-        const interval = w.srs_interval ?? 1;
-        const ease = w.srs_ease ?? 2.5;
-        const prog = srsMode
-            ? `${t('fl.remaining', { n: deck.length })} &nbsp;·&nbsp; ${t('fl.doneSess', { n: srsSessionDone })}`
-            : `${idx + 1} / ${deck.length}`;
-        const ratingHtml = (srsMode && flipped) ? `
-            <div class="pg-srs-rating">
-                <button class="pg-srs-btn pg-srs-again" data-rating="0">
-                    <span class="pg-srs-label">${t('fl.again')}</span>
-                    <span class="pg-srs-preview">${srsPreview(interval, ease, 0)}</span>
+        Object.assign(w, { example: sentence, example_translation: translation });
+        if (slot?.isConnected)
+            slot.outerHTML = exampleView(w).value;
+    }
+    catch {
+        if (request.signal.aborted || !slot?.isConnected)
+            return;
+        setHtml(slot, html `<div class="pg-flash-example pg-flash-example-err">—</div>`);
+    }
+    finally {
+        if (exampleRequest === request)
+            exampleRequest = null;
+    }
+}
+// ── Session ───────────────────────────────────────────────────────────────────
+class FlashcardSession {
+    root;
+    deps;
+    deck = [];
+    index = 0;
+    flipped = false;
+    srs = false;
+    reviewed = 0;
+    setSelect;
+    area;
+    constructor(root, deps) {
+        this.root = root;
+        this.deps = deps;
+        setHtml(root, html `
+            <div class="pg-flash-controls">
+                <select class="pg-set-select pg-flash-set" aria-label="${t('fl.allWords')}">
+                    <option value="all">${t('fl.allWords')}</option>
+                    ${getSets().map(s => html `<option value="${s.id}">${s.name}</option>`)}
+                </select>
+                <button class="pg-btn pg-btn-secondary pg-srs-toggle" data-action="toggle-srs" title="${t('fl.srsTitle')}">
+                    🔁 SRS <span class="pg-srs-badge" hidden>0</span>
                 </button>
-                <button class="pg-srs-btn pg-srs-hard" data-rating="1">
-                    <span class="pg-srs-label">${t('fl.hard')}</span>
-                    <span class="pg-srs-preview">${srsPreview(interval, ease, 1)}</span>
-                </button>
-                <button class="pg-srs-btn pg-srs-good" data-rating="2">
-                    <span class="pg-srs-label">${t('fl.good')}</span>
-                    <span class="pg-srs-preview">${srsPreview(interval, ease, 2)}</span>
-                </button>
-                <button class="pg-srs-btn pg-srs-easy" data-rating="3">
-                    <span class="pg-srs-label">${t('fl.easy')}</span>
-                    <span class="pg-srs-preview">${srsPreview(interval, ease, 3)}</span>
-                </button>
-            </div>` : '';
-        const navHtml = !srsMode ? `
-            <div class="pg-flash-nav">
-                <button id="pg-flash-prev" class="pg-btn pg-btn-secondary" ${idx === 0 ? 'disabled' : ''}>${t('fl.prev')}</button>
-                <button id="pg-flash-flip" class="pg-btn pg-btn-primary">${flipped ? t('fl.showWord') : t('fl.showMeaning')}</button>
-                <button id="pg-flash-next" class="pg-btn pg-btn-secondary" ${idx === deck.length - 1 ? 'disabled' : ''}>${t('fl.next')}</button>
-            </div>` : '';
-        const hintText = srsMode
-            ? (flipped ? '' : t('fl.clickReveal'))
-            : (flipped ? '' : t('fl.tapReveal'));
-        // ── Back-face example: already cached, derived, or placeholder for lazy load
-        const backExampleHtml = _buildBackExample(w, flipped);
-        areaEl.innerHTML = `
-            <div class="pg-flash-progress">${prog}</div>
-            <div class="pg-flash-card ${flipped ? 'pg-flash-flipped' : ''}" id="pg-flash-card">
+                <button class="pg-btn pg-btn-secondary pg-flash-shuffle" data-action="shuffle" title="${t('fl.shuffle')}">🔀</button>
+            </div>
+            <div class="pg-flash-area"></div>`);
+        this.setSelect = root.querySelector('.pg-flash-set');
+        this.area = root.querySelector('.pg-flash-area');
+        root.addEventListener('click', e => this.onClick(e));
+        this.setSelect.addEventListener('change', () => this.restart());
+        this.restart();
+    }
+    get card() { return this.deck[this.index]; }
+    pool() {
+        const setId = this.setSelect.value;
+        return scopedWordbook().filter(w => isCard(w) && (setId === 'all' || (w.setIds ?? []).includes(setId)));
+    }
+    /** Rebuilds the deck from the current set and mode, and shows its first card. */
+    restart() {
+        const pool = this.pool();
+        const now = Date.now();
+        this.deck = this.srs
+            ? pool.filter(w => (w.srs_due ?? 0) <= now).sort((a, b) => (a.srs_due ?? 0) - (b.srs_due ?? 0))
+            : pool;
+        this.index = 0;
+        this.flipped = false;
+        this.reviewed = 0;
+        this.updateControls(pool);
+        this.render();
+    }
+    updateControls(pool = this.pool()) {
+        const due = srsDueCount(pool);
+        const badge = this.root.querySelector('.pg-srs-badge');
+        if (badge) {
+            badge.textContent = String(due);
+            badge.hidden = due === 0;
+        }
+        this.root.querySelector('.pg-srs-toggle')?.classList.toggle('pg-srs-active', this.srs);
+        const shuffle = this.root.querySelector('.pg-flash-shuffle');
+        if (shuffle)
+            shuffle.disabled = this.srs;
+    }
+    // ── Views ─────────────────────────────────────────────────────────────────
+    emptyView() {
+        if (!this.srs)
+            return html `<div class="pg-empty-hint">${multiline(t('fl.noWords'))}</div>`;
+        return html `
+            <div class="pg-srs-complete">
+                <div class="pg-srs-complete-icon">🎉</div>
+                <div class="pg-srs-complete-title">${t('fl.allDone')}</div>
+                <div class="pg-srs-complete-sub">${t('fl.allDoneSub', { n: this.reviewed })}</div>
+                <button class="pg-btn pg-btn-secondary pg-btn-full" data-action="browse-all">${t('fl.backAll')}</button>
+            </div>`;
+    }
+    cardView(w) {
+        const { flipped, srs } = this;
+        const progress = srs
+            ? `${t('fl.remaining', { n: this.deck.length })} · ${t('fl.doneSess', { n: this.reviewed })}`
+            : `${this.index + 1} / ${this.deck.length}`;
+        return html `
+            <div class="pg-flash-progress">${progress}</div>
+            <div class="pg-flash-card ${flipped && 'pg-flash-flipped'}" data-action="flip">
                 <div class="pg-flash-front">
-                    <div class="pg-flash-word">${escapeHtml(w.word)}</div>
-                    ${w.pos_info ? `<div class="pg-flash-pos">${escapeHtml(w.pos_info)}</div>` : ''}
+                    <div class="pg-flash-word">${rubyWord(w.word, shownReading(w))}</div>
+                    ${w.pos_info && html `<div class="pg-flash-pos">${w.pos_info}</div>`}
                     <div class="pg-flash-btn-row">
-                        <button class="pg-speak-btn pg-flash-speak" title="${t('fl.listen')}">🔊</button>
-                        ${deps.hasSpeechRecog()
-            ? `<button class="pg-flash-mic" title="${t('fl.mic')}" data-active="false">🎤</button>`
-            : ''}
+                        <button class="pg-speak-btn pg-flash-speak" data-action="speak" title="${t('fl.listen')}">🔊</button>
+                        ${this.deps.hasSpeechRecog() && html `<button class="pg-flash-mic" data-action="mic" title="${t('fl.mic')}" data-active="false">🎤</button>`}
                     </div>
                 </div>
                 <div class="pg-flash-back">
-                    <div class="pg-flash-meaning">${escapeHtml(w.meaning)}</div>
-                    ${w.base_form && w.base_form !== w.word
-            ? `<div class="pg-flash-pos">${escapeHtml(w.base_form)}</div>` : ''}
-                    ${w.context_meaning && w.context_meaning !== w.meaning
-            ? `<div class="pg-flash-ctx">${escapeHtml(w.context_meaning)}</div>` : ''}
-                    ${backExampleHtml}
-                    ${w.notes
-            ? `<div class="pg-flash-notes">${escapeHtml(w.notes)}</div>`
-            : ''}
+                    ${flipped && w.image && html `<img class="pg-word-img" src="${userFileUrl(w.image)}" alt="">`}
+                    <div class="pg-flash-meaning">${w.meaning}</div>
+                    ${w.base_form && w.base_form !== w.word && html `<div class="pg-flash-pos">${w.base_form}</div>`}
+                    ${w.context_meaning && w.context_meaning !== w.meaning && html `<div class="pg-flash-ctx">${w.context_meaning}</div>`}
+                    ${flipped && exampleView(w)}
+                    ${w.notes && html `<div class="pg-flash-notes">${w.notes}</div>`}
                 </div>
             </div>
-            <div class="pg-pronun-result" id="pg-pronun-result"></div>
-            <div class="pg-flash-hint">${hintText}</div>
-            ${ratingHtml}
-            ${navHtml}`;
-        // Lazy-load example sentence if needed
-        if (flipped && !w.example) {
-            _loadExample(w, areaEl, deps);
-        }
-        // ── Event bindings ────────────────────────────────────────────────────
-        const abortRecog = () => {
-            const r = deps.getActiveRecog();
-            if (r) {
-                r.abort();
-                deps.setActiveRecog(null);
-            }
-        };
-        areaEl.querySelector('#pg-flash-card')?.addEventListener('click', () => {
-            abortRecog();
-            flipped = !flipped;
-            renderCard();
-        });
-        areaEl.querySelector('#pg-flash-flip')?.addEventListener('click', e => {
-            e.stopPropagation();
-            abortRecog();
-            flipped = !flipped;
-            renderCard();
-        });
-        areaEl.querySelector('#pg-flash-prev')?.addEventListener('click', e => {
-            e.stopPropagation();
-            abortRecog();
-            if (idx > 0) {
-                idx--;
-                flipped = false;
-                renderCard();
-            }
-        });
-        areaEl.querySelector('#pg-flash-next')?.addEventListener('click', e => {
-            e.stopPropagation();
-            abortRecog();
-            if (idx < deck.length - 1) {
-                idx++;
-                flipped = false;
-                renderCard();
-            }
-        });
-        // SRS rating buttons
-        areaEl.querySelectorAll('.pg-srs-btn').forEach(btn => {
-            btn.addEventListener('click', e => {
+            <div class="pg-pronun-result"></div>
+            <div class="pg-flash-hint">${!flipped && t(srs ? 'fl.clickReveal' : 'fl.tapReveal')}</div>
+            ${srs && flipped && html `
+            <div class="pg-srs-rating">${RATINGS.map(r => html `
+                <button class="pg-srs-btn ${r.cls}" data-action="rate" data-rating="${r.rating}">
+                    <span class="pg-srs-label">${t(r.key)}</span>
+                    <span class="pg-srs-preview">${srsPreview(w.srs_interval ?? 1, w.srs_ease ?? 2.5, r.rating)}</span>
+                </button>`)}
+            </div>`}
+            ${!srs && html `
+            <div class="pg-flash-nav">
+                <button class="pg-btn pg-btn-secondary" data-action="prev" ${this.index === 0 && html `disabled`}>${t('fl.prev')}</button>
+                <button class="pg-btn pg-btn-primary" data-action="flip">${t(flipped ? 'fl.showWord' : 'fl.showMeaning')}</button>
+                <button class="pg-btn pg-btn-secondary" data-action="next" ${this.index === this.deck.length - 1 && html `disabled`}>${t('fl.next')}</button>
+            </div>`}`;
+    }
+    render() {
+        exampleRequest?.abort();
+        const w = this.card;
+        setHtml(this.area, w ? this.cardView(w) : this.emptyView());
+        if (w && this.flipped && !w.example)
+            loadExample(w, this.area, this.deps);
+    }
+    // ── Actions ───────────────────────────────────────────────────────────────
+    stopMic() {
+        this.deps.getActiveRecog()?.abort();
+        this.deps.setActiveRecog(null);
+    }
+    go(step) {
+        const next = this.index + step;
+        if (next < 0 || next >= this.deck.length)
+            return;
+        this.index = next;
+        this.flipped = false;
+        this.render();
+    }
+    rate(rating) {
+        const w = this.card;
+        if (!w)
+            return;
+        const wordbook = loadWordbook();
+        const entry = wordbook.find(e => e.word === w.word);
+        if (!entry)
+            return;
+        const requeue = srsRate(entry, rating);
+        saveWordbook(wordbook);
+        this.deck.splice(this.index, 1);
+        if (requeue)
+            this.deck.push(entry);
+        else
+            this.reviewed++;
+        this.index = Math.min(this.index, Math.max(0, this.deck.length - 1));
+        this.flipped = false;
+        this.updateControls();
+        this.render();
+    }
+    onClick(e) {
+        const el = e.target.closest('[data-action]');
+        if (!el || !this.root.contains(el))
+            return;
+        const action = el.dataset.action;
+        if (action !== 'mic')
+            this.stopMic();
+        const w = this.card;
+        switch (action) {
+            case 'flip':
+                this.flipped = !this.flipped;
+                this.render();
+                break;
+            case 'prev':
                 e.stopPropagation();
-                abortRecog();
-                const rating = parseInt(btn.dataset.rating ?? '0');
-                const wb = loadWordbook();
-                const target = wb.find(en => en.word === w.word);
-                if (!target)
-                    return;
-                const requeue = srsRate(target, rating);
-                saveWordbook(wb);
-                deck.splice(idx, 1);
-                if (requeue)
-                    deck.push(target);
-                else
-                    srsSessionDone++;
-                if (idx >= deck.length)
-                    idx = Math.max(0, deck.length - 1);
-                flipped = false;
-                updateBadge();
-                renderCard();
-            });
-        });
-        // 🔊 TTS
-        areaEl.querySelector('.pg-flash-speak')?.addEventListener('click', e => {
-            e.stopPropagation();
-            deps.speak(w.word, deps.getLang());
-        });
-        // 🎤 Pronunciation check
-        const micBtn = areaEl.querySelector('.pg-flash-mic');
-        const resultEl = areaEl.querySelector('#pg-pronun-result');
-        if (micBtn && resultEl) {
-            micBtn.addEventListener('click', e => {
+                this.go(-1);
+                break;
+            case 'next':
                 e.stopPropagation();
-                if (micBtn.dataset.active === 'true') {
-                    abortRecog();
-                    return;
+                this.go(1);
+                break;
+            case 'rate':
+                this.rate(Number(el.dataset.rating));
+                break;
+            case 'toggle-srs':
+                this.srs = !this.srs;
+                this.restart();
+                break;
+            case 'browse-all':
+                this.srs = false;
+                this.restart();
+                break;
+            case 'shuffle':
+                if (this.srs)
+                    break;
+                this.restart();
+                this.deck = shuffleArray(this.deck);
+                this.render();
+                break;
+            case 'speak':
+                e.stopPropagation();
+                if (w)
+                    this.deps.speak(w.word, this.deps.getLang(), w.audio);
+                break;
+            case 'mic': {
+                e.stopPropagation();
+                if (el.dataset.active === 'true') {
+                    this.stopMic();
+                    break;
                 }
-                deps.setActiveRecog(deps.runPronunCheck(w.word, micBtn, resultEl));
-            });
-        }
-    } // ─ end renderCard
-    // ── Control events ────────────────────────────────────────────────────────
-    srsToggle.addEventListener('click', () => {
-        srsMode = !srsMode;
-        const pool = _getPool();
-        buildDeck(pool);
-        updateBadge(pool);
-        renderCard();
-    });
-    setEl.addEventListener('change', () => {
-        const pool = _getPool();
-        buildDeck(pool);
-        updateBadge(pool);
-        renderCard();
-    });
-    shuffleEl?.addEventListener('click', () => {
-        if (srsMode)
-            return;
-        buildDeck();
-        deck = shuffleArray(deck);
-        renderCard();
-    });
-    const initPool = _getPool();
-    buildDeck(initPool);
-    updateBadge(initPool);
-    renderCard();
-}
-// ── Internal: back-face example HTML builder ──────────────────────────────────
-/**
- * Returns the HTML for the example sentence area on the card back.
- *
- * • If `flipped` is false  → empty string (back not visible yet).
- * • If entry.example set   → render immediately.
- * • Else                   → render a loading placeholder (AI will fill it in).
- */
-function _buildBackExample(w, flipped) {
-    if (!flipped)
-        return '';
-    // Already persisted — show sentence + translation (translation toggle via click)
-    if (w.example) {
-        const transHtml = w.example_translation
-            ? `<div class="pg-flash-example-trans">${escapeHtml(w.example_translation)}</div>`
-            : '';
-        return `<div class="pg-flash-example-wrap">
-                    <div class="pg-flash-example">${escapeHtml(w.example)}</div>
-                    ${transHtml}
-                </div>`;
-    }
-    // Placeholder — _loadExample() will replace this via AI call
-    return `<div class="pg-flash-example-wrap">
-                <div class="pg-flash-example pg-flash-example-loading" id="pg-flash-example-slot">
-                    <i class="fa-solid fa-spinner fa-spin"></i>
-                </div>
-            </div>`;
-}
-/**
- * Lazily generates and persists an example sentence for a wordbook entry.
- * Replaces the #pg-flash-example-slot element in place once ready.
- */
-async function _loadExample(w, areaEl, deps) {
-    _exampleAbort?.abort();
-    const abort = new AbortController();
-    _exampleAbort = abort;
-    const slot = areaEl.querySelector('#pg-flash-example-slot');
-    try {
-        const s = deps.getSettings();
-        const lang = deps.getLang();
-        const native = deps.getNativeLang();
-        const raw = await deps.callModel(API.sysJson, exampleSentencePrompt(w.base_form || w.word, lang, s.cefr_level, native), abort.signal);
-        if (abort.signal.aborted)
-            return;
-        const result = parseJSON(raw);
-        const sentence = result.sentence?.trim();
-        const translation = result.translation?.trim();
-        if (!sentence)
-            return;
-        // Persist — load fresh to avoid overwriting concurrent SRS changes
-        const wb = loadWordbook();
-        const entry = wb.find(e => e.word === w.word);
-        if (entry) {
-            entry.example = sentence;
-            if (translation)
-                entry.example_translation = translation;
-            saveWordbook(wb);
-            // Also update the live deck reference so re-renders use the cached value
-            w.example = sentence;
-            if (translation)
-                w.example_translation = translation;
-        }
-        // Update DOM in place
-        if (slot && document.contains(slot)) {
-            slot.id = '';
-            slot.className = 'pg-flash-example';
-            slot.textContent = sentence;
-            // Append translation below if present
-            if (translation) {
-                const transEl = document.createElement('div');
-                transEl.className = 'pg-flash-example-trans';
-                transEl.textContent = translation;
-                slot.after(transEl);
+                const result = this.area.querySelector('.pg-pronun-result');
+                if (w && result)
+                    this.deps.setActiveRecog(this.deps.runPronunCheck(w.word, el, result));
+                break;
             }
         }
     }
-    catch {
-        if (abort.signal.aborted)
-            return;
-        if (slot && document.contains(slot)) {
-            slot.id = '';
-            slot.className = 'pg-flash-example pg-flash-example-err';
-            slot.textContent = '—';
-        }
-    }
-    finally {
-        if (_exampleAbort === abort)
-            _exampleAbort = null;
-    }
+}
+/** Renders the flashcard tab (set picker, SRS toggle, shuffle, card) into `container`. */
+export function renderFlashcard(container, deps) {
+    new FlashcardSession(container, deps);
 }

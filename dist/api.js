@@ -1,12 +1,12 @@
 // ════════════════════════════
 // Polyglot  api.ts
 // ════════════════════════════
-// AI provider router — unified callModel entry point and per-provider backends.
+// AI provider router — complete() entry point and per-provider backends.
 //
 // Design rules:
 //   • No DOM, no ST state reads.  getSettings() is NOT called here.
-//   • callModel() takes an explicit `s: Settings` so this module has zero
-//     dependency on index.ts state.  The caller (index.ts) injects settings.
+//   • complete() takes an explicit `s: Settings`; runtime.ts binds the live
+//     settings and wraps it in the JSON client (ai/client.ts).
 //   • ST imports are limited to getRequestHeaders / secret_state — both are
 //     pure request utilities with no side effects.
 //
@@ -79,136 +79,159 @@ const PROVIDER_SECRET_KEY = {
     deepseek: SECRET_KEYS.DEEPSEEK,
     // vertexai omitted — ST handles Express / Service Account auth internally
 };
-// ── Internal helpers ──────────────────────────────────────────────────────────
-function _buildMessages(systemPrompt, userPrompt) {
-    const messages = [];
-    if (systemPrompt)
-        messages.push({ role: 'system', content: systemPrompt });
-    messages.push({ role: 'user', content: userPrompt });
-    return messages;
+// ── Request plumbing ──────────────────────────────────────────────────────────
+const TEMPERATURE = 0.3;
+function buildMessages(system, user) {
+    return system
+        ? [{ role: 'system', content: system }, { role: 'user', content: user }]
+        : [{ role: 'user', content: user }];
 }
+/** Leading reasoning blocks some models write before the answer; an unclosed one runs to the end. */
+const REASONING_BLOCK = /^\s*<(think|thinking|reasoning)>[\s\S]*?(?:<\/\1>|$)/i;
+/** The answer without the model's reasoning preamble. */
+export function stripReasoning(text) {
+    let rest = text;
+    for (let m = REASONING_BLOCK.exec(rest); m; m = REASONING_BLOCK.exec(rest))
+        rest = rest.slice(m[0].length);
+    return rest;
+}
+/**
+ * Text of a content-part list, skipping reasoning parts: Anthropic `thinking`
+ * blocks (no `text`), Gemini parts flagged `thought`, any typed non-text part.
+ */
+function answerParts(parts) {
+    if (!Array.isArray(parts))
+        return undefined;
+    return parts
+        .filter(p => typeof p?.text === 'string' && !p.thought && (!p.type || p.type === 'text' || p.type === 'output_text'))
+        .map(p => p.text)
+        .join('');
+}
+/** Reads the answer text and the "hit the token limit" flag from any supported response shape. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function readReply(data) {
+    const choice = data?.choices?.[0];
+    const content = choice?.message?.content;
+    const text = (typeof content === 'string' ? content : answerParts(content)) ?? // OpenAI-compatible
+        answerParts(data?.content) ?? // Anthropic
+        answerParts(data?.candidates?.[0]?.content?.parts) ?? // Gemini
+        '';
+    const truncated = choice?.finish_reason === 'length' ||
+        data?.stop_reason === 'max_tokens' ||
+        data?.candidates?.[0]?.finishReason === 'MAX_TOKENS';
+    return { text: stripReasoning(text), truncated };
+}
+/** Long enough for slow reasoning models; a hung backend must not leave a spinner forever. */
+const REQUEST_TIMEOUT_MS = 180_000;
+/** The caller's signal plus a timeout; `release` clears the timer and the listener on the caller's signal. */
+function timeoutSignal(caller) {
+    const ctrl = new AbortController();
+    let expired = false;
+    const timer = setTimeout(() => { expired = true; ctrl.abort(); }, REQUEST_TIMEOUT_MS);
+    const forward = () => ctrl.abort();
+    if (caller?.aborted)
+        ctrl.abort();
+    else
+        caller?.addEventListener('abort', forward, { once: true });
+    return {
+        signal: ctrl.signal,
+        timedOut: () => expired,
+        release: () => { clearTimeout(timer); caller?.removeEventListener('abort', forward); },
+    };
+}
+async function postChat({ url, headers, body, signal, errorLabel, networkHint }) {
+    const request = timeoutSignal(signal);
+    try {
+        let resp;
+        try {
+            resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                signal: request.signal,
+                body: JSON.stringify({ temperature: TEMPERATURE, stream: false, ...body }),
+            });
+        }
+        catch (e) {
+            if (request.timedOut())
+                throw new Error(`${errorLabel}: no response within ${REQUEST_TIMEOUT_MS / 1000} s.`);
+            if (e instanceof Error && e.name === 'AbortError')
+                throw e;
+            throw new Error(networkHint);
+        }
+        if (!resp.ok) {
+            const detail = await resp.text().catch(() => '');
+            throw new Error(`${errorLabel} ${resp.status}: ${detail.slice(0, 200)}`);
+        }
+        return readReply(await resp.json());
+    }
+    finally {
+        request.release();
+    }
+}
+const ST_GENERATE_URL = '/api/backends/chat-completions/generate';
+const ST_NETWORK_HINT = 'Network request failed. Make sure the SillyTavern server is running.';
 // ── Public API ────────────────────────────────────────────────────────────────
 /**
- * Unified model call entry point.
- *
- * Dispatches to the correct backend based on `s.provider`.
- * Does NOT call getSettings() — the caller must inject the current settings.
- * In index.ts a thin wrapper `callModel(sys, user, signal)` does the injection.
- *
- * @param s            Current Polyglot settings (injected by caller).
- * @param systemPrompt System / instruction prompt.
- * @param userPrompt   User message.
- * @param signal       Optional AbortSignal for cancellation.
+ * Sends one system + user prompt to the provider chosen in settings.
+ * Settings are passed in (this module never reads ST state); runtime.ts binds them.
  */
-export async function callModel(s, systemPrompt, userPrompt, signal = null) {
-    const provider = s.provider || 'st';
-    if (provider === 'st')
-        return callSTBackend(systemPrompt, userPrompt, s, signal);
-    if (provider === 'custom')
-        return callCustomAPI(systemPrompt, userPrompt, s, signal);
-    // Vertex AI: route through callSTBackend so ST reads its own saved auth config
-    // (Express key or Service Account). google_vertex_express is forwarded from
-    // chatCompletionSettings so ST's backend picks the correct auth path.
-    if (provider === 'vertexai') {
-        return callSTBackend(systemPrompt, userPrompt, { ...s, route_chat_source: 'vertexai', route_model: s.model }, signal);
+export function complete(s, system, user, signal = null) {
+    switch (s.provider || 'st') {
+        case 'st': return completeViaST(system, user, s, signal);
+        case 'custom': return completeViaCustom(system, user, s, signal);
+        // ST reads its own saved Vertex auth (Express key or service account)
+        case 'vertexai': return completeViaST(system, user, { ...s, route_chat_source: 'vertexai', route_model: s.model }, signal);
+        default: return completeViaProvider(system, user, s, signal);
     }
-    return callViaSTBackend(systemPrompt, userPrompt, s, signal);
 }
-/**
- * ST-default mode — uses whatever API connection ST is currently configured with.
- * Also used for Vertex AI (caller sets route_chat_source = 'vertexai').
- */
-export async function callSTBackend(systemPrompt, userPrompt, s, signal) {
-    const ctx = getContext();
-    const ccs = ctx.chatCompletionSettings ?? {};
-    const src = s.route_chat_source || ccs.chat_completion_source || 'openai';
-    const modelKey = ROUTE_MODEL_KEY.get(src) || 'model';
+/** ST's current connection (or the source/model overridden in route_* settings). */
+async function completeViaST(system, user, s, signal) {
+    const ccs = getContext().chatCompletionSettings ?? {};
+    const source = s.route_chat_source || ccs.chat_completion_source || 'openai';
+    const modelKey = ROUTE_MODEL_KEY.get(source) || 'model';
     const model = s.route_model || ccs[modelKey] || '';
-    const messages = _buildMessages(systemPrompt, userPrompt);
-    let resp;
-    try {
-        resp = await fetch('/api/backends/chat-completions/generate', {
-            method: 'POST',
-            headers: { ...getRequestHeaders(), 'Content-Type': 'application/json' },
-            signal: signal ?? undefined,
-            body: JSON.stringify({
-                chat_completion_source: src,
-                [modelKey]: model,
-                model,
-                messages,
-                max_tokens: s.max_tokens,
-                temperature: 0.3,
-                stream: false,
-                // Forward all Vertex AI config fields from ST's saved settings.
-                ...(src === 'vertexai' && {
-                    vertexai_auth_mode: ccs.vertexai_auth_mode ?? 'full',
-                    vertexai_region: ccs.vertexai_region ?? 'global',
-                    vertexai_express_project_id: ccs.vertexai_express_project_id ?? '',
-                }),
+    return postChat({
+        url: ST_GENERATE_URL,
+        headers: getRequestHeaders(),
+        signal,
+        errorLabel: 'ST API',
+        networkHint: ST_NETWORK_HINT,
+        body: {
+            chat_completion_source: source,
+            [modelKey]: model,
+            model,
+            messages: buildMessages(system, user),
+            max_tokens: s.max_tokens,
+            ...(source === 'vertexai' && {
+                vertexai_auth_mode: ccs.vertexai_auth_mode ?? 'full',
+                vertexai_region: ccs.vertexai_region ?? 'global',
+                vertexai_express_project_id: ccs.vertexai_express_project_id ?? '',
             }),
-        });
-    }
-    catch (fetchErr) {
-        if (fetchErr instanceof Error && fetchErr.name === 'AbortError')
-            throw fetchErr;
-        throw new Error('Network request failed. Make sure the SillyTavern server is running.');
-    }
-    if (!resp.ok) {
-        const text = await resp.text().catch(() => '');
-        throw new Error(`ST API ${resp.status}: ${text.slice(0, 200)}`);
-    }
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.content ?? data.content?.[0]?.text ?? '';
+        },
+    });
 }
-/**
- * Known-provider mode — routes through ST backend with an explicit
- * chat_completion_source.  Reuses ST's stored API keys.
- */
-export async function callViaSTBackend(systemPrompt, userPrompt, s, signal) {
-    const chatSource = PROVIDER_SOURCE[s.provider];
-    if (!chatSource)
+/** A known provider routed through ST's backend, reusing ST's stored API keys. */
+async function completeViaProvider(system, user, s, signal) {
+    const source = PROVIDER_SOURCE[s.provider];
+    if (!source)
         throw new Error(`Unknown provider: ${s.provider}`);
     if (!s.model)
         throw new Error('No model selected. Please choose a model in the settings.');
-    // Pre-flight key check — gives faster, clearer error feedback
     const secretKey = PROVIDER_SECRET_KEY[s.provider];
     if (secretKey && !secret_state[secretKey]) {
         throw new Error(`${s.provider.toUpperCase()} API key is not set. Enter it in SillyTavern's API settings.`);
     }
-    const messages = _buildMessages(systemPrompt, userPrompt);
-    let resp;
-    try {
-        resp = await fetch('/api/backends/chat-completions/generate', {
-            method: 'POST',
-            headers: { ...getRequestHeaders(), 'Content-Type': 'application/json' },
-            signal: signal ?? undefined,
-            body: JSON.stringify({
-                chat_completion_source: chatSource,
-                model: s.model,
-                messages,
-                max_tokens: s.max_tokens,
-                temperature: 0.3,
-                stream: false,
-            }),
-        });
-    }
-    catch (fetchErr) {
-        if (fetchErr instanceof Error && fetchErr.name === 'AbortError')
-            throw fetchErr;
-        throw new Error('Network request failed. Make sure the SillyTavern server is running.');
-    }
-    if (!resp.ok) {
-        const text = await resp.text().catch(() => '');
-        throw new Error(`${s.provider.toUpperCase()} API ${resp.status}: ${text.slice(0, 200)}`);
-    }
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.content ?? data.content?.[0]?.text ?? '';
+    return postChat({
+        url: ST_GENERATE_URL,
+        headers: getRequestHeaders(),
+        signal,
+        errorLabel: `${s.provider.toUpperCase()} API`,
+        networkHint: ST_NETWORK_HINT,
+        body: { chat_completion_source: source, model: s.model, messages: buildMessages(system, user), max_tokens: s.max_tokens },
+    });
 }
-/**
- * Custom-provider mode — user-supplied Base URL and API key.
- * Normalises the base URL before appending /v1/chat/completions.
- */
-export async function callCustomAPI(systemPrompt, userPrompt, s, signal) {
+/** Any OpenAI-compatible endpoint with a user-supplied base URL and key. */
+async function completeViaCustom(system, user, s, signal) {
     const { ext_api_key: apiKey, ext_base_url: baseUrl, model, max_tokens } = s;
     if (!baseUrl)
         throw new Error('Custom provider requires a Base URL. Check the settings.');
@@ -216,33 +239,17 @@ export async function callCustomAPI(systemPrompt, userPrompt, s, signal) {
         throw new Error('Custom API key is empty. Check the settings.');
     if (!model)
         throw new Error('Model name is empty. Check the settings.');
-    // Validate protocol — only http and https are valid for API calls.
-    // Catches typos like "htps://" or "ftp://" before attempting a fetch.
     if (!/^https?:\/\//i.test(baseUrl)) {
         throw new Error(`Invalid Base URL: "${baseUrl}". Must start with http:// or https://.`);
     }
-    // Strip trailing slash and any /v1 or /v1/chat/completions suffix the user may have included,
-    // so we never produce .../v1/v1/...
-    const normBase = baseUrl.replace(/\/$/, '').replace(/\/v1\/chat\/completions$/i, '').replace(/\/v1$/i, '');
-    const url = normBase + '/v1/chat/completions';
-    const messages = _buildMessages(systemPrompt, userPrompt);
-    let resp;
-    try {
-        resp = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-            signal: signal ?? undefined,
-            body: JSON.stringify({ model, max_tokens, messages, temperature: 0.3, stream: false }),
-        });
-    }
-    catch (fetchErr) {
-        if (fetchErr instanceof Error && fetchErr.name === 'AbortError')
-            throw fetchErr;
-        throw new Error(`Unable to connect to custom API server. Check the Base URL: ${baseUrl}`);
-    }
-    if (!resp.ok) {
-        const text = await resp.text().catch(() => '');
-        throw new Error(`Custom API error: ${resp.status}: ${text.slice(0, 200)}`);
-    }
-    return (await resp.json()).choices?.[0]?.message?.content ?? '';
+    // Accept ".../v1" or ".../v1/chat/completions" without producing ".../v1/v1/..."
+    const root = baseUrl.replace(/\/$/, '').replace(/\/v1\/chat\/completions$/i, '').replace(/\/v1$/i, '');
+    return postChat({
+        url: `${root}/v1/chat/completions`,
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal,
+        errorLabel: 'Custom API error:',
+        networkHint: `Unable to connect to custom API server. Check the Base URL: ${baseUrl}`,
+        body: { model, max_tokens, messages: buildMessages(system, user) },
+    });
 }

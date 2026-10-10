@@ -1,202 +1,138 @@
 // ════════════════════════════
 // Polyglot  features/conjugation.ts
 // ════════════════════════════
-// Verb conjugation popup — DOM overlay, table renderer, and IDB cache logic.
+// Verb conjugation popup: a modal overlay showing one table per tense.
 //
-// Two entry points:
-//   showConjugationPopup(base, lang, deps)
-//     → Called from the annotation bubble's 📊 button.
-//       Always fetches from IDB first, falls back to API.
+// Tables come from the IndexedDB cache when present, otherwise from the AI
+// (then cached, and the wordbook entry is flagged `conj_cached`).
 //
-//   showConjugationPopupFromCache(word, deps)
-//     → Called from the Wordbook list's conj button.
-//       Silently re-fetches if the IDB cache is missing (e.g. after lang change).
+// Entry points:
+//   showConjugationPopup(base, lang, deps)    annotation bubble 📊 button (shows a language badge)
+//   showConjugationPopupFromCache(word, deps) wordbook row button
 //
 // Design rules:
-//   • No direct ST state reads — callModel, getLang, wordbook ops are injected.
-//   • _createConjOverlay is module-private — callers use the two public fns.
-//   • escapeHtml is imported directly from ui.manager (no side effects).
+//   • No direct ST state reads — the AI client and language getters are injected.
+//   • Only one popup exists at a time; opening a new one closes the previous.
 //
-// Dependencies: constants.ts, prompts.ts, utils.ts, ui.manager.ts,
-//               conj-cache.ts, wordbook.ts, types.ts
-import { API } from '../constants.js';
+// Dependencies: prompts.ts, html.ts, i18n.ts, conj-cache.ts, wordbook.ts, ai/client.ts
 import { verbConjugationPrompt } from '../prompts.js';
-import { parseJSON } from '../utils.js';
-import { escapeHtml } from '../ui.manager.js';
+import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { getConjCache, setConjCache } from '../conj-cache.js';
 import { loadWordbook, saveWordbook } from '../wordbook.js';
-// ── Module-level ESC handler tracker ─────────────────────────────────────────
-// Only one popup can be open at a time — the handler is replaced on each open.
-let _conjEscHandler = null;
-// ── Internal helpers ──────────────────────────────────────────────────────────
-/**
- * Creates the conjugation popup DOM and wires up close/ESC behaviour.
- * Returns { overlay, body, abort } so callers can populate body content
- * and cancel any in-flight API call when the popup is dismissed.
- */
-function _createConjOverlay(base, langLabel) {
-    // Dismiss any existing popup before creating a new one
-    document.querySelector('.pg-conj-overlay')?.remove();
-    if (_conjEscHandler) {
-        document.removeEventListener('keydown', _conjEscHandler);
-        _conjEscHandler = null;
+import { isRecord } from '../ai/client.js';
+// ── Data ──────────────────────────────────────────────────────────────────────
+/** Accepts a table with at least one tense; drops tenses without rows. */
+function acceptConjData(v) {
+    if (!isRecord(v) || !Array.isArray(v.tenses))
+        return null;
+    const tenses = v.tenses.filter(tn => isRecord(tn) && Array.isArray(tn.rows) && tn.rows.length);
+    if (!tenses.length)
+        return null;
+    return { base: String(v.base ?? ''), translation: String(v.translation ?? ''), tenses };
+}
+/** Cached table, or a freshly generated (and then cached) one. */
+async function loadConjugation(word, lang, deps, signal) {
+    const cached = await getConjCache(word, lang);
+    if (cached?.tenses?.length)
+        return cached;
+    const { data } = await deps.ai.json({
+        prompt: verbConjugationPrompt(word, lang, deps.getNativeLang()),
+        signal,
+        accept: acceptConjData,
+    });
+    await setConjCache(word, data, lang);
+    markCached(word);
+    return data;
+}
+function markCached(word) {
+    const wordbook = loadWordbook();
+    const entry = wordbook.find(e => e.word === word || e.base_form === word);
+    if (entry && !entry.conj_cached) {
+        entry.conj_cached = true;
+        saveWordbook(wordbook);
     }
+}
+let closeCurrent = null;
+/** Opens the modal (closing any previous one). Closing it cancels the pending request. */
+function openPopup(title, badge) {
+    closeCurrent?.();
     const overlay = document.createElement('div');
     overlay.className = 'pg-conj-overlay';
-    overlay.innerHTML = `
-        <div class="pg-conj-modal" role="dialog" aria-modal="true">
+    setHtml(overlay, html `
+        <div class="pg-conj-modal" role="dialog" aria-modal="true" aria-label="${title}">
             <div class="pg-conj-header">
-                <span class="pg-conj-base">${escapeHtml(base)}</span>
-                ${langLabel ? `<span class="pg-conj-lang-badge">${escapeHtml(langLabel)}</span>` : ''}
+                <span class="pg-conj-base">${title}</span>
+                ${badge && html `<span class="pg-conj-lang-badge">${badge}</span>`}
                 <button class="pg-conj-close" title="Close" aria-label="Close"></button>
             </div>
             <div class="pg-conj-body"></div>
-        </div>`;
+        </div>`);
     document.body.appendChild(overlay);
-    const abortCtrl = new AbortController();
+    const abort = new AbortController();
+    const onKey = (e) => { if (e.key === 'Escape')
+        close(); };
     const close = () => {
-        abortCtrl.abort();
+        abort.abort();
         overlay.remove();
-        if (_conjEscHandler) {
-            document.removeEventListener('keydown', _conjEscHandler);
-            _conjEscHandler = null;
-        }
+        document.removeEventListener('keydown', onKey);
+        if (closeCurrent === close)
+            closeCurrent = null;
     };
+    closeCurrent = close;
     overlay.addEventListener('pointerdown', e => { if (e.target === overlay) {
         e.stopPropagation();
         close();
     } });
-    overlay.querySelector('.pg-conj-close').addEventListener('click', close);
-    _conjEscHandler = (e) => { if (e.key === 'Escape')
-        close(); };
-    document.addEventListener('keydown', _conjEscHandler);
-    return { overlay, body: overlay.querySelector('.pg-conj-body'), abort: abortCtrl };
+    overlay.querySelector('.pg-conj-close')?.addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    return { body: overlay.querySelector('.pg-conj-body'), signal: abort.signal };
 }
-/** Renders ConjData JSON into the popup body element. */
-function _renderConjTable(body, data) {
-    const { base, translation, tenses = [] } = data;
-    if (!tenses.length) {
-        body.className = 'pg-conj-body pg-conj-error';
-        body.innerHTML = t('conj.noData');
-        return;
+function setBody(body, state, content) {
+    body.className = state === 'ready' ? 'pg-conj-body' : `pg-conj-body pg-conj-${state}`;
+    setHtml(body, content);
+}
+function renderTable(body, { base, translation, tenses }) {
+    // The resolved base form and its meaning replace the clicked surface form in the header
+    const header = body.closest('.pg-conj-modal');
+    const baseEl = header?.querySelector('.pg-conj-base');
+    if (baseEl && base)
+        baseEl.textContent = base;
+    if (baseEl && translation && !header?.querySelector('.pg-conj-meaning')) {
+        baseEl.insertAdjacentElement('afterend', Object.assign(document.createElement('span'), { className: 'pg-conj-meaning', textContent: translation }));
     }
-    // Update header with resolved base form + meaning badge
-    const modal = body.closest('.pg-conj-modal');
-    if (modal) {
-        const baseEl = modal.querySelector('.pg-conj-base');
-        if (baseEl)
-            baseEl.textContent = base;
-        if (translation && !modal.querySelector('.pg-conj-meaning')) {
-            const badge = document.createElement('span');
-            badge.className = 'pg-conj-meaning';
-            badge.textContent = translation;
-            baseEl?.insertAdjacentElement('afterend', badge);
-        }
+    setBody(body, 'ready', html `
+        <div class="pg-conj-grid">${tenses.map(tense => html `
+            <div class="pg-conj-tense-col">
+                <div class="pg-conj-tense-head">
+                    <span class="pg-conj-tense-name">${tense.name}</span>
+                    <span class="pg-conj-tense-ko">${tense.name_native}</span>
+                </div>
+                <table class="pg-conj-table"><tbody>${(tense.rows ?? []).map(r => html `
+                    <tr><td class="pg-conj-person">${r.person}</td><td class="pg-conj-form">${r.form}</td></tr>`)}
+                </tbody></table>
+            </div>`)}
+        </div>`);
+}
+async function show(word, lang, deps, badge) {
+    const { body, signal } = openPopup(word, badge);
+    setBody(body, 'loading', html `<i class="fa-solid fa-spinner fa-spin"></i> ${t('conj.loading')}`);
+    try {
+        renderTable(body, await loadConjugation(word, lang, deps, signal));
     }
-    const tablesCols = tenses.map(t => `
-        <div class="pg-conj-tense-col">
-            <div class="pg-conj-tense-head">
-                <span class="pg-conj-tense-name">${escapeHtml(t.name)}</span>
-                <span class="pg-conj-tense-ko">${escapeHtml(t.name_native)}</span>
-            </div>
-            <table class="pg-conj-table">
-                <tbody>
-                    ${(t.rows || []).map(r => `
-                        <tr>
-                            <td class="pg-conj-person">${escapeHtml(r.person)}</td>
-                            <td class="pg-conj-form">${escapeHtml(r.form)}</td>
-                        </tr>`).join('')}
-                </tbody>
-            </table>
-        </div>`).join('');
-    body.className = 'pg-conj-body';
-    body.innerHTML = `<div class="pg-conj-grid">${tablesCols}</div>`;
-}
-function _showLoadingSpinner(body) {
-    body.classList.add('pg-conj-loading');
-    body.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${t('conj.loading')}`;
-}
-function _showError(body, err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    body.className = 'pg-conj-body pg-conj-error';
-    body.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${t('conj.failed', { msg: escapeHtml(msg) })}`;
+    catch (err) {
+        if (signal.aborted)
+            return;
+        const msg = err instanceof Error ? err.message : String(err);
+        setBody(body, 'error', html `<i class="fa-solid fa-triangle-exclamation"></i> ${t('conj.failed', { msg })}`);
+    }
 }
 // ── Public API ────────────────────────────────────────────────────────────────
-/**
- * Opens the conjugation popup for a word from the annotation bubble.
- * IDB cache is checked first; falls back to a live API call.
- * Also updates the wordbook entry's conj_cached flag on successful fetch.
- */
-export async function showConjugationPopup(base, lang, deps) {
-    const { body, abort } = _createConjOverlay(base, lang);
-    _showLoadingSpinner(body);
-    try {
-        // getConjCache returns ConjData | null directly (entry.data is unwrapped inside conj-cache.ts).
-        const data = await getConjCache(base, lang);
-        if (!data?.tenses) {
-            const raw = await deps.callModel(API.sysJson, verbConjugationPrompt(base, lang, deps.getNativeLang()), abort.signal);
-            if (abort.signal.aborted)
-                return;
-            const fetched = parseJSON(raw);
-            // Persist to IDB and mark the wordbook entry as cached
-            await setConjCache(base, fetched, lang);
-            const wb = loadWordbook();
-            const wbEntry = wb.find(e => e.word === base || e.base_form === base);
-            if (wbEntry && !wbEntry.conj_cached) {
-                wbEntry.conj_cached = true;
-                saveWordbook(wb);
-            }
-            // Remove loading class regardless of whether data came from cache or API
-            body.classList.remove('pg-conj-loading');
-            _renderConjTable(body, fetched);
-            return;
-        }
-        // Cache hit — render immediately
-        body.classList.remove('pg-conj-loading');
-        _renderConjTable(body, data);
-    }
-    catch (err) {
-        if (abort.signal.aborted)
-            return;
-        _showError(body, err);
-    }
+/** From the annotation bubble: shows the language as a badge. */
+export function showConjugationPopup(base, lang, deps) {
+    return show(base, lang, deps, lang);
 }
-/**
- * Opens the conjugation popup for a word from the Wordbook list.
- * Reads from IDB; silently re-fetches if the cache is missing
- * (e.g. after a language switch or manual cache clear).
- */
-export async function showConjugationPopupFromCache(word, deps) {
-    const lang = deps.getLang();
-    const { body, abort } = _createConjOverlay(word);
-    // getConjCache returns ConjData | null directly — no wrapper to unwrap.
-    const cached = await getConjCache(word, lang);
-    if (cached?.tenses) {
-        _renderConjTable(body, cached);
-        return;
-    }
-    // Cache miss — re-fetch silently
-    _showLoadingSpinner(body);
-    try {
-        const raw = await deps.callModel(API.sysJson, verbConjugationPrompt(word, lang, deps.getNativeLang()), abort.signal);
-        if (abort.signal.aborted)
-            return;
-        const data = parseJSON(raw);
-        await setConjCache(word, data, lang);
-        // Update conj_cached flag on wordbook entry
-        const wb = loadWordbook();
-        const wbEntry = wb.find(e => e.word === word || e.base_form === word);
-        if (wbEntry && !wbEntry.conj_cached) {
-            wbEntry.conj_cached = true;
-            saveWordbook(wb);
-        }
-        body.classList.remove('pg-conj-loading');
-        _renderConjTable(body, data);
-    }
-    catch (err) {
-        if (abort.signal.aborted)
-            return;
-        _showError(body, err);
-    }
+/** From a wordbook row: uses the current study language. */
+export function showConjugationPopupFromCache(word, deps) {
+    return show(word, deps.getLang(), deps);
 }
