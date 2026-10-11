@@ -17,16 +17,16 @@
 //     what study-scope.ts skips (status windows, names) is neither sent nor highlighted.
 import { KEY, DELAY } from './constants.js';
 import { ST_SEL, mesSelector, mesIdOf, mesTextOf } from './st-dom.js';
-import { levelClass, findWord, entryList, withEntryFor } from './utils.js';
+import { levelClass, findWord, entryList, withEntryFor, relocateEntries } from './utils.js';
 import { annotatorPrompt } from './prompts.js';
 import { notify } from './ui.manager.js';
 import { html, setHtml } from './html.js';
 import { t } from './i18n.js';
 import { addToWordbook } from './wordbook.js';
 import { chatValue, currentChatId } from './storage.js';
-import { getSettings, getLang, getNativeLang, ai } from './runtime.js';
+import { getSettings, getLang, getNativeLang, ai, getContext } from './runtime.js';
 import { acceptObject, unionBy } from './ai/client.js';
-import { plainText } from './plain-text.js';
+import { plainText, shownTextHashes } from './plain-text.js';
 import { studiedText, skippedNodes, skippedNames, wordSkipper } from './study-scope.js';
 import { drawDialogue, stripDialogue, LINE_CLASS } from './ui/dialogue-layer.js';
 import { showFuriganaFor, hideFuriganaFor, clearChatFurigana } from './furigana/messages.js';
@@ -224,6 +224,14 @@ export function restoreAnnotations() {
             show(msgEl, mesId, data);
     }
     syncButtons();
+}
+/** Messages were deleted and ST renumbered the rest: saved analyses follow their messages. */
+export function relocateAnnotations() {
+    const saved = store.get();
+    const length = getContext().chat?.length;
+    const moved = saved && typeof length === 'number' && relocateEntries(saved, shownTextHashes(), length);
+    if (moved)
+        store.set(moved);
 }
 /** ST renders messages asynchronously after a load — keep restoring until they all exist (or time runs out). */
 export function restoreWithRetry() {

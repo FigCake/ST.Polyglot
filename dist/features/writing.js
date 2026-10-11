@@ -3,6 +3,7 @@
 //
 //   pick a kind ─▶ task (AI) ─▶ write ─▶ feedback (AI): four 0–3 criteria,
 //                                         estimated level, corrections, model answer
+//   correction archive ─▶ messages the 🪄 input checker corrected (note, delete)
 //
 // The task and draft survive leaving the mode while the page stays open, so
 // switching to a word card and back loses nothing.
@@ -12,9 +13,11 @@
 //   • Every AI reply passes through writing-model.ts before it is shown.
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
-import { notify } from '../ui.manager.js';
+import { notify, askInput } from '../ui.manager.js';
 import { writingTaskPrompt, writingFeedbackPrompt } from '../prompts.js';
 import { cleanRawMessage } from '../study-scope.js';
+import { checksFor, deleteCheck, setCheckNote } from '../check-archive.js';
+import { studyLangKey } from '../wordbook.js';
 import { lengthTarget, countText, acceptWritingTask, acceptFeedback, diffText, countsCharacters, CRITERIA, } from './writing-model.js';
 const KINDS = [
     { id: 'letter', icon: '✉️', title: 'wr.kindLetter', desc: 'wr.kindLetterDesc' },
@@ -52,6 +55,14 @@ const picker = () => html `
             <span class="pg-qmode-title">${t(k.title)}</span>
             <span class="pg-qmode-desc">${t(k.desc)}</span>
         </button>`)}
+        <button class="pg-quiz-mode-btn pg-quiz-mode-wide" data-kind="archive">
+            <span class="pg-qmode-icon">🪄</span>
+            <span class="pg-qmode-text">
+                <span class="pg-qmode-title">${t('wr.archive')}</span>
+                <span class="pg-qmode-desc">${t('wr.archiveDesc')}</span>
+            </span>
+            <span class="pg-qmode-count">${t('wr.archiveCount', { n: checksFor(studyLangKey()).length })}</span>
+        </button>
     </div>`;
 const skeleton = () => html `
     <div class="pg-skeleton-quiz pg-skeleton">
@@ -74,9 +85,11 @@ function taskCard(s, target) {
         </div>`;
 }
 const dots = (n) => html `<span class="pg-write-dots" aria-label="${n} / 3">${[0, 1, 2].map(i => html `<i class="${i < n && 'on'}"></i>`)}</span>`;
+/** `after` with the changes from `before` marked; plain when they share too little (a translation). */
 function diffView(before, after, lang) {
     const parts = diffText(before, after, countsCharacters(lang));
-    if (!parts)
+    const kept = parts?.filter(p => p.kind === 'same').reduce((n, p) => n + p.text.length, 0) ?? 0;
+    if (!parts || kept < 0.3 * Math.max(before.length, after.length))
         return html `${after}`;
     return html `${parts.map(p => p.kind === 'same' ? html `${p.text}`
         : p.kind === 'del' ? html `<del>${p.text}</del>` : html `<ins>${p.text}</ins>`)}`;
@@ -121,7 +134,9 @@ function renderPicker(container, deps) {
     setHtml(container, html `${picker()}<div class="pg-write-area"></div>`);
     container.querySelector('.pg-quiz-modes')?.addEventListener('click', e => {
         const kind = e.target.closest('[data-kind]')?.dataset.kind;
-        if (kind)
+        if (kind === 'archive')
+            renderArchive(container, deps);
+        else if (kind)
             void newTask(container, deps, kind);
     });
 }
@@ -269,6 +284,52 @@ function saveErrors(deps, btn) {
         deps.saveWrongAnswers([...saved, ...added]);
     btn.textContent = t('qz.wrongSaved');
     btn.disabled = true;
+}
+// ── Correction archive ────────────────────────────────────────────────────────
+function renderArchive(container, deps) {
+    const lang = deps.getLang();
+    const checks = checksFor(studyLangKey());
+    const date = (at) => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    setHtml(container, html `
+        <div class="pg-write-bar">
+            <span class="pg-write-title">${t('wr.archive')}</span>
+            <span class="pg-wb-count-spacer"></span>
+            <button class="pg-wb-row-btn" data-write="tasks">${t('wr.backToTasks')}</button>
+        </div>
+        ${checks.length ? checks.map(c => html `
+        <div class="pg-quiz-card pg-check-card" data-id="${c.id}">
+            <div class="pg-write-meta">${date(c.at)}</div>
+            <div class="pg-check-original">${c.original}</div>
+            <div class="pg-write-diff">${diffView(c.original, c.grammar, lang)}</div>
+            ${c.natural && c.natural !== c.grammar && html `
+                <div class="pg-check-natural"><span class="pg-write-type">${t('wr.natural')}</span> ${c.natural}</div>`}
+            ${c.explanation && html `<div class="pg-write-muted pg-check-why">${c.explanation}</div>`}
+            ${c.note && html `<div class="pg-check-note">${c.note}</div>`}
+            <div class="pg-check-actions">
+                <button class="pg-wb-row-btn" data-write="note">${t('wr.note')}</button>
+                <button class="pg-wb-row-btn pg-wb-row-btn-danger" data-write="delete">${t('wb.delete')}</button>
+            </div>
+        </div>`) : html `<div class="pg-empty-hint">${t('wr.archiveEmpty')}</div>`}`);
+    container.onclick = async (e) => {
+        const btn = e.target.closest('[data-write]');
+        const id = btn?.closest('[data-id]')?.dataset.id;
+        const action = btn?.dataset.write;
+        if (action === 'tasks') {
+            renderPicker(container, deps);
+            return;
+        }
+        if (!id)
+            return;
+        if (action === 'delete')
+            deleteCheck(id);
+        if (action === 'note') {
+            const note = await askInput(t('wr.note'), { initial: checks.find(c => c.id === id)?.note ?? '' });
+            if (note === null)
+                return;
+            setCheckNote(id, note);
+        }
+        renderArchive(container, deps);
+    };
 }
 /** Shows the writing mode: the current task and draft if there is one for this language and level, else the task kinds. */
 export function renderWriting(container, deps) {

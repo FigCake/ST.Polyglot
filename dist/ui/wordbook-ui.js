@@ -17,11 +17,12 @@ import { levelLabel } from '../utils.js';
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { askConfirm, askInput } from '../ui.manager.js';
-import { getSets, createSet, deleteSet, removeFromWordbook, currentScope, isShared, langFilter, otherLangWords, addToWordbook as addEntry, } from '../wordbook.js';
+import { getSets, createSet, deleteSet, removeFromWordbook, currentScope, isShared, langFilter, otherLangWords, addToWordbook as addEntry, scopedWordbook, } from '../wordbook.js';
 import { getSettings, getLang } from '../runtime.js';
 import { currentChatId } from '../storage.js';
 import { toggleReanalysis } from './reanalysis-bar.js';
 import { emptyFilter } from './wordbook/filters.js';
+import { isMissed } from '../srs.js';
 import { renderList, countLabel, selectedWords } from './wordbook/list.js';
 import { pickAndImport } from './wordbook/import.js';
 import { showDuplicates } from './wordbook/duplicates.js';
@@ -32,7 +33,7 @@ const filter = emptyFilter();
 const LEVEL_PILLS = [...LEVEL_FILTERS, 'sentence'];
 let pane = null;
 // ── Markup ────────────────────────────────────────────────────────────────────
-const toolbar = (sets) => html `
+const toolbar = (sets, missed) => html `
     <div class="pg-reanalysis-bar pg-wb-reanalysis-bar" hidden></div>
 
     <div class="pg-wb-search-row">
@@ -45,6 +46,10 @@ const toolbar = (sets) => html `
             <button class="pg-filter-pill ${filter.level === level && 'active'}" data-action="level" data-level="${level}">
                 ${level === 'all' ? t('wb.filterAll') : levelLabel(level)}
             </button>`)}
+            ${(missed > 0 || filter.missed) && html `
+            <button class="pg-filter-pill pg-filter-missed ${filter.missed && 'active'}" data-action="missed" title="${t('wb.missedTip')}">
+                ${t('wb.missed', { n: missed })}
+            </button>`}
         </div>
         <div class="pg-wb-set-row">
             <select class="pg-set-select" aria-label="${t('wb.allSets')}">
@@ -131,6 +136,7 @@ const ACTIONS = {
         if (el)
             showDuplicates(el, () => renderListOnly(root));
     },
+    'missed': root => { filter.missed = !filter.missed; renderWordbook(root); },
     'level': (root, el) => {
         filter.level = el.dataset.level ?? 'all';
         filter.pos = ''; // a POS filter on top of a level pill is confusing
@@ -211,7 +217,7 @@ export function renderWordbook(root) {
         filter.query = '';
     const scroll = listOf(root)?.scrollTop ?? 0;
     pane = root;
-    setHtml(root, toolbar(getSets()));
+    setHtml(root, toolbar(getSets(), scopedWordbook().filter(isMissed).length));
     if (!bound.has(root)) {
         bind(root);
         bound.add(root);

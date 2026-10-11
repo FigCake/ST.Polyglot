@@ -32,15 +32,18 @@ The user wants to express something in ${lang}.
 
 Instructions:
 - Detect the language of the input text.
-- If the input IS already in ${lang}: fix only spelling, grammar, and unnatural phrasing. Do not rephrase what is already correct.
-- If the input is in ANY OTHER language: translate it naturally into ${lang} at CEFR ${level} level, then apply corrections.
-- The final "corrected_text" must always be in ${lang}.
+- If the input IS already in ${lang}:
+  - "grammar": fix ONLY grammar and spelling mistakes. Do not change the wording, word choice or style; leave what is correct exactly as it is.
+  - "natural": the same message said more naturally, the way a native speaker would, at CEFR ${level} level.
+- If the input is in ANY OTHER language:
+  - "grammar": a faithful translation into ${lang}, close to the original wording.
+  - "natural": a natural ${lang} way to say it at CEFR ${level} level.
+- Both must always be in ${lang}. When the text needs no change, both equal the input.
 
 Return ONLY valid JSON (no markdown, no extra text):
-{ "corrected_text": "...", "explanation": "..." }
+{ "grammar": "...", "natural": "...", "explanation": "..." }
 
-- "corrected_text": the final ${lang} text (translated if needed, then corrected)
-- "explanation": brief explanation in ${nativeLang} — if translated, say which language was detected and what was changed; if only corrected, describe the corrections; if nothing changed, say "no change"
+- "explanation": brief explanation in ${nativeLang} — if translated, say which language was detected; list the grammar fixes, then what makes the natural version more natural; if nothing changed, say "no change"
 
 Text:
 <text>${text}</text>`;

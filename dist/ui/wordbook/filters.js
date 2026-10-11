@@ -1,7 +1,8 @@
-// Wordbook list filters (level pill, set, part of speech, search) — pure.
-export const emptyFilter = () => ({ level: 'all', setId: 'all', pos: '', query: '' });
+// Wordbook list filters (level pill, frequently missed, set, part of speech, search) — pure.
+import { isMissed } from '../../srs.js';
+export const emptyFilter = () => ({ level: 'all', setId: 'all', pos: '', query: '', missed: false });
 export function isFiltered(f) {
-    return f.level !== 'all' || f.setId !== 'all' || !!f.pos || !!f.query.trim();
+    return f.level !== 'all' || f.setId !== 'all' || !!f.pos || !!f.query.trim() || f.missed;
 }
 function matchesLevel(w, level) {
     if (level === 'all')
@@ -20,6 +21,7 @@ export function applyFilter(wordbook, f) {
     return wordbook
         .filter(w => matchesLevel(w, f.level) &&
         (!f.pos || w.pos === f.pos) &&
+        (!f.missed || isMissed(w)) &&
         (f.setId === 'all' || (w.setIds ?? []).includes(f.setId)) &&
         (!q || matchesQuery(w, q)))
         .reverse();

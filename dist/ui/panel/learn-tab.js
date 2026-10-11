@@ -12,8 +12,9 @@ import { html, setHtml } from '../../html.js';
 import { askConfirm } from '../../ui.manager.js';
 import { t } from '../../i18n.js';
 import { getAllConjEntries } from '../../conj-cache.js';
-import { wrongAnswersData, replaceUserData } from '../../data-store.js';
+import { wrongAnswersData, replaceUserData, onDataReplaced } from '../../data-store.js';
 import { renderDetail } from '../wordbook-ui.js';
+import { renderStudyRecord } from './study-record.js';
 import { renderFlashcard } from '../../features/flashcard.js';
 import { renderSpeaking } from '../../features/speaking.js';
 import { renderMatchSetup } from '../../features/match.js';
@@ -72,13 +73,13 @@ function renderQuizPicker(container) {
 const MODES = [
     {
         id: 'flash', icon: '🃏', key: 'pnl.learn.flash',
-        render: c => renderFlashcard(c, {
+        render: (c, opts) => renderFlashcard(c, {
             ai, getLang, getNativeLang, getSettings, speak,
             hasSpeechRecog: hasSpeechRecognition,
             runPronunCheck: pronounce,
             setActiveRecog: setActiveRecognition,
             getActiveRecog: getActiveRecognition,
-        }),
+        }, opts.review),
     },
     { id: 'quiz', icon: '🎯', key: 'pnl.learn.quiz', render: renderQuizPicker },
     { id: 'write', icon: '✍️', key: 'pnl.learn.write', render: c => renderWriting(c, quizDeps) },
@@ -97,6 +98,9 @@ export class LearnTab {
     detail = document.createElement('div');
     mode = document.createElement('div');
     bar = document.createElement('div');
+    /** The word in the detail card; none: the study record shows there. */
+    current;
+    unsubscribe;
     constructor(initial, actions) {
         this.actions = actions;
         this.el.className = 'pg-box-pane pg-learn-tab';
@@ -111,15 +115,34 @@ export class LearnTab {
             if (id)
                 this.enter(id);
         });
-        renderDetail(this.detail, initial, actions);
+        this.current = initial;
+        if (initial)
+            renderDetail(this.detail, initial, actions);
+        else
+            this.showRecord();
+        // The data file loaded, or another device's changes came in: the record shows them
+        this.unsubscribe = onDataReplaced(() => this.refresh());
         this.el.append(this.detail, this.mode, this.bar);
+    }
+    /** Redraws the study record, when it is what the tab shows, with the current numbers. */
+    refresh() {
+        if (!this.current && this.mode.hidden)
+            this.showRecord();
+    }
+    /** Stops following data changes (the panel closed or the tab was rebuilt). */
+    dispose() {
+        this.unsubscribe();
     }
     /** Shows a word in the detail card, leaving any active mode. */
     showDetail(data) {
+        this.current = data;
         renderDetail(this.detail, data, this.actions);
         this.exit();
     }
-    enter(id) {
+    showRecord() {
+        renderStudyRecord(this.detail, () => this.enter('flash', { review: true }));
+    }
+    enter(id, opts = {}) {
         const mode = MODES.find(m => m.id === id);
         if (!mode)
             return;
@@ -133,7 +156,7 @@ export class LearnTab {
         leaveWriting();
         this.mode.replaceChildren(back, inner);
         this.setActive(id);
-        mode.render(inner);
+        mode.render(inner, opts);
     }
     exit() {
         if (this.mode.hidden)
@@ -142,6 +165,9 @@ export class LearnTab {
         leaveWriting();
         this.mode.replaceChildren();
         this.setActive(null);
+        // Back from studying: the record shows the new numbers
+        if (!this.current)
+            this.showRecord();
     }
     setActive(id) {
         this.detail.hidden = id !== null;

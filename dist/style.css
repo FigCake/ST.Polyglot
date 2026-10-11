@@ -959,6 +959,13 @@
     font-size: 13px;
 }
 
+.pg-pset-number {
+    width: 64px !important;
+    margin: 0 !important;
+    font-size: 13px;
+    text-align: right;
+}
+
 /* Label above a full-width text input, optional hint below */
 .pg-pset-field {
     display: flex;
@@ -3040,17 +3047,12 @@ mark.pg-wb-hl {
 
 /* ── Flashcard example sentence ── */
 .pg-flash-example-wrap {
-    margin-top: 10px;
-    padding: 6px 10px;
-    border-left: 3px solid var(--SmartThemeQuoteColor, #7a9ec2);
-    background: rgba(122, 158, 194, 0.08);
-    border-radius: 0 4px 4px 0;
+    margin-top: 12px;
 }
 .pg-flash-example {
     font-size: 0.83em;
     color: var(--pg-t1);
     opacity: 0.85;
-    font-style: italic;
     line-height: 1.5;
     min-height: 1.4em;
 }
@@ -3183,7 +3185,24 @@ mark.pg-wb-hl {
     color: var(--pg-t1);
     opacity: 0.6;
     line-height: 1.6;
+    margin-bottom: 4px;
+}
+
+.pg-srs-complete .pg-btn + .pg-btn { margin-top: 6px; }
+
+.pg-srs-forecast {
+    font-size: max(11px, 0.75em);
+    color: var(--pg-t3);
+    font-variant-numeric: tabular-nums;
     margin-bottom: 18px;
+}
+
+.pg-srs-new {
+    font-size: max(11px, 0.72em);
+    color: var(--pg-t2);
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(128,128,128,0.15);
 }
 
 
@@ -4071,6 +4090,13 @@ textarea.pg-soft-input.pg-write-text {
 .pg-write-errors  { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.84em; line-height: 1.45; }
 .pg-write-type    { font-size: 0.85em; color: var(--pg-t3); }
 
+.pg-write-bar .pg-write-title { margin: 0; }
+.pg-check-original { font-size: 0.82em; color: var(--pg-t3); margin-bottom: 4px; white-space: pre-wrap; }
+.pg-check-natural  { font-size: 0.86em; line-height: 1.6; color: var(--pg-t1); margin-top: 6px; white-space: pre-wrap; }
+.pg-check-why      { margin-top: 6px; }
+.pg-check-note     { margin-top: 6px; padding-left: 8px; border-left: 2px solid rgba(128,128,128,0.35); font-size: 0.82em; color: var(--pg-t2); white-space: pre-wrap; }
+.pg-check-actions  { display: flex; justify-content: flex-end; gap: 4px; margin-top: 6px; }
+
 .pg-typed-card .pg-quiz-q { line-height: 2; }
 input.pg-soft-input.pg-typed-input {
     display: inline-block;
@@ -4085,3 +4111,81 @@ input.pg-typed-input.pg-typed-ok  { background: rgba(60, 180, 100, 0.25); }
 input.pg-typed-input.pg-typed-bad { background: rgba(220, 60, 60, 0.22); }
 .pg-typed-hint  { margin-left: 4px; font-size: 0.9em; color: var(--pg-t3); }
 .pg-typed-close { margin-left: 6px; color: var(--pg-warn); }
+
+
+/* ── Study record (Learn tab, before a mode): borderless, one translucent hue per theme ── */
+
+.pg-record { --pg-hue: #6da7ec; padding: 10px 2px 0; }
+[data-pg-theme="light"] .pg-record,
+[data-pg-theme="breeze"] .pg-record { --pg-hue: #1c5cab; }
+[data-pg-theme="milk"] .pg-record { --pg-hue: #9b2350; }
+
+.pg-record-streak { display: flex; align-items: baseline; gap: 6px; color: var(--pg-t1); }
+.pg-record-streak b { font-size: 34px; font-weight: 300; line-height: 1; letter-spacing: -0.02em; }
+.pg-record-streak span { font-size: 0.85em; color: var(--pg-t2); }
+.pg-record-sub { font-size: max(11px, 0.72em); color: var(--pg-t3); margin-top: 4px; }
+
+.pg-month { margin: 18px 0 16px; }
+.pg-month-title { font-size: max(11px, 0.75em); color: var(--pg-t2); margin-bottom: 6px; }
+.pg-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 4px; }
+.pg-month-wd span { text-align: center; font-size: max(10px, 0.65em); color: var(--pg-t3); padding-bottom: 2px; }
+.pg-mday { display: flex; justify-content: center; padding: 0 1px; }
+.pg-mday > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 34px;
+    height: 26px;
+    border-radius: 13px;
+    font-size: max(11px, 0.74em);
+    color: var(--pg-t3);
+    font-variant-numeric: tabular-nums;
+}
+.pg-mday-on > span { color: var(--pg-t1); background: color-mix(in srgb, var(--pg-hue) 26%, transparent); }
+/* Consecutive days run into one band */
+.pg-join-l { padding-left: 0; }
+.pg-join-r { padding-right: 0; }
+.pg-join-l > span { border-top-left-radius: 0; border-bottom-left-radius: 0; max-width: none; }
+.pg-join-r > span { border-top-right-radius: 0; border-bottom-right-radius: 0; max-width: none; }
+.pg-mday-today > span { box-shadow: inset 0 0 0 1.5px var(--pg-hue); font-weight: 600; }
+.pg-mday-future > span { opacity: 0.45; }
+
+.pg-record-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 4px 0 18px; }
+.pg-record-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    text-align: left;
+    font-family: var(--pg-font);
+}
+.pg-record-val { font-size: 1.15em; font-weight: 500; color: var(--pg-t1); }
+.pg-record-lab { font-size: max(10px, 0.68em); color: var(--pg-t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pg-record-go { cursor: pointer; }
+.pg-record-go .pg-record-lab { color: var(--pg-t2); }
+.pg-record-go:hover .pg-record-val { color: var(--pg-hue); }
+
+.pg-record-ahead { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 8px; }
+.pg-record-ahead-lab { font-size: max(10px, 0.68em); color: var(--pg-t3); padding-bottom: 14px; white-space: nowrap; }
+.pg-record-ahead-bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; flex: 1; }
+.pg-record-ab { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; height: 40px; }
+.pg-record-ab i { display: block; width: 6px; border-radius: 3px; background: color-mix(in srgb, var(--pg-hue) 55%, transparent); }
+.pg-record-ab b { font-weight: 400; font-size: max(10px, 0.62em); color: var(--pg-t3); }
+
+.pg-record-hint { padding-top: 4px; font-size: 0.78em; }
+
+/* Frequently missed words: a quiet warm tag (wordbook rows, flashcards) */
+.pg-missed-tag {
+    font-size: max(10px, 0.68em);
+    color: var(--pg-t2);
+    padding: 1px 7px;
+    border-radius: 8px;
+    background: rgba(224, 128, 96, 0.18);
+    white-space: nowrap;
+}
+.pg-filter-missed.active { background: rgba(224, 128, 96, 0.28); }

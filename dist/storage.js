@@ -1,9 +1,13 @@
 // Chat metadata access. Where Polyglot keeps what:
 //
-//   user file       polyglot-data.json on the ST server       wordbook, sets, wrong answers (data-store.ts)
-//   chat metadata   per chat, saved inside the chat file      annotations (and the wordbook on an ST
-//                                                             without file storage)
-//   settings        global, ST's settings.json                options only
+//   user files      on the ST server                          polyglot-data.json: wordbook, sets, wrong answers,
+//                                                             correction archive (data-store.ts); words' sounds
+//                                                             and pictures (media-files.ts)
+//   chat metadata   per chat, saved inside the chat file      analyses and readings by message (and the wordbook
+//                                                             on an ST without file storage)
+//   settings        global, ST's settings.json                options (and, without file storage, sets, wrong
+//                                                             answers and the correction archive)
+//   localStorage    per browser                               media uploads no save has accounted for yet
 //   IndexedDB       per browser                               conjugation tables (conj-cache.ts) — a cache
 // @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
 import { getContext, saveMetadataDebounced } from '../../../../extensions.js';

@@ -5,7 +5,8 @@
 //   offline   the file could not be read yet: changes are kept in memory and
 //             merged into the file once it loads (retried in the background)
 //   chat      this ST cannot store files: the wordbook goes into each chat's
-//             file and sets / wrong answers into settings (the pre-1.5 layout)
+//             file and sets, wrong answers, the correction archive and the
+//             study days into settings (the pre-1.5 layout)
 //
 // Reads are synchronous: the data is held in memory and the arrays handed out
 // are live (mutate, then commit()). Saves are debounced, serialised, verified
@@ -17,14 +18,14 @@
 // from settings only after the file has been read back intact.
 //
 // Unused media files (words' sounds and pictures) are deleted once a save
-// no longer refers to them.
+// no longer refers to them; files a closed page uploaded, at a later load.
 import { KEY } from './constants.js';
 import { getSettings, saveSettings } from './runtime.js';
 import { chatMetadata, saveChatMetadata } from './storage.js';
 import { notify } from './ui.manager.js';
 import { t } from './i18n.js';
 import { readUserFile, writeUserFile } from './user-files.js';
-import { mediaIn, releaseMedia } from './media-files.js';
+import { mediaIn, releaseMedia, sweepPending } from './media-files.js';
 import { emptyData, hasData, mergeUserData, parseData, rebaseUserData, serializeData, } from './user-data.js';
 const DATA_FILE = 'polyglot-data.json';
 /** One-time copy of the settings data, written before the first migration. */
@@ -43,8 +44,10 @@ let failures = 0;
 let lastText = '';
 /** Media files the saved data refers to (unused ones are deleted after a save). */
 let savedMedia = new Set();
+/** The unreadable file text last copied aside, so retries do not copy it again. */
+let keptUnreadable = '';
 const listeners = new Set();
-const LEGACY_KEYS = ['_wordbook', '_sets', 'saved_wrong_answers'];
+const LEGACY_KEYS = ['_wordbook', '_sets', 'saved_wrong_answers', 'saved_checks', 'saved_days'];
 /** A data array kept in settings, created on first use. */
 function settingsList(key) {
     const s = getSettings();
@@ -55,7 +58,10 @@ function settingsList(key) {
 function legacySettingsData() {
     const s = getSettings();
     const arr = (k) => (Array.isArray(s[k]) ? s[k] : []);
-    return { wordbook: arr('_wordbook'), sets: arr('_sets'), wrongAnswers: arr('saved_wrong_answers') };
+    return {
+        wordbook: arr('_wordbook'), sets: arr('_sets'), wrongAnswers: arr('saved_wrong_answers'),
+        checks: arr('saved_checks'), days: arr('saved_days'),
+    };
 }
 function dropLegacySettings() {
     const s = getSettings();
@@ -83,9 +89,15 @@ export function setsData() {
 export function wrongAnswersData() {
     return mode === 'chat' ? settingsList('saved_wrong_answers') : data.wrongAnswers;
 }
+export function checksData() {
+    return mode === 'chat' ? settingsList('saved_checks') : data.checks;
+}
+export function daysData() {
+    return mode === 'chat' ? settingsList('saved_days') : data.days;
+}
 /** A snapshot of all data (for backups). */
 export function userData() {
-    return { wordbook: wordbookData(), sets: setsData(), wrongAnswers: wrongAnswersData() };
+    return { wordbook: wordbookData(), sets: setsData(), wrongAnswers: wrongAnswersData(), checks: checksData(), days: daysData() };
 }
 /** Called after the data was replaced from outside the session (load, reload, restore). */
 export function onDataReplaced(listener) {
@@ -108,6 +120,10 @@ export function replaceUserData(patch) {
             getSettings()._sets = patch.sets;
         if (patch.wrongAnswers)
             getSettings().saved_wrong_answers = patch.wrongAnswers;
+        if (patch.checks)
+            getSettings().saved_checks = patch.checks;
+        if (patch.days)
+            getSettings().saved_days = patch.days;
     }
     else {
         data = { ...data, ...patch };
@@ -148,7 +164,7 @@ async function catchUp() {
         if (server.reason === 'newer')
             return 'newer';
         // Unreadable: keep a copy before it is replaced, as on load
-        return await writeUserFile(`polyglot-data-unreadable-${Date.now()}.json`, res.text) === 'ok' ? 'ok' : 'retry';
+        return await keepUnreadable(res.text) ? 'ok' : 'retry';
     }
     const base = parseData(lastText);
     data = rebaseUserData(base.ok ? base.data : emptyData(), data, server.data);
@@ -216,6 +232,15 @@ export async function flush() {
     return !dirty;
 }
 // ── Loading and migration ────────────────────────────────────────────────────
+/** Copies an unreadable data file aside before it is replaced — once, however often loading or saving is retried. */
+async function keepUnreadable(text) {
+    if (text === keptUnreadable)
+        return true;
+    const ok = await writeUserFile(`polyglot-data-unreadable-${Date.now()}.json`, text) === 'ok';
+    if (ok)
+        keptUnreadable = text;
+    return ok;
+}
 /** Writes `text` and reads it back. */
 async function writeVerified(name, text) {
     const written = await writeUserFile(name, text);
@@ -238,7 +263,10 @@ function switchToChatMode() {
     clearTimeout(retryTimer);
     dirty = false;
     const merged = mergeUserData(legacySettingsData(), pending);
-    Object.assign(getSettings(), { _wordbook: merged.wordbook, _sets: merged.sets, saved_wrong_answers: merged.wrongAnswers });
+    Object.assign(getSettings(), {
+        _wordbook: merged.wordbook, _sets: merged.sets, saved_wrong_answers: merged.wrongAnswers,
+        saved_checks: merged.checks, saved_days: merged.days,
+    });
     saveSettings();
     notify(t('data.chatMode'), 'warn', 8000);
     emitReplaced();
@@ -279,7 +307,7 @@ async function load() {
         }
         else {
             // Unreadable: keep a copy before it is replaced
-            await writeUserFile(`polyglot-data-unreadable-${Date.now()}.json`, res.text);
+            await keepUnreadable(res.text);
         }
     }
     const legacy = legacySettingsData();
@@ -317,6 +345,7 @@ async function load() {
         lastText = res.status === 'ok' ? res.text : '';
     }
     savedMedia = mediaIn(data.wordbook);
+    sweepPending(savedMedia);
     const wasOffline = mode === 'offline';
     mode = 'file';
     failures = 0;

@@ -5,13 +5,15 @@ import { shuffleArray } from '../utils.js';
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { scopedWordbook, getSets } from '../wordbook.js';
+import { isMissed } from '../srs.js';
 const MAX_PAIRS = 12;
 const MIN_PAIRS = 4;
 /** How long a wrong pair stays red, and the pause before the completion message. */
 const FEEDBACK_MS = 600;
+/** `setId` is a set id, 'all', or 'missed' (frequently missed words). */
 function matchableWords(setId, level) {
     return scopedWordbook().filter(w => w.level !== 'grammar' && w.level !== 'sentence' &&
-        (setId === 'all' || (w.setIds ?? []).includes(setId)) &&
+        (setId === 'all' || (setId === 'missed' ? isMissed(w) : (w.setIds ?? []).includes(setId))) &&
         (level === 'all' || w.level === level));
 }
 // ── Game ──────────────────────────────────────────────────────────────────────
@@ -69,12 +71,14 @@ function startGame(gameEl, words) {
 // ── Setup ─────────────────────────────────────────────────────────────────────
 /** Renders the set/level pickers, the available-word count and the Start button. */
 export function renderMatchSetup(container) {
+    const missed = matchableWords('missed', 'all').length;
     setHtml(container, html `
         <div class="pg-match-setup">
             <div class="pg-match-setup-title">${t('mat.title')}</div>
             <div class="pg-match-options">
                 <select class="pg-set-select pg-match-set" aria-label="${t('mat.allWords')}">
                     <option value="all">${t('mat.allWords')}</option>
+                    ${missed > 0 && html `<option value="missed">${t('wb.missed', { n: missed })}</option>`}
                     ${getSets().map(s => html `<option value="${s.id}">${s.name}</option>`)}
                 </select>
                 <select class="pg-set-select pg-match-level" aria-label="${t('mat.allLevels')}">

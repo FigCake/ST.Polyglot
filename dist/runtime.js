@@ -48,6 +48,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     panel_bg_image: '',
     panel_floating: false,
     auto_save_idioms: true,
+    srs_new_per_day: 20,
     dialogue_only: false,
     wordbook_scope: 'chat',
     wordbook_lang_only: true,

@@ -14,14 +14,15 @@ import { getSettings, getLang, getNativeLang, ai, getContext } from './runtime.j
 import { DELAY } from './constants.js';
 import { ST_SEL, mesSelector } from './st-dom.js';
 import { runChecker } from './features/checker.js';
-import { migrateChatWordbook } from './wordbook.js';
+import { migrateChatWordbook, studyLangKey } from './wordbook.js';
+import { archiveCheck } from './check-archive.js';
 import { refreshWordbook } from './ui/wordbook-ui.js';
 import { initDataStore, onDataReplaced, storeMode } from './data-store.js';
 import { notify } from './ui.manager.js';
-import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, redrawAnnotations, } from './annotator.js';
+import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, redrawAnnotations, relocateAnnotations, } from './annotator.js';
 import { t } from './i18n.js';
 import { setupPlainCopy } from './plain-text.js';
-import { restoreFurigana, restoreFuriganaWithRetry, autoFurigana, forgetFurigana, resetFuriganaState, applyFuriganaDisplay, onFuriganaSettingChange, setupReadingEditor, } from './furigana/messages.js';
+import { restoreFurigana, restoreFuriganaWithRetry, autoFurigana, relocateFurigana, forgetFurigana, resetFuriganaState, applyFuriganaDisplay, onFuriganaSettingChange, setupReadingEditor, } from './furigana/messages.js';
 // @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
 import { eventSource, event_types } from '../../../../../script.js';
 // @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
@@ -33,7 +34,7 @@ import { ARGUMENT_TYPE, SlashCommandNamedArgument } from '../../../../slash-comm
 // ── Chat-UI entry points ──────────────────────────────────────────────────────
 const WAND_ICON = '<i class="fa-solid fa-earth-europe"></i>';
 const SPINNER_ICON = '<i class="fa-solid fa-spinner fa-spin"></i>';
-const checkerDeps = () => ({ ai, getSettings, getLang, getNativeLang, setWandBusy });
+const checkerDeps = () => ({ ai, getSettings, getLang, getNativeLang, setWandBusy, archive: archiveCheck, langKey: studyLangKey });
 /** Adds the 🌍 input-assistant button next to ST's send button. */
 function injectWandButton() {
     if (!getSettings().enabled_checker)
@@ -148,13 +149,27 @@ function onToggle(name, handler) {
         restoreFurigana();
     });
     // An edited or deleted message: highlights whose text no longer matches go
-    for (const type of [event_types.MESSAGE_UPDATED, event_types.MESSAGE_DELETED]) {
-        if (type)
-            eventSource.on(type, () => { restoreAnnotations(); restoreFurigana(); });
+    if (event_types.MESSAGE_UPDATED)
+        eventSource.on(event_types.MESSAGE_UPDATED, () => { restoreAnnotations(); restoreFurigana(); });
+    // After a deletion ST renumbers the later messages: their saved analyses move along
+    if (event_types.MESSAGE_DELETED) {
+        eventSource.on(event_types.MESSAGE_DELETED, () => {
+            relocateAnnotations();
+            relocateFurigana();
+            restoreAnnotations();
+            restoreFurigana();
+        });
     }
     // Older messages loaded with "Show more messages" get buttons and their saved highlights
     if (event_types.MORE_MESSAGES_LOADED) {
-        eventSource.on(event_types.MORE_MESSAGES_LOADED, () => { injectAnnotateButtons(); restoreAnnotations(); restoreFurigana(); });
+        eventSource.on(event_types.MORE_MESSAGES_LOADED, () => {
+            injectAnnotateButtons();
+            // Older messages renumbered by a deletion while they were not rendered find their saves again
+            relocateAnnotations();
+            relocateFurigana();
+            restoreAnnotations();
+            restoreFurigana();
+        });
     }
     injectChatButtons();
     injectExtensionsMenuEntry();

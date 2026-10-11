@@ -13,12 +13,12 @@
 // messages without analysing them.
 import { KEY } from '../constants.js';
 import { ST_SEL, mesTextOf, mesIdOf } from '../st-dom.js';
-import { isJapanese, entryList, withEntryFor } from '../utils.js';
+import { isJapanese, entryList, withEntryFor, relocateEntries } from '../utils.js';
 import { chatValue, currentChatId } from '../storage.js';
-import { getSettings, getLang, ai } from '../runtime.js';
+import { getSettings, getLang, ai, getContext } from '../runtime.js';
 import { notify, askInput } from '../ui.manager.js';
 import { t } from '../i18n.js';
-import { plainText } from '../plain-text.js';
+import { plainText, shownTextHashes } from '../plain-text.js';
 import { skippedRanges, subtractRanges, maskRanges } from '../study-scope.js';
 import { setLayer, hasLayer, messagesWith, resetLayers, untilRendered, cancelUntilRendered } from '../ui/message-decor.js';
 import { fetchReadings } from './request.js';
@@ -177,6 +177,14 @@ export function restoreFurigana() {
         if (entry && !entry.hidden)
             show(mesId, entry);
     }
+}
+/** Messages were deleted and ST renumbered the rest: saved readings follow their messages. */
+export function relocateFurigana() {
+    const saved = store.get();
+    const length = getContext().chat?.length;
+    const moved = saved && typeof length === 'number' && relocateEntries(saved, shownTextHashes(), length);
+    if (moved)
+        store.set(moved);
 }
 /** Restores as ST finishes rendering a loaded chat. */
 export function restoreFuriganaWithRetry() {

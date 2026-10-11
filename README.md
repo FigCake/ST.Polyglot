@@ -6,12 +6,12 @@
 
 ### Features
 
-- **Input Assistant** — Translate or grammar-check your input before sending (🌍 button)
+- **Input Assistant** — Translate or check your input before sending (🌍 button): the grammar fix, then a more natural version under `---`, in the input box. Each check is kept in the correction archive (writing practice) with its explanation, for notes; the last 100 are kept
 - **Annotation** — Highlight vocabulary by CEFR level and grammar patterns on any AI message
 - **Leave out of study** — Status windows and metadata (tags such as `<status>`, code blocks, folded boxes, `[bracket]` lines) are not analysed, and character, persona and group-member names are never highlighted or saved as words; JS-Slash-Runner frontends and hidden text are always left out. Set in Extensions → Polyglot, with a check of what the last message sends
 - **Tap to Translate** — Double-click a sentence (mouse), or select text and tap **Translate sentence** (touch), for an inline translation with verb forms; ask for a deeper sentence analysis from there
 - **Quick Lookup** — Select any word to get its dictionary form, POS, IPA, and meaning
-- **Wordbook + SRS** — Save words and review them with SM-2 spaced repetition. One shared wordbook, viewable per chat or across all chats, and per study language. Merge duplicates, fill missing meanings with AI re-analysis, organise words into sets
+- **Wordbook + spaced review** — Save words and review them on an FSRS schedule: today's due words first, then new words up to a daily limit, with a forecast for the coming days. Words you keep forgetting are marked as often missed, with a wordbook filter and a matching game of just those words. The Learn tab opens on your study record: day streak, today's work, reviews left, 30-day accuracy, this month's calendar with your runs of study days, and the reviews due this week. One shared wordbook, viewable per chat or across all chats, and per study language. Merge duplicates, fill missing meanings with AI re-analysis, organise words into sets
 - **Import / Export** — Anki decks (`.apkg` / `.colpkg`, with sounds and images), CSV, and a TXT file for flashcard apps
 - **Furigana (Japanese)** — Readings over kanji with message analysis (📖) and on word cards, flashcards and the PDF deck; click a reading to correct it
 - **Study Modes** — Flashcards, quiz, cloze, typed grammar gaps, reading exam, a weak-points exam built from saved wrong answers, conjugation drill, match, speaking

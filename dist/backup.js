@@ -1,7 +1,8 @@
 // Full backup / restore as one JSON file:
 //
-//   wordbook (with SRS progress, notes, chat tags) · word sets · saved wrong
-//   answers · settings · cached conjugation tables
+//   wordbook (with review schedules, notes, chat tags) · word sets · saved
+//   wrong answers · correction archive · study days · settings · cached
+//   conjugation tables
 //
 // When words have sounds or pictures (media-files.ts), the backup is a zip:
 //
@@ -22,7 +23,7 @@
 // createBackup / parseBackup are pure and unit-tested (merging: user-data.ts).
 import { downloadText, downloadBlob } from './export/download.js';
 import { buildZip, readZip, readEntry } from './zip.js';
-import { mediaIn, existingMedia, inParallel, isMediaName, keepableMedia, noteUploaded } from './media-files.js';
+import { mediaIn, existingMedia, inParallel, isMediaName, keepableMedia, noteUploaded, notePending } from './media-files.js';
 import { readUserBytes, writeUserFile } from './user-files.js';
 import { getSettings, saveSettings, DEFAULT_SETTINGS } from './runtime.js';
 import { listConjCache, setConjCache, clearConjCacheStore } from './conj-cache.js';
@@ -33,7 +34,7 @@ export const BACKUP_FORMAT = 'polyglot-backup';
 const BACKUP_VERSION = 1;
 /** Settings keys that hold data (backed up separately), the API key, or where AI requests go. */
 const NOT_SETTINGS = new Set([
-    '_wordbook', '_sets', 'saved_wrong_answers',
+    '_wordbook', '_sets', 'saved_wrong_answers', 'saved_checks', 'saved_days',
     'ext_api_key', 'ext_base_url', 'provider', 'model', '_model_history', 'route_chat_source', 'route_model',
 ]);
 /**
@@ -52,6 +53,8 @@ export function createBackup(settings, data, conjugations, now = new Date()) {
         wordbook: data.wordbook,
         sets: data.sets,
         wrongAnswers: data.wrongAnswers,
+        checks: data.checks,
+        days: data.days,
         conjugations,
     };
 }
@@ -133,6 +136,7 @@ export async function openBackupZip(file) {
                 const entry = entries.get(MEDIA_DIR + name);
                 return entry && !present.has(name) ? [{ name, entry }] : [];
             });
+            notePending(missing.map(m => m.name));
             await inParallel(missing, 6, async ({ name, entry }) => {
                 const ok = await readEntry(file, entry)
                     .then(bytes => writeUserFile(name, bytes))
@@ -163,7 +167,9 @@ export async function restoreBackup(backup, mode) {
         const s = getSettings();
         Object.assign(s, backup.settings, { ext_api_key: s.ext_api_key });
         saveSettings();
-        replaceUserData({ wordbook: backup.wordbook, sets: backup.sets, wrongAnswers: backup.wrongAnswers });
+        replaceUserData({
+            wordbook: backup.wordbook, sets: backup.sets, wrongAnswers: backup.wrongAnswers, checks: backup.checks, days: backup.days,
+        });
         await restoreConjugations(backup.conjugations, true);
         return { added: backup.wordbook.length, merged: 0 };
     }

@@ -117,3 +117,46 @@ export function withEntryFor(list, item, keep) {
 }
 /** A saved value as a list: older saves held one entry, newer ones a list. */
 export const entryList = (value) => (value === undefined ? [] : Array.isArray(value) ? value : [value]);
+/**
+ * Entries saved by message index, moved to where their messages are now after
+ * ST deleted messages and renumbered the rest. `shown` is the text hash each
+ * rendered message shows: a message whose text is saved under another index
+ * takes that list (its other swipes too), swapping with what was there.
+ * Lists left at or past `length` belonged to messages deleted from the end and
+ * go; a list a swap moved there stays (it may belong to an older message not
+ * rendered yet, found again once it is). Null when nothing changed.
+ */
+export function relocateEntries(saved, shown, length) {
+    const out = { ...saved };
+    const has = (k, h) => !!h && entryList(out[k]).some(e => e.h === h);
+    /** Keys holding a list a swap moved there. */
+    const carried = new Set();
+    let changed = false;
+    for (const [mesId, h] of [...shown].sort((a, b) => Number(a[0]) - Number(b[0]))) {
+        if (has(mesId, h))
+            continue;
+        // Not from a message that shows its own saved text (two messages can read the same)
+        const from = Object.keys(out).find(k => k !== mesId && has(k, h) && !has(k, shown.get(k)));
+        if (from === undefined)
+            continue;
+        const here = out[mesId];
+        out[mesId] = out[from];
+        carried.delete(mesId);
+        if (here === undefined) {
+            delete out[from];
+            carried.delete(from);
+        }
+        else {
+            out[from] = here;
+            carried.add(from);
+        }
+        changed = true;
+    }
+    for (const k of Object.keys(out)) {
+        if (Number(k) >= length && !carried.has(k)) {
+            delete out[k];
+            changed = true;
+        }
+    }
+    return changed ? out : null;
+}

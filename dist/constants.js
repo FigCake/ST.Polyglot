@@ -1,8 +1,7 @@
 // Shared values used across the extension. SillyTavern's DOM selectors are
 // in st-dom.ts.
-//   KEY   — storage keys (extension_settings, chatMetadata, IndexedDB)
+//   KEY   — storage keys (extension_settings, chatMetadata, localStorage, IndexedDB)
 //   DELAY — timing values in milliseconds
-//   SRS   — SM-2 spaced-repetition parameters
 //   UI    — miscellaneous UI limits
 // ── Storage keys ───────────────────────────────────────────────────────────────
 export const KEY = {
@@ -12,6 +11,8 @@ export const KEY = {
     wordbook: 'pg_wordbook',
     annotations: 'pg_annotations',
     furigana: 'pg_furigana',
+    // localStorage — media uploads no save has accounted for yet (media-files.ts)
+    mediaPending: 'pg_media_pending',
     // IndexedDB — conjugation cache
     conjDB: 'pg_conj_cache',
     conjStore: 'tables',
@@ -60,24 +61,6 @@ export const POS_LABELS = {
 export const UI = {
     /** Recent chat messages sent with a quiz prompt. */
     quizHistoryMessages: 6,
-};
-// ── SRS (SM-2 spaced-repetition) parameters ───────────────────────────────────
-export const SRS = {
-    dayMs: 86_400_000,
-    /** Anki's default. */
-    defaultEase: 2.5,
-    /** Floor that keeps cards from becoming unrecoverable. */
-    minEase: 1.3,
-    /** Days. */
-    initialInterval: 1,
-    /** Ease penalty for "Again" (rating 0). */
-    againEaseDelta: -0.20,
-    /** Ease penalty for "Hard" (rating 1). */
-    hardEaseDelta: -0.15,
-    /** Interval multiplier for "Hard" (rating 1). */
-    hardIntervalMult: 1.2,
-    /** Interval bonus multiplier for "Easy" (rating 3). */
-    easyIntervalBonus: 1.3,
 };
 // ── Native-language tags ───────────────────────────────────────────────────────
 // BCP-47 short tags for the supported UI / explanation languages.

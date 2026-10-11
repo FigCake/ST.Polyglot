@@ -55,10 +55,13 @@ export function openLearningPanel(initialTab = 'learn', wordData = null) {
         {
             name: t('tab.learn'), id: 'learn',
             render: () => {
+                learnTab?.dispose();
                 learnTab = new LearnTab(pendingWord, { lookup: w => lookUpWord(w), save: addToWordbook });
                 pendingWord = null;
                 return learnTab.el;
             },
+            // Settings or the wordbook may have changed what the study record counts
+            onShow: () => learnTab?.refresh(),
         },
         {
             name: t('tab.settings'), id: 'settings',
@@ -71,6 +74,7 @@ export function openLearningPanel(initialTab = 'learn', wordData = null) {
         onDismiss: () => {
             abortActiveRecognition();
             unmountWordbook();
+            learnTab?.dispose();
             learnTab = null;
             pendingWord = null;
         },

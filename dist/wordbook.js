@@ -9,7 +9,7 @@
 //     callers (ui/wordbook-ui.ts) handle it.
 //   • Writes always go through loadWordbook() (all entries); scopedWordbook()
 //     is for reading what the user sees, never for saving back.
-import { KEY, SRS as SRS_CFG } from './constants.js';
+import { KEY } from './constants.js';
 import { getSettings, getLang } from './runtime.js';
 import { wordbookData, setsData, replaceUserData, flush, storeMode } from './data-store.js';
 import { clearConjCacheStore, setConjCache, deleteConjCache } from './conj-cache.js';
@@ -219,9 +219,6 @@ export function addToWordbook(wordData, { quiet = false } = {}) {
         langs: [studyLangKey()],
         dateAdded: new Date().toISOString(),
         conj_cached: !!conjData,
-        srs_interval: SRS_CFG.initialInterval,
-        srs_ease: SRS_CFG.defaultEase,
-        srs_due: Date.now(),
     });
     saveWordbook(wordbook);
     if (conjData)

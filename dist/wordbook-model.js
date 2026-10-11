@@ -41,7 +41,7 @@ export function tagLang(e, lang) {
     return true;
 }
 // ── Merging ───────────────────────────────────────────────────────────────────
-const progressOf = (e) => [e.srs_reviewed_at ?? 0, e.srs_interval ?? 0];
+const progressOf = (e) => [e.srs_reviewed_at ?? 0, e.srs_stability ?? e.srs_interval ?? 0];
 /** True when `a` has seen more review than `b` (latest review first, then longest interval). */
 function moreReviewed(a, b) {
     const [ra, ia] = progressOf(a), [rb, ib] = progressOf(b);
@@ -61,6 +61,9 @@ const earliest = (a, b) => (!a ? b : !b ? a : a < b ? a : b);
 export function mergeEntries(a, b) {
     const srs = moreReviewed(a, b) ? a : b;
     const merged = { ...b, ...stripEmpty(a) };
+    // The schedule comes whole from one copy, never mixed
+    for (const k of SRS_FIELDS)
+        delete merged[k];
     return {
         ...merged,
         setIds: union(a.setIds, b.setIds),
@@ -70,14 +73,20 @@ export function mergeEntries(a, b) {
         notes: joinNotes(a.notes, b.notes),
         dateAdded: earliest(a.dateAdded, b.dateAdded),
         conj_cached: !!(a.conj_cached || b.conj_cached),
-        srs_interval: srs.srs_interval,
-        srs_ease: srs.srs_ease,
-        srs_due: srs.srs_due,
-        srs_streak: srs.srs_streak,
-        srs_reviewed_at: srs.srs_reviewed_at,
+        ...srsOf(srs),
     };
 }
-const SRS_FIELDS = ['srs_interval', 'srs_ease', 'srs_due', 'srs_streak', 'srs_reviewed_at'];
+/** The review schedule fields, which always move together (FSRS and the older SM-2 ones). */
+const SRS_FIELDS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
+    'srs_interval', 'srs_ease', 'srs_streak'];
+/** An entry's schedule fields that are set. */
+function srsOf(e) {
+    const out = {};
+    for (const k of SRS_FIELDS)
+        if (e[k] !== undefined)
+            out[k] = e[k];
+    return out;
+}
 const LIST_FIELDS = new Set(['setIds', 'chats', 'langs']);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /** A list after both sides' additions and removals since `base`. */
@@ -116,6 +125,27 @@ export function rebaseEntry(base, local, server) {
         if (v !== undefined)
             out[k] = v;
     }
+    return out;
+}
+/** Fields that change without the learner editing the word: reviews, the conjugation flag, chat and language tags. */
+const UPKEEP_FIELDS = new Set([...SRS_FIELDS, 'conj_cached', 'chats', 'langs']);
+/**
+ * A word this session still has but another device deleted since `base`:
+ * gone, unless the learner edited it here (a review or a tag does not bring
+ * a deleted word back). A word kept loses the sound or picture it had at
+ * `base` when no word on the server uses it: the other device deleted the file.
+ */
+export function keptAfterDeletion(base, local, serverMedia) {
+    const b = base;
+    const l = local;
+    const edited = [...new Set([...Object.keys(b), ...Object.keys(l)])].some(k => !UPKEEP_FIELDS.has(k) && !same(l[k], b[k]));
+    if (!edited)
+        return null;
+    const out = { ...local };
+    if (out.audio && out.audio === base.audio && !serverMedia.has(out.audio))
+        delete out.audio;
+    if (out.image && out.image === base.image && !serverMedia.has(out.image))
+        delete out.image;
     return out;
 }
 /** Removes undefined / empty-string fields so they do not override the other copy when spread. */

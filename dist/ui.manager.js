@@ -261,6 +261,8 @@ export function buildTabView(panes, activePaneId = null) {
             if (pane)
                 nodeCache.set(id, pane.render());
         }
+        else
+            panes.find(p => p.id === id)?.onShow?.();
         const cached = nodeCache.get(id);
         if (cached)
             viewport.replaceChildren(cached);

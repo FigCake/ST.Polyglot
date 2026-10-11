@@ -10,7 +10,7 @@
 // Anki package to its import dialog (ui/wordbook/deck-dialog.ts).
 //
 // parseWordbookFile() is pure and unit-tested; importWordbookFile() applies it.
-import { CEFR_LEVELS, SRS as SRS_CFG } from '../../constants.js';
+import { CEFR_LEVELS } from '../../constants.js';
 import { notify } from '../../ui.manager.js';
 import { t } from '../../i18n.js';
 import { getNativeLang } from '../../runtime.js';
@@ -132,9 +132,6 @@ function importWordbookFile(text, filename) {
             chats: chatId ? [chatId] : [],
             langs: [studyLangKey()],
             dateAdded: new Date().toISOString(),
-            srs_interval: SRS_CFG.initialInterval,
-            srs_ease: SRS_CFG.defaultEase,
-            srs_due: Date.now(),
         };
         wordbook.push(entry);
         byWord.set(row.word, entry);

@@ -91,7 +91,7 @@ export async function writeUserFile(name, data, signal) {
         return 'error';
     }
 }
-/** Deletes a file; true when it is gone. */
+/** Deletes a file; true when it is gone (a file that was already missing too). */
 export async function deleteUserFile(name) {
     assertName(name);
     try {
@@ -101,7 +101,7 @@ export async function deleteUserFile(name) {
             body: JSON.stringify({ path: `user/files/${name}` }),
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
-        return res.ok;
+        return res.ok || res.status === 404;
     }
     catch {
         return false;

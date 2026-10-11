@@ -1,15 +1,27 @@
 // Input checker / translator (🌍 button).
-// Reads the ST send_textarea, calls the AI, and replaces the text with
-// the corrected version + explanation if a correction was made.
+// Reads the ST send_textarea, calls the AI, and replaces the text with the
+// grammar-only fix and, under a --- line, a more natural version. The
+// explanation goes to the correction archive (the Writing mode), not the box.
 //
 // Design rules:
-//   • No direct ST state reads — settings, lang, and the AI client are injected.
+//   • No direct ST state reads — settings, lang, the AI client and the archive are injected.
 //   • setWandBusy is injected so this module has no dependency on index.ts.
 import { checkerPrompt } from '../prompts.js';
 import { notify } from '../ui.manager.js';
 import { acceptObject } from '../ai/client.js';
 import { t } from '../i18n.js';
 import { ST_SEL } from '../st-dom.js';
+/**
+ * What goes into the input box: the grammar fix, then (when it differs) the
+ * natural version under a --- line. Null when nothing needs changing.
+ */
+export function checkerText(original, grammar, natural) {
+    const g = grammar.trim() || natural.trim();
+    const n = natural.trim();
+    if (!g || (g === original && (!n || n === original)))
+        return null;
+    return n && n !== g ? `${g}\n---\n${n}` : g;
+}
 // ── Module-level abort tracker ────────────────────────────────────────────────
 let _checkerAbort = null;
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -37,19 +49,21 @@ export async function runChecker(deps) {
         });
         if (abort.signal.aborted)
             return;
-        const corrected = result.corrected_text?.trim() ?? '';
+        const str = (v) => (typeof v === 'string' ? v.trim() : '');
+        const grammar = str(result.grammar), natural = str(result.natural);
+        const corrected = checkerText(text, grammar, natural);
+        if (!corrected) {
+            notify(t('chk.looksGood'), 'ok', 2000);
+            return;
+        }
+        deps.archive({ lang: deps.langKey(), original: text, grammar: grammar || natural, natural, explanation: str(result.explanation) });
         // The box may have been sent, cleared or typed in meanwhile: never write over that
-        if (corrected && corrected !== text && textarea.value.trim() !== text) {
+        if (textarea.value.trim() !== text) {
             notify(t('chk.changed', { text: corrected }), 'info', 10000);
         }
-        else if (corrected && corrected !== text) {
-            // Insert corrected text + explanation back into the input box
-            const explanation = result.explanation ? `\n--\n${result.explanation}` : '';
-            textarea.value = corrected + explanation;
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        }
         else {
-            notify(t('chk.looksGood'), 'ok', 2000);
+            textarea.value = corrected;
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
         }
     }
     catch (e) {

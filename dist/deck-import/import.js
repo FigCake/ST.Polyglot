@@ -7,12 +7,11 @@
 // (or two decks sharing a file) stores each file once; a file already on the
 // server is not uploaded again. Existing words keep their text: an import
 // only fills what is empty and adds the word to the deck's set.
-import { SRS as SRS_CFG } from '../constants.js';
 import { getNativeLang } from '../runtime.js';
 import { currentChatId } from '../storage.js';
 import { storeMode } from '../data-store.js';
 import { writeUserFile } from '../user-files.js';
-import { existingMedia, inParallel, keepableMedia, noteUploaded } from '../media-files.js';
+import { existingMedia, inParallel, keepableMedia, noteUploaded, notePending } from '../media-files.js';
 import { loadWordbook, saveWordbook, getSets, createSet, studyLangKey } from '../wordbook.js';
 import { mergeWordbooks } from '../wordbook-model.js';
 // ── Media ─────────────────────────────────────────────────────────────────────
@@ -74,6 +73,7 @@ export async function storeMedia(names, read, onProgress, signal) {
                 return;
             let upload = uploads.get(file);
             if (!upload) {
+                notePending([file]);
                 upload = writeUserFile(file, bytes, signal).then(r => r === 'ok', () => false);
                 uploads.set(file, upload);
             }
@@ -143,9 +143,6 @@ export function addRows(rows, fallbackDeck, media) {
             chats: chatId ? [chatId] : [],
             langs: [studyLangKey()],
             dateAdded: now,
-            srs_interval: SRS_CFG.initialInterval,
-            srs_ease: SRS_CFG.defaultEase,
-            srs_due: Date.now(),
         });
     }
     const { wordbook, added, merged } = mergeWordbooks(loadWordbook(), [...incoming.values()]);

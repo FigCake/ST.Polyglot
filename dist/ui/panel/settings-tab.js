@@ -75,6 +75,11 @@ const textField = (setting, label, value, placeholder, hint) => html `
                placeholder="${placeholder}" autocomplete="off" spellcheck="false">
         ${hint && html `<span class="pg-pset-hint">${hint}</span>`}
     </label>`;
+const numberRow = (setting, label, value) => html `
+    <label class="pg-pset-row">
+        <span class="pg-pset-label">${label}</span>
+        <input type="number" class="text_pole pg-pset-number" data-setting="${setting}" value="${value}" min="0" max="999" step="1">
+    </label>`;
 const dangerButton = (action, label) => html `
     <button class="pg-btn pg-btn-secondary pg-btn-block pg-btn-danger" data-action="${action}">${label}</button>`;
 function render(s) {
@@ -106,6 +111,7 @@ function render(s) {
 
         ${section(t('tab.learn'), html `
             ${toggleRow('auto_save_idioms', t('pnl.set.autoIdioms'), s.auto_save_idioms !== false)}
+            ${numberRow('srs_new_per_day', t('pnl.set.newPerDay'), s.srs_new_per_day ?? 20)}
             ${dangerButton('reset-srs', t('pnl.set.resetSrs'))}
             ${dangerButton('clear-conj', t('pnl.set.clearConj'))}
             ${dangerButton('clear-chat', t('pnl.set.clearChat'))}
@@ -155,14 +161,17 @@ async function withBusy(btn, fn) {
         btn.innerHTML = idle;
     }
 }
-/** Resets review progress of the words in the current scope. */
+const SRS_KEYS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
+    'srs_interval', 'srs_ease', 'srs_streak'];
+/** Resets review progress of the words in the current scope: they are new again. */
 function resetSrs() {
     const inView = new Set(scopedWordbook().map(w => w.word));
     const wordbook = loadWordbook();
     for (const w of wordbook) {
         if (!inView.has(w.word))
             continue;
-        Object.assign(w, { srs_interval: 1, srs_ease: 2.5, srs_due: 0, srs_streak: 0, srs_reviewed_at: undefined });
+        for (const k of SRS_KEYS)
+            delete w[k];
     }
     saveWordbook(wordbook);
 }
@@ -215,6 +224,11 @@ function readInput(el) {
         return el.checked;
     if (el.dataset.setting === 'furigana_size')
         return Number(el.value);
+    if (el instanceof HTMLInputElement && el.type === 'number') {
+        // An emptied field means the default, not 0 (Number('') is 0)
+        const n = el.value.trim() === '' ? NaN : Math.round(Number(el.value));
+        return Number.isFinite(n) ? Math.min(Math.max(n, 0), 999) : 20;
+    }
     return el.dataset.setting === 'panel_bg_image' ? el.value.trim() : el.value;
 }
 // ── Public ────────────────────────────────────────────────────────────────────

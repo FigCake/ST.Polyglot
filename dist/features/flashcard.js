@@ -1,4 +1,5 @@
-// Flashcards: browse mode, or SM-2 spaced repetition (SRS) mode.
+// Flashcards: browse mode, or review mode (FSRS, srs.ts): today's due words
+// first, then new words up to the day's limit (setting srs_new_per_day).
 //
 //   front  word · part of speech · 🔊 · 🎤 pronunciation check
 //   back   meaning · base form · meaning in context · example sentence · note
@@ -13,9 +14,10 @@ import { exampleSentencePrompt } from '../prompts.js';
 import { shuffleArray } from '../utils.js';
 import { rubyWord, shownReading } from '../furigana/word.js';
 import { html, setHtml, raw } from '../html.js';
-import { t } from '../i18n.js';
+import { t, currentLang } from '../i18n.js';
 import { loadWordbook, saveWordbook, scopedWordbook, getSets } from '../wordbook.js';
-import { srsRate, srsDueCount, srsPreview } from '../srs.js';
+import { srsRate, previewDays, todaysCards, forecast, isNew, isMissed } from '../srs.js';
+import { logReview, newWordsToday } from '../study-log.js';
 import { acceptObject } from '../ai/client.js';
 import { userFileUrl } from '../user-files.js';
 const RATINGS = [
@@ -25,7 +27,19 @@ const RATINGS = [
     { rating: 3, key: 'fl.easy', cls: 'pg-srs-easy' },
 ];
 /** Grammar patterns and sentences are review material for quizzes, not cards. */
-const isCard = (w) => w.level !== 'grammar' && w.level !== 'sentence';
+export const isCard = (w) => w.level !== 'grammar' && w.level !== 'sentence';
+/** How many more new words "more new words" adds to today's. */
+const MORE_NEW = 10;
+/** An interval as a button label: "3d", "1.5mo", "2y" (in the UI language). */
+function intervalLabel(days) {
+    // 1.5 / 1,5 by the UI language
+    const short = (n) => (n < 10 ? Math.round(n * 10) / 10 : Math.round(n)).toLocaleString(currentLang());
+    if (days < 30)
+        return t('fl.ivlDays', { n: days });
+    if (days < 365)
+        return t('fl.ivlMonths', { n: short(days / 30) });
+    return t('fl.ivlYears', { n: short(days / 365) });
+}
 const multiline = (text) => html `${text.split('\n').map((line, i) => html `${i > 0 && raw('<br>')}${line}`)}`;
 // ── Example sentences ─────────────────────────────────────────────────────────
 let exampleRequest = null;
@@ -87,11 +101,14 @@ class FlashcardSession {
     flipped = false;
     srs = false;
     reviewed = 0;
+    /** New words added to today's limit this session ("more new words"). */
+    extraNew = 0;
     setSelect;
     area;
-    constructor(root, deps) {
+    constructor(root, deps, review) {
         this.root = root;
         this.deps = deps;
+        this.srs = review;
         setHtml(root, html `
             <div class="pg-flash-controls">
                 <select class="pg-set-select pg-flash-set" aria-label="${t('fl.allWords')}">
@@ -115,13 +132,15 @@ class FlashcardSession {
         const setId = this.setSelect.value;
         return scopedWordbook().filter(w => isCard(w) && (setId === 'all' || (w.setIds ?? []).includes(setId)));
     }
+    /** New words still to start today. */
+    newLeft() {
+        const limit = this.deps.getSettings().srs_new_per_day ?? 20;
+        return Math.max(0, limit + this.extraNew - newWordsToday());
+    }
     /** Rebuilds the deck from the current set and mode, and shows its first card. */
     restart() {
         const pool = this.pool();
-        const now = Date.now();
-        this.deck = this.srs
-            ? pool.filter(w => (w.srs_due ?? 0) <= now).sort((a, b) => (a.srs_due ?? 0) - (b.srs_due ?? 0))
-            : pool;
+        this.deck = this.srs ? todaysCards(pool, this.newLeft()) : pool;
         this.index = 0;
         this.flipped = false;
         this.reviewed = 0;
@@ -129,11 +148,11 @@ class FlashcardSession {
         this.render();
     }
     updateControls(pool = this.pool()) {
-        const due = srsDueCount(pool);
+        const today = this.srs ? this.deck.length : todaysCards(pool, this.newLeft()).length;
         const badge = this.root.querySelector('.pg-srs-badge');
         if (badge) {
-            badge.textContent = String(due);
-            badge.hidden = due === 0;
+            badge.textContent = String(today);
+            badge.hidden = today === 0;
         }
         this.root.querySelector('.pg-srs-toggle')?.classList.toggle('pg-srs-active', this.srs);
         const shuffle = this.root.querySelector('.pg-flash-shuffle');
@@ -144,11 +163,16 @@ class FlashcardSession {
     emptyView() {
         if (!this.srs)
             return html `<div class="pg-empty-hint">${multiline(t('fl.noWords'))}</div>`;
+        const pool = this.pool();
+        const ahead = forecast(pool);
+        const more = pool.some(isNew);
         return html `
             <div class="pg-srs-complete">
                 <div class="pg-srs-complete-icon">🎉</div>
                 <div class="pg-srs-complete-title">${t('fl.allDone')}</div>
                 <div class="pg-srs-complete-sub">${t('fl.allDoneSub', { n: this.reviewed })}</div>
+                <div class="pg-srs-forecast">${t('fl.forecast', { tomorrow: ahead.tomorrow, week: ahead.week })}</div>
+                ${more && html `<button class="pg-btn pg-btn-secondary pg-btn-full" data-action="more-new">${t('fl.moreNew', { n: MORE_NEW })}</button>`}
                 <button class="pg-btn pg-btn-secondary pg-btn-full" data-action="browse-all">${t('fl.backAll')}</button>
             </div>`;
     }
@@ -157,8 +181,9 @@ class FlashcardSession {
         const progress = srs
             ? `${t('fl.remaining', { n: this.deck.length })} · ${t('fl.doneSess', { n: this.reviewed })}`
             : `${this.index + 1} / ${this.deck.length}`;
+        const days = srs && flipped ? previewDays(w) : [];
         return html `
-            <div class="pg-flash-progress">${progress}</div>
+            <div class="pg-flash-progress">${srs && isNew(w) && html `<span class="pg-srs-new">${t('fl.newBadge')}</span> `}${isMissed(w) && html `<span class="pg-srs-new pg-missed-tag">${t('wb.missedTag')}</span> `}${progress}</div>
             <div class="pg-flash-card ${flipped && 'pg-flash-flipped'}" data-action="flip">
                 <div class="pg-flash-front">
                     <div class="pg-flash-word">${rubyWord(w.word, shownReading(w))}</div>
@@ -183,7 +208,7 @@ class FlashcardSession {
             <div class="pg-srs-rating">${RATINGS.map(r => html `
                 <button class="pg-srs-btn ${r.cls}" data-action="rate" data-rating="${r.rating}">
                     <span class="pg-srs-label">${t(r.key)}</span>
-                    <span class="pg-srs-preview">${srsPreview(w.srs_interval ?? 1, w.srs_ease ?? 2.5, r.rating)}</span>
+                    <span class="pg-srs-preview">${r.rating === 0 ? t('fl.ivlSoon') : intervalLabel(days[r.rating])}</span>
                 </button>`)}
             </div>`}
             ${!srs && html `
@@ -221,8 +246,9 @@ class FlashcardSession {
         const entry = wordbook.find(e => e.word === w.word);
         if (!entry)
             return;
-        const requeue = srsRate(entry, rating);
+        const { requeue, wasNew } = srsRate(entry, rating);
         saveWordbook(wordbook);
+        logReview({ wasNew, forgot: rating === 0 });
         this.deck.splice(this.index, 1);
         if (requeue)
             this.deck.push(entry);
@@ -265,6 +291,10 @@ class FlashcardSession {
                 this.srs = false;
                 this.restart();
                 break;
+            case 'more-new':
+                this.extraNew += MORE_NEW;
+                this.restart();
+                break;
             case 'shuffle':
                 if (this.srs)
                     break;
@@ -291,7 +321,7 @@ class FlashcardSession {
         }
     }
 }
-/** Renders the flashcard tab (set picker, SRS toggle, shuffle, card) into `container`. */
-export function renderFlashcard(container, deps) {
-    new FlashcardSession(container, deps);
+/** Renders the flashcard tab (set picker, SRS toggle, shuffle, card) into `container`; `review` starts in today's review. */
+export function renderFlashcard(container, deps, review = false) {
+    new FlashcardSession(container, deps, review);
 }

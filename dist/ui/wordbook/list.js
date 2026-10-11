@@ -12,6 +12,7 @@ import { ai, getLang, getNativeLang } from '../../runtime.js';
 import { speak } from '../../speech.js';
 import { userFileUrl } from '../../user-files.js';
 import { showConjugationPopupFromCache } from '../../features/conjugation.js';
+import { isMissed } from '../../srs.js';
 import { applyFilter, isFiltered, splitMatch } from './filters.js';
 import { rubyWord, shownReading } from '../../furigana/word.js';
 import { toggleNoteEditor, openNoteEditor, isNoteEditorOpen } from './note-editor.js';
@@ -52,6 +53,7 @@ function row(w, ctx) {
             <div class="pg-wb-meta">
                 ${w.ipa && html `<span class="pg-ipa-chip">${w.ipa}</span>`}
                 <span class="pg-level-badge level-${levelClass(w.level || 'grammar')}">${levelLabel(w.level)}</span>
+                ${isMissed(w) && html `<span class="pg-missed-tag" title="${t('wb.missedTip')}">${t('wb.missedTag')}</span>`}
                 ${w.conj_cached && html `<button class="pg-icon-btn pg-wb-conj-btn" data-action="conjugate" title="${t('wb.conjTable')}">📊</button>`}
                 <button class="pg-icon-btn pg-wb-note-btn${w.notes ? ' pg-wb-note-btn-has' : ''}" data-action="note" title="${t('wb.noteTitle')}">📝</button>
                 ${date && html `<span class="pg-wb-date">${date}</span>`}

@@ -3,7 +3,8 @@
 // reads message text — tap translation, look-up, annotation, furigana —
 // goes through here, so a ruby reading never leaks into a prompt or the
 // clipboard.
-import { ST_SEL } from './st-dom.js';
+import { ST_SEL, mesIdOf } from './st-dom.js';
+import { textHash } from './furigana/model.js';
 /** Elements whose text is not part of the message's own text. */
 const NOT_TEXT = new Set(['SCRIPT', 'STYLE', 'RT', 'RP']);
 const ADDED = '.pg-tap-bubble';
@@ -22,6 +23,16 @@ export function plainTextNodes(root) {
 }
 /** The concatenated plain text (offsets in it match plainOffsetIn). */
 export const plainText = (root) => plainTextNodes(root).map(n => n.data).join('');
+/** The text hash of every rendered message, by message index. */
+export function shownTextHashes() {
+    const out = new Map();
+    for (const el of document.querySelectorAll(`${ST_SEL.mes} ${ST_SEL.mesText}`)) {
+        const mesId = mesIdOf(el);
+        if (mesId !== null)
+            out.set(mesId, textHash(plainText(el)));
+    }
+    return out;
+}
 /**
  * Offset of a DOM position within plainText(root); -1 if outside root.
  * A position inside a reading counts as the start of the next plain text.
