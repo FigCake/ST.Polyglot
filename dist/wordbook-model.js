@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  wordbook-model.ts
-// ════════════════════════════
 // Pure wordbook operations: chat tags, scope, merging, per-chat overview.
 //
 // One shared wordbook holds every entry. `entry.chats` lists the chats the
@@ -64,6 +61,47 @@ export function mergeEntries(a, b) {
         srs_streak: srs.srs_streak,
         srs_reviewed_at: srs.srs_reviewed_at,
     };
+}
+const SRS_FIELDS = ['srs_interval', 'srs_ease', 'srs_due', 'srs_streak', 'srs_reviewed_at'];
+const LIST_FIELDS = new Set(['setIds', 'chats']);
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+/** A list after both sides' additions and removals since `base`. */
+function rebaseList(base = [], local = [], server = []) {
+    const removed = (x) => base.includes(x) && (!local.includes(x) || !server.includes(x));
+    return union(local, server).filter(x => !removed(x));
+}
+/**
+ * An entry both devices changed since `base`, field by field: a field only
+ * one side changed takes that change; lists get both sides' additions and
+ * removals; notes are joined; other text changed on both sides keeps this
+ * device's (`local`). The SRS state moves as one, from the side that
+ * reviewed the word (both: the one reviewed more), so it is never a mix.
+ */
+export function rebaseEntry(base, local, server) {
+    const b = base;
+    const l = local;
+    const r = server;
+    const reviewed = (e) => SRS_FIELDS.some(k => !same(e[k], b[k]));
+    const srs = !reviewed(l) ? r : !reviewed(r) ? l : moreReviewed(local, server) ? l : r;
+    const out = {};
+    for (const k of new Set([...Object.keys(b), ...Object.keys(l), ...Object.keys(r)])) {
+        let v;
+        if (SRS_FIELDS.includes(k))
+            v = srs[k];
+        else if (same(l[k], b[k]))
+            v = r[k];
+        else if (same(r[k], b[k]))
+            v = l[k];
+        else if (LIST_FIELDS.has(k))
+            v = rebaseList(b[k], l[k], r[k]);
+        else if (k === 'notes')
+            v = joinNotes(l[k], r[k]);
+        else
+            v = l[k];
+        if (v !== undefined)
+            out[k] = v;
+    }
+    return out;
 }
 /** Removes undefined / empty-string fields so they do not override the other copy when spread. */
 function stripEmpty(e) {

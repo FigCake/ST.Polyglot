@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/panel/learn-tab.ts
-// ════════════════════════════
 // Learn tab: the word-detail card plus a bar of study modes.
 //
 //   ┌ detail ┐   click a mode   ┌ ← back ┐
@@ -9,9 +6,6 @@
 //
 // Modes and quiz variants are declared as data (MODES / QUIZ_VARIANTS), so
 // adding one is a single table entry.
-//
-// Dependencies: runtime.ts, speech.ts, html.ts, ui.manager.ts, features/*,
-//               ui/wordbook-ui.ts (renderDetail), conj-cache.ts
 import { getSettings, getLang, getNativeLang, ai, getContext } from '../../runtime.js';
 import { speak, hasSpeechRecognition, runPronunciationCheck, setActiveRecognition, getActiveRecognition, abortActiveRecognition, } from '../../speech.js';
 import { html, setHtml } from '../../html.js';

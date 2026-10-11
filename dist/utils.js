@@ -1,37 +1,20 @@
-// ════════════════════════════
-// Polyglot  utils.ts
-// ════════════════════════════
-// Pure utility functions — no side effects, no DOM, no API calls.
-// Dependencies: constants.ts (resolveNativeLang).
+// Pure utility functions: no side effects, no DOM, no API calls.
 import { resolveNativeLang } from './constants.js';
 // ── Language helpers ───────────────────────────────────────────────────────────
-// These helpers extract the resolved language strings from a Settings object.
-// Defined here (not in index.ts) so annotator.ts, wordbook.ts, and index.ts
-// can all share the same logic without creating a circular dependency.
-/**
- * Returns the current learning language string from settings.
- * Falls back to 'English' when the language is absent or set to 'Custom'
- * without a custom value.
- */
+/** The learning language; 'English' when unset or 'Custom' without a value. */
 export function getLangFromSettings(s) {
     return s?.language === 'Custom'
         ? (s.language_custom || 'English')
         : (s?.language || 'English');
 }
-/**
- * Returns the resolved native-language name for use in AI prompts
- * (e.g. "Korean", "English", "Italian").
- */
+/** The native-language name used in AI prompts (e.g. "Korean"). */
 export function getNativeLangFromSettings(s) {
     return resolveNativeLang(s?.native_lang ?? 'en', s?.native_lang_custom ?? '');
 }
 // ── Array utilities ───────────────────────────────────────────────────────────
-/**
- * Fisher-Yates shuffle — unbiased O(n), returns a new array (non-mutating).
- * Use instead of .sort(() => Math.random() - 0.5) which is biased and O(n log n).
- */
 /** Whether a study-language name is Japanese. */
 export const isJapanese = (lang) => /japanese|日本語/i.test(lang);
+/** Fisher-Yates shuffle into a new array. Unlike sort(() => Math.random() - 0.5), it is unbiased. */
 export function shuffleArray(arr) {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -41,8 +24,7 @@ export function shuffleArray(arr) {
     return a;
 }
 // ── Level display helpers ─────────────────────────────────────────────────────
-// Used by annotator.ts, wordbook-ui.ts, and flashcard.ts.
-/** Converts a CEFR level label to its CSS class name. */
+/** CSS class for a level (CEFR, 'grammar', 'sentence' or 'idiom'). */
 export function levelClass(level) {
     if (!level)
         return 'grammar';
@@ -67,7 +49,7 @@ export function levelLabel(level) {
     return level; // A1–C2 as-is
 }
 // ── String similarity ──────────────────────────────────────────────────────────
-/** Levenshtein edit distance (rolling single-row DP — O(min) memory). */
+/** Levenshtein edit distance, keeping one row of the table at a time. */
 export function levenshtein(a, b) {
     if (!a.length)
         return b.length;
@@ -125,3 +107,13 @@ export function findWord(text, word, from = 0) {
     }
     return -1;
 }
+/**
+ * What a message keeps saved per text it has shown (its swipes, edits): the
+ * entries for other texts plus `item`, newest last, at most `keep` of them.
+ * Entries without a hash (older saves) give way to the new one.
+ */
+export function withEntryFor(list, item, keep) {
+    return [...list.filter(e => e.h && e.h !== item.h), item].slice(-keep);
+}
+/** A saved value as a list: older saves held one entry, newer ones a list. */
+export const entryList = (value) => (value === undefined ? [] : Array.isArray(value) ? value : [value]);

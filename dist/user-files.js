@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  user-files.ts
-// ════════════════════════════
 // Reads and writes files in the ST user's files folder (data/<user>/user/files),
 // the same place ST's Data Bank keeps attachments.
 //
@@ -10,8 +7,6 @@
 //
 // Every call reports an outcome instead of throwing, so callers can tell a
 // missing file or an old ST without the API from a passing network error.
-//
-// Dependencies: ST internals (getRequestHeaders)
 // @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
 import { getRequestHeaders } from '../../../../../script.js';
 const TIMEOUT_MS = 30_000;

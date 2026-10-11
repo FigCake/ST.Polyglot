@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  features/quiz.ts
-// ════════════════════════════
 // Multiple-choice quizzes. Every variant is: generate questions → renderQuiz().
 //
 //   Quick / Full    from recent chat history
@@ -19,9 +16,6 @@
 //     card is answerable and its correct option is marked at render time.
 //   • Each container runs one session at a time: starting a quiz cancels the
 //     previous one's request and listeners in that container.
-//
-// Dependencies: constants.ts, prompts.ts, utils.ts, html.ts, i18n.ts,
-//               quiz-sanitize.ts, ai/client.ts
 import { UI, QUIZ_TYPE_LABELS } from '../constants.js';
 import { quizPrompt, clozeQuizPrompt, readingExamPrompt, conjDrillPrompt, targetedExamPrompt } from '../prompts.js';
 import { shuffleArray } from '../utils.js';

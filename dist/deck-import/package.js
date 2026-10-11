@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  anki/package.ts
-// ════════════════════════════
 // Opens an Anki package (.apkg, or a whole-profile .colpkg) and lists its
 // note types, notes and media.
 //
@@ -14,8 +11,6 @@
 // Compression is told by the bytes themselves (zstd magic), not by the version.
 //
 // Media bytes are read only when asked for, one file at a time.
-//
-// Dependencies: zip.ts, anki/zstd.ts, anki/sqlite.ts
 import { readZip, readEntry } from '../zip.js';
 import { zstdDecompress, isZstd } from './zstd.js';
 import { SqliteFile } from './sqlite.js';
@@ -55,12 +50,14 @@ function modernCollection(db) {
 }
 function readCollection(db) {
     const { noteTypes, decks } = db.hasTable('notetypes') ? modernCollection(db) : legacyCollection(db);
-    // A note's deck is its first card's deck
+    // A note's deck is its first card's deck — its home deck (odid) while the card sits in a filtered deck
     const deckOf = new Map();
-    for (const { values: [, nid, did, ord] } of db.rows('cards')) {
+    for (const { values } of db.rows('cards')) {
+        const [, nid, did, ord] = values;
+        const home = Number(values[15]) || Number(did); // cards.odid: 0 unless in a filtered deck
         const prev = deckOf.get(Number(nid));
         if (!prev || Number(ord) < prev.ord)
-            deckOf.set(Number(nid), { ord: Number(ord), did: Number(did) });
+            deckOf.set(Number(nid), { ord: Number(ord), did: home });
     }
     const notes = [];
     for (const { rowid, values } of db.rows('notes')) {
@@ -78,14 +75,19 @@ function readCollection(db) {
 function mediaNamesFromProtobuf(bytes) {
     const names = [];
     const text = new TextDecoder();
+    const bad = () => { throw new AnkiFormatError('bad media list'); };
     const varint = (p) => {
         let v = 0, mul = 1, i = p;
         for (; bytes[i] & 0x80; i++, mul *= 128)
             v += (bytes[i] & 0x7f) * mul;
+        if (i >= bytes.length)
+            bad();
         return [v + bytes[i] * mul, i + 1];
     };
-    /** Calls `fn` with each field of the message in bytes[start, end). */
+    /** Calls `fn` with each field of the message in bytes[start, end); a length past the data is an error. */
     const fields = (start, end, fn) => {
+        if (end > bytes.length)
+            bad();
         for (let p = start; p < end;) {
             const [key, a] = varint(p);
             const no = Math.floor(key / 8), wire = key & 7;
@@ -94,6 +96,8 @@ function mediaNamesFromProtobuf(bytes) {
             }
             else if (wire === 2) {
                 const [len, b] = varint(a);
+                if (b + len > end)
+                    bad();
                 fn(no, b, b + len);
                 p = b + len;
             }
@@ -102,7 +106,7 @@ function mediaNamesFromProtobuf(bytes) {
             else if (wire === 1)
                 p = a + 8;
             else
-                throw new AnkiFormatError('bad media list');
+                bad();
         }
     };
     fields(0, bytes.length, (no, from, to) => {

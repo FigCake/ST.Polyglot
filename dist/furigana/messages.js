@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  furigana/messages.ts
-// ════════════════════════════
 // Furigana on chat messages, part of message analysis (📖) while the study
 // language is Japanese and "Use furigana" is on.
 //
@@ -14,11 +11,9 @@
 // they are no longer used. Display (always / on hover) and size are global
 // settings applied with CSS. An optional auto mode adds readings to new AI
 // messages without analysing them.
-//
-// Dependencies: constants.ts, utils.ts, storage.ts, runtime.ts, ui.manager.ts, i18n.ts,
-//               plain-text.ts, ui/message-decor.ts, furigana/*
 import { KEY } from '../constants.js';
-import { isJapanese } from '../utils.js';
+import { ST_SEL, mesTextOf, mesIdOf } from '../st-dom.js';
+import { isJapanese, entryList, withEntryFor } from '../utils.js';
 import { chatValue, currentChatId } from '../storage.js';
 import { getSettings, getLang, ai } from '../runtime.js';
 import { notify, askInput } from '../ui.manager.js';
@@ -28,20 +23,29 @@ import { setLayer, hasLayer, messagesWith, resetLayers, untilRendered, cancelUnt
 import { fetchReadings } from './request.js';
 import { drawRuby, stripRuby } from './render.js';
 import { hasKanji, isKana, textHash, toHiragana } from './model.js';
+/** Saved readings by message index: one entry per text the message has shown (older saves: a single entry). */
 const store = chatValue(KEY.furigana);
+const KEEP_PER_MESSAGE = 6;
 const requests = new Map();
-const textOf = (mesId) => document.querySelector(`.mes[mesid="${CSS.escape(mesId)}"] .mes_text`);
 /** Furigana is used while the study language is Japanese and the user has it on. */
 export const furiganaEnabled = () => isJapanese(getLang()) && getSettings().furigana_enabled !== false;
 // ── Saved readings ────────────────────────────────────────────────────────────
-const saved = (mesId) => store.get()?.[mesId];
+const savedList = (mesId) => entryList(store.get()?.[mesId]);
+/** Readings saved for the text the message shows now, if any. */
+function saved(mesId) {
+    const textEl = mesTextOf(mesId);
+    if (!textEl)
+        return undefined;
+    const h = textHash(plainText(textEl));
+    return savedList(mesId).find(e => e.h === h);
+}
 function save(mesId, readings) {
-    store.set({ ...store.get(), [mesId]: readings });
+    store.set({ ...store.get(), [mesId]: withEntryFor(savedList(mesId), readings, KEEP_PER_MESSAGE) });
 }
 /** Readings saved for the message's current text, if any. */
 function currentReadings(mesId, text, dialogue = false) {
-    const entry = saved(mesId);
-    return entry?.h === textHash(text) && !!entry.d === dialogue ? entry : undefined;
+    const h = textHash(text);
+    return savedList(mesId).find(e => e.h === h && !!e.d === dialogue);
 }
 // ── Showing ───────────────────────────────────────────────────────────────────
 function show(mesId, readings) {
@@ -64,7 +68,7 @@ async function generate(mesId, text, quiet, lines) {
         if (abort.signal.aborted || chatId !== currentChatId())
             return;
         // The message may have changed while we waited
-        const now = textOf(mesId);
+        const now = mesTextOf(mesId);
         if (!now || plainText(now) !== text)
             return;
         const readings = { h: textHash(text), s: spans, ...(lines && { d: true }) };
@@ -91,7 +95,7 @@ async function generate(mesId, text, quiet, lines) {
 export async function showFuriganaFor(mesId, lines) {
     if (!furiganaEnabled() || requests.has(mesId))
         return;
-    const textEl = textOf(mesId);
+    const textEl = mesTextOf(mesId);
     if (!textEl)
         return;
     const text = plainText(textEl);
@@ -117,7 +121,7 @@ export function hideFuriganaFor(mesId) {
 // ── Editing a reading ─────────────────────────────────────────────────────────
 /** Asks for a corrected reading of one ruby and saves it (an empty answer removes the ruby). */
 async function editReading(ruby) {
-    const mesId = ruby.closest('.mes')?.getAttribute('mesid');
+    const mesId = mesIdOf(ruby);
     const index = Number(ruby.dataset.pgSpan);
     const entry = mesId ? saved(mesId) : undefined;
     const span = entry?.s[index];
@@ -149,7 +153,7 @@ export function setupReadingEditor() {
     document.addEventListener('click', e => {
         const rt = e.target?.closest?.('rt');
         const ruby = rt?.closest('ruby.pg-ruby[data-pg-span]');
-        if (!ruby || !ruby.closest('.mes_text'))
+        if (!ruby || !ruby.closest(ST_SEL.mesText))
             return;
         e.preventDefault();
         e.stopPropagation();
@@ -157,15 +161,15 @@ export function setupReadingEditor() {
     }, { capture: true });
 }
 // ── Restore / auto / reset ────────────────────────────────────────────────────
-/** Shows saved, non-hidden readings on messages that are in the DOM and match them. */
+/** Shows saved, non-hidden readings on messages that are in the DOM, for the text each shows now. */
 export function restoreFurigana() {
     if (!furiganaEnabled())
         return;
-    for (const [mesId, entry] of Object.entries(store.get() ?? {})) {
-        if (entry.hidden || hasLayer(mesId, 'furigana'))
+    for (const mesId of Object.keys(store.get() ?? {})) {
+        if (hasLayer(mesId, 'furigana'))
             continue;
-        const textEl = textOf(mesId);
-        if (textEl && textHash(plainText(textEl)) === entry.h)
+        const entry = saved(mesId);
+        if (entry && !entry.hidden)
             show(mesId, entry);
     }
 }
@@ -175,14 +179,19 @@ export function restoreFuriganaWithRetry() {
 }
 /** Automatic readings for a newly rendered AI message (setting "auto"); one request at a time. */
 let autoQueue = Promise.resolve();
+/** Bumped on a chat switch: tasks queued before it belong to the old chat and do nothing. */
+let autoGeneration = 0;
 export function autoFurigana(mesId) {
     if (!furiganaEnabled() || !getSettings().furigana_auto)
         return;
     if (saved(mesId)?.hidden || requests.has(mesId))
         return;
+    const generation = autoGeneration;
     autoQueue = autoQueue.then(async () => {
-        const textEl = textOf(mesId);
-        if (!textEl || textEl.closest('.mes')?.getAttribute('is_user') !== 'false')
+        if (generation !== autoGeneration)
+            return;
+        const textEl = mesTextOf(mesId);
+        if (!textEl || !textEl.closest(ST_SEL.aiMes))
             return;
         const text = plainText(textEl);
         if (!hasKanji(text) || requests.has(mesId))
@@ -196,14 +205,11 @@ export function autoFurigana(mesId) {
         await generate(mesId, text, true);
     });
 }
-/** A swiped message gets new text: drop its readings and any request. */
+/** A swiped message shows other text: its readings and request go; readings saved per text stay. */
 export function forgetFurigana(mesId) {
     requests.get(mesId)?.abort();
     requests.delete(mesId);
     hide(mesId);
-    const { [mesId]: gone, ...rest } = store.get() ?? {};
-    if (gone)
-        store.set(rest);
 }
 /** Deletes every saved reading of the open chat (with "clear this chat's annotations"). */
 export function clearChatFurigana() {
@@ -217,6 +223,7 @@ export function resetFuriganaState() {
     requests.forEach(r => r.abort());
     requests.clear();
     resetLayers('furigana');
+    autoGeneration++;
     autoQueue = Promise.resolve();
 }
 /** The study language or "Use furigana" changed: show or hide readings everywhere. */
@@ -240,7 +247,7 @@ export function applyFuriganaDisplay() {
  * Measures a shown reading and says so when it was enlarged.
  */
 export function warnIfFontClamped() {
-    const rt = document.querySelector('.mes_text ruby.pg-ruby rt');
+    const rt = document.querySelector(`${ST_SEL.mesText} ruby.pg-ruby rt`);
     const base = rt?.parentElement;
     if (!rt || !base)
         return;

@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  data-store.ts
-// ════════════════════════════
 // Where the learner's data (user-data.ts) lives, and the only module that
 // loads or saves it.
 //
@@ -21,9 +18,6 @@
 //
 // Unused media files (words' sounds and pictures) are deleted once a save
 // no longer refers to them.
-//
-// Dependencies: user-data.ts, user-files.ts, media-files.ts, runtime.ts, storage.ts, constants.ts,
-//               ui.manager.ts (notify), i18n.ts
 import { KEY } from './constants.js';
 import { getSettings, saveSettings } from './runtime.js';
 import { chatMetadata, saveChatMetadata } from './storage.js';
@@ -31,7 +25,7 @@ import { notify } from './ui.manager.js';
 import { t } from './i18n.js';
 import { readUserFile, writeUserFile } from './user-files.js';
 import { mediaIn, releaseMedia } from './media-files.js';
-import { emptyData, hasData, mergeUserData, parseData, serializeData, } from './user-data.js';
+import { emptyData, hasData, mergeUserData, parseData, rebaseUserData, serializeData, } from './user-data.js';
 export const DATA_FILE = 'polyglot-data.json';
 /** One-time copy of the settings data, written before the first migration. */
 const MIGRATION_COPY = 'polyglot-data-before-migration.json';
@@ -137,19 +131,53 @@ function scheduleSave(delay) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { void save(); }, delay);
 }
+/**
+ * Takes in what another device saved since this session last read or wrote
+ * the file, so a save never overwrites it. 'retry' when the file could not be
+ * read (writing blind could undo the other device); 'newer' when a newer
+ * Polyglot wrote it and it must never be written over.
+ */
+async function catchUp() {
+    const res = await readUserFile(DATA_FILE);
+    if (res.status === 'error')
+        return 'retry';
+    if (res.status === 'missing' || res.text === lastText)
+        return 'ok';
+    const server = parseData(res.text);
+    if (!server.ok) {
+        if (server.reason === 'newer')
+            return 'newer';
+        // Unreadable: keep a copy before it is replaced, as on load
+        return await writeUserFile(`polyglot-data-unreadable-${Date.now()}.json`, res.text) === 'ok' ? 'ok' : 'retry';
+    }
+    const base = parseData(lastText);
+    data = rebaseUserData(base.ok ? base.data : emptyData(), data, server.data);
+    emitReplaced();
+    return 'ok';
+}
 /** Writes the file once; a save requested meanwhile runs right after. */
 function save() {
     if (saving)
         return saving;
     clearTimeout(saveTimer);
+    // Until the file has loaded, `data` is only part of the learner's data
+    if (mode !== 'file')
+        return Promise.resolve();
     saving = (async () => {
         dirty = false;
+        const caught = await catchUp();
+        if (caught === 'newer') {
+            dirty = true;
+            notify(t('data.newerFile'), 'err', 10000);
+            goOffline();
+            return;
+        }
         const text = serializeData(data);
         const media = mediaIn(data.wordbook);
-        const result = await writeUserFile(DATA_FILE, text);
+        const result = caught === 'ok' ? await writeUserFile(DATA_FILE, text) : 'error';
         if (result === 'ok') {
             lastText = text;
-            releaseMedia(savedMedia, media);
+            releaseMedia(savedMedia, media, mediaIn(data.wordbook));
             savedMedia = media;
             if (failures > 0)
                 notify(t('data.saveRecovered'), 'ok', 3000);

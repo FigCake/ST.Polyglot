@@ -1,14 +1,9 @@
-// ════════════════════════════
-// Polyglot  ui/licenses.ts
-// ════════════════════════════
 // "Open-source licenses": shows THIRD_PARTY_NOTICES.md (copied into dist at
 // build time, next to this module's parent) in a dialog.
 //
 // The file is plain Markdown; only what it uses is rendered — headings, the
 // summary table, and everything else as preformatted text. All text goes in
 // through textContent.
-//
-// Dependencies: i18n.ts, ui.manager.ts
 import { t } from '../i18n.js';
 import { el, notify, showDocument } from '../ui.manager.js';
 const NOTICES_URL = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);

@@ -16,6 +16,7 @@ Used to build and test Polyglot; not shipped with it.
 | ESLint | MIT |
 | typescript-eslint | MIT / BSD-2-Clause |
 | Vitest | MIT |
+| Zstandard test vectors (`src/deck-import/fixtures/zstd-golden*`, from facebook/zstd) | BSD-3-Clause, © Meta Platforms, Inc. |
 
 ## Environment
 

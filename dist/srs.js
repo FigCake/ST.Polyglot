@@ -1,35 +1,33 @@
-// ════════════════════════════
-// Polyglot  srs.ts
-// ════════════════════════════
-// SM-2 spaced-repetition algorithm.
-// Pure functions — no side effects, no DOM, no API calls.
-// Dependencies: constants.ts, types.ts only.
+// SM-2 spaced-repetition algorithm. Pure functions: no side effects, no DOM, no API calls.
 import { SRS as SRS_CFG } from './constants.js';
 /**
- * Updates the SRS schedule for a wordbook entry in-place.
- * @param entry   Wordbook entry
- * @param rating  0=Again 1=Hard 2=Good 3=Easy
- * @returns true if the card should be re-queued this session (Again)
+ * Days until the next review for a rating (0 = due again now). Good always
+ * adds at least a day and Easy at least a day more than Good: with a low ease
+ * (after lapses) rounding would otherwise keep a card at 1 day forever.
  */
+function nextInterval(interval, ease, rating) {
+    if (rating === 0)
+        return 0;
+    if (rating === 1)
+        return Math.max(1, Math.round(interval * SRS_CFG.hardIntervalMult));
+    const good = Math.max(interval + 1, Math.round(interval * ease));
+    return rating === 2 ? good : Math.max(good + 1, Math.round(interval * ease * SRS_CFG.easyIntervalBonus));
+}
+/** Updates the entry's schedule in place (0=Again 1=Hard 2=Good 3=Easy). True = re-queue this session. */
 export function srsRate(entry, rating) {
     let interval = entry.srs_interval ?? SRS_CFG.initialInterval;
     let ease = entry.srs_ease ?? SRS_CFG.defaultEase;
-    let requeue = false;
-    if (rating === 0) { // Again — re-queue at end of session
+    const requeue = rating === 0;
+    if (rating === 0) { // Again — re-queue at end of session, start over at 1 day
         interval = 1;
         ease = Math.max(SRS_CFG.minEase, ease + SRS_CFG.againEaseDelta);
-        requeue = true;
     }
-    else if (rating === 1) { // Hard — shorter interval, slight ease decrease
-        interval = Math.max(1, Math.round(interval * SRS_CFG.hardIntervalMult));
-        ease = Math.max(SRS_CFG.minEase, ease + SRS_CFG.hardEaseDelta);
-    }
-    else if (rating === 2) { // Good — normal interval
-        interval = Math.max(1, Math.round(interval * ease));
-    }
-    else { // Easy — longer interval, slight ease increase
-        interval = Math.max(1, Math.round(interval * ease * SRS_CFG.easyIntervalBonus));
-        ease = Math.min(4.0, ease + 0.15);
+    else {
+        interval = nextInterval(interval, ease, rating);
+        if (rating === 1)
+            ease = Math.max(SRS_CFG.minEase, ease + SRS_CFG.hardEaseDelta);
+        if (rating === 3)
+            ease = Math.min(4.0, ease + 0.15);
     }
     entry.srs_interval = interval;
     entry.srs_ease = parseFloat(ease.toFixed(2));
@@ -37,22 +35,13 @@ export function srsRate(entry, rating) {
     entry.srs_reviewed_at = Date.now();
     return requeue;
 }
-/** Returns the number of due cards in the given pool. */
 export function srsDueCount(pool) {
     const now = Date.now();
     return pool.filter(w => (w.srs_due ?? 0) <= now).length;
 }
-/** Returns a preview string like "in N days" shown above SRS rating buttons. */
+/** The label ("today", "tomorrow", "in 3d") shown above a rating button; the same schedule srsRate sets. */
 export function srsPreview(interval, ease, rating) {
-    let days;
-    if (rating === 0)
-        days = 1;
-    else if (rating === 1)
-        days = Math.max(1, Math.round(interval * SRS_CFG.hardIntervalMult));
-    else if (rating === 2)
-        days = Math.max(1, Math.round(interval * ease));
-    else
-        days = Math.max(1, Math.round(interval * ease * SRS_CFG.easyIntervalBonus));
+    const days = nextInterval(interval, ease, rating);
     if (days <= 0)
         return 'today';
     if (days === 1)

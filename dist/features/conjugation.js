@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  features/conjugation.ts
-// ════════════════════════════
 // Verb conjugation popup: a modal overlay showing one table per tense.
 //
 // Tables come from the IndexedDB cache when present, otherwise from the AI
@@ -13,8 +10,6 @@
 // Design rules:
 //   • No direct ST state reads — the AI client and language getters are injected.
 //   • Only one popup exists at a time; opening a new one closes the previous.
-//
-// Dependencies: prompts.ts, html.ts, i18n.ts, conj-cache.ts, wordbook.ts, ai/client.ts
 import { verbConjugationPrompt } from '../prompts.js';
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
@@ -36,11 +31,14 @@ async function loadConjugation(word, lang, deps, signal) {
     const cached = await getConjCache(word, lang);
     if (cached?.tenses?.length)
         return cached;
-    const { data } = await deps.ai.json({
+    const { data, partial } = await deps.ai.json({
         prompt: verbConjugationPrompt(word, lang, deps.getNativeLang()),
         signal,
         accept: acceptConjData,
     });
+    // A table from a cut-off reply is shown but not kept, so the next look asks again
+    if (partial)
+        return data;
     await setConjCache(word, data, lang);
     markCached(word);
     return data;
@@ -70,12 +68,16 @@ function openPopup(title, badge) {
         </div>`);
     document.body.appendChild(overlay);
     const abort = new AbortController();
-    const onKey = (e) => { if (e.key === 'Escape')
-        close(); };
+    // Capture, and stop it there: the Escape closes this popup, not the panel under it
+    const onKey = (e) => { if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.preventDefault();
+        close();
+    } };
     const close = () => {
         abort.abort();
         overlay.remove();
-        document.removeEventListener('keydown', onKey);
+        window.removeEventListener('keydown', onKey, true);
         if (closeCurrent === close)
             closeCurrent = null;
     };
@@ -85,7 +87,7 @@ function openPopup(title, badge) {
         close();
     } });
     overlay.querySelector('.pg-conj-close')?.addEventListener('click', close);
-    document.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
     return { body: overlay.querySelector('.pg-conj-body'), signal: abort.signal };
 }
 function setBody(body, state, content) {

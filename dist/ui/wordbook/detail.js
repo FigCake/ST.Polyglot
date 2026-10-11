@@ -1,11 +1,5 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/detail.ts
-// ════════════════════════════
 // The Learn tab's detail card: a looked-up word, a grammar pattern, an idiom,
 // or the loading / error / empty states.
-//
-// Dependencies: constants.ts, utils.ts, html.ts, i18n.ts, wordbook.ts, runtime.ts,
-//               speech.ts, ui/wordbook/note-editor.ts
 import { dictUrl } from '../../constants.js';
 import { levelClass, levelLabel } from '../../utils.js';
 import { html, setHtml, raw } from '../../html.js';
@@ -118,9 +112,11 @@ function renderGrammar(container, g, actions) {
         ${section(t('det.structure'), g.structure, true)}
         ${section(t('det.words'), g.words_used, true)}
         ${saveButton(saved, t('det.addGram'))}`);
+    // The pattern is the entry's key (base_form); the words it uses go with its structure
     if (!saved)
         bindSave(container, {
-            word: g.pattern, base_form: g.words_used || '', pos_info: g.structure || '', meaning: g.meaning || '', level: 'grammar',
+            word: g.pattern, base_form: g.pattern, meaning: g.meaning || '', level: 'grammar',
+            pos_info: [g.structure, g.words_used].filter(Boolean).join(' · '),
         }, actions);
 }
 function renderIdiom(container, idiom, actions) {

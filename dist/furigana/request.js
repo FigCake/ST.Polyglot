@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  furigana/request.ts
-// ════════════════════════════
 // Asks the model for the readings of a text and turns them into ruby spans.
 //
 //   text ─▶ kanji chunks ─▶ ONE request (words back as "surface=reading …")
@@ -9,8 +6,6 @@
 //
 // One request per message, however long: a longer reply takes longer, but a
 // long message's analysis (sent at the same time) takes longer still.
-//
-// Dependencies: prompts.ts, ai/client.ts, furigana/model.ts
 import { furiganaPrompt } from '../prompts.js';
 import { isRecord, unionBy } from '../ai/client.js';
 import { alignReadings, hasKanji, kanjiChunks, kanjiGaps, parseWordList, } from './model.js';

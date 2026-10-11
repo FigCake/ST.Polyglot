@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook-ui.ts
-// ════════════════════════════
 // The Wordbook tab: this-chat / all-chats switch, search, level pills, set
 // picker, selection toolbar, the word list and the set manager.
 //
@@ -14,9 +11,6 @@
 // The tab remembers the element it was last rendered into (while the panel is
 // open), so any module can call refreshWordbook() after changing data — even
 // while another tab is showing and the wordbook is detached.
-//
-// Dependencies: constants.ts, utils.ts, html.ts, i18n.ts, ui.manager.ts, wordbook.ts,
-//               storage.ts, runtime.ts, ui/reanalysis-bar.ts, ui/wordbook/*
 import { LEVEL_FILTERS } from '../constants.js';
 import { levelLabel } from '../utils.js';
 import { html, setHtml } from '../html.js';

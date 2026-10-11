@@ -1,10 +1,5 @@
-// ════════════════════════════
-// Polyglot  ui/tap/deep-analysis.ts
-// ════════════════════════════
 // "Deep" sentence breakdown inside a translation bubble: role-coloured token
 // chips, dependency arcs above them, grammar points and a summary.
-//
-// Dependencies: html.ts, i18n.ts, prompts.ts, runtime.ts, ai/client.ts
 import { html, setHtml, raw } from '../../html.js';
 import { t } from '../../i18n.js';
 import { deepAnalysisPrompt } from '../../prompts.js';

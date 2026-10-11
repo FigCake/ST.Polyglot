@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ai/json-repair.ts
-// ════════════════════════════
 // Extracts the first JSON value from a model reply, repairing what models
 // typically get wrong:
 //

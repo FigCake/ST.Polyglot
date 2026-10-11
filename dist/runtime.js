@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  runtime.ts
-// ════════════════════════════
 // Live settings access and the helpers that are bound to them.
 //
 // Design rules:
@@ -8,9 +5,6 @@
 //     Other modules either import getSettings() from here or receive it via deps.
 //   • extension_settings is imported directly (not via getContext()) because
 //     some ST versions hand out a snapshot from getContext().extensionSettings.
-//
-// Dependencies: constants.ts, types.ts, utils.ts, api.ts, ai/client.ts, ui.manager.ts, i18n.ts,
-//               ST internals (extension_settings, saveSettingsDebounced)
 import { KEY } from './constants.js';
 import { getLangFromSettings, getNativeLangFromSettings } from './utils.js';
 import { complete } from './api.js';
@@ -73,6 +67,7 @@ export function getSettings() {
     backfillDefaults(s);
     migrateLegacyProvider(s);
     migrateFurigana(s);
+    dropRemovedTts(s);
     return s;
 }
 export function saveSettings() { saveSettingsDebounced(); }
@@ -116,6 +111,12 @@ function migrateFurigana(s) {
     // Left by the removed local dictionary
     delete s.furigana_dict;
     delete s.furigana_source;
+}
+/** The text-to-speech engines removed in March 2026 left their settings behind, API keys included. */
+function dropRemovedTts(s) {
+    for (const key of Object.keys(s))
+        if (key.startsWith('tts_'))
+            delete s[key];
 }
 /** ST context accessor, re-exported so nested modules need no deep relative ST paths. */
 export { getContext };

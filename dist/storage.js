@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  storage.ts
-// ════════════════════════════
 // Chat metadata access. Where Polyglot keeps what:
 //
 //   user file       polyglot-data.json on the ST server       wordbook, sets, wrong answers (data-store.ts)
@@ -8,15 +5,13 @@
 //                                                             without file storage)
 //   settings        global, ST's settings.json                options only
 //   IndexedDB       per browser                               conjugation tables (conj-cache.ts) — a cache
-//
-// Dependencies: ST internals (getContext, saveMetadataDebounced)
 // @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
 import { getContext, saveMetadataDebounced } from '../../../../extensions.js';
-/** The open chat's metadata object, or null when no chat is loaded. */
+/** Null when no chat is loaded. */
 export function chatMetadata() {
     return getContext()?.chatMetadata ?? null;
 }
-/** Schedules a save of the open chat's metadata (older ST builds expose it only on the context). */
+/** Schedules a metadata save. Older ST builds expose it only on the context. */
 export function saveChatMetadata() {
     if (typeof saveMetadataDebounced === 'function') {
         saveMetadataDebounced();
@@ -28,7 +23,6 @@ export function saveChatMetadata() {
     else if (typeof ctx?.saveMetadataDebounced === 'function')
         ctx.saveMetadataDebounced();
 }
-/** Typed read/write access to one key of the open chat's metadata. */
 export function chatValue(key) {
     return {
         get() {

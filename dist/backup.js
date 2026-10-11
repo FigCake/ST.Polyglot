@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  backup.ts
-// ════════════════════════════
 // Full backup / restore as one JSON file:
 //
 //   wordbook (with SRS progress, notes, chat tags) · word sets · saved wrong
@@ -13,8 +10,9 @@
 //
 // A restore puts the files back before the words that use them.
 //
-// API keys are never written to a backup, and a restore never overwrites the
-// key currently configured.
+// API keys and the AI connection (provider, model, Custom base URL) are never
+// written to a backup or restored from one: a backup from someone else could
+// otherwise point this device's key at their server.
 //
 // Restore modes:
 //   merge    add new words, combine duplicates (user-data.mergeUserData),
@@ -24,16 +22,20 @@
 // createBackup / parseBackup are pure and unit-tested (merging: user-data.ts).
 import { downloadText, downloadBlob } from './export/download.js';
 import { buildZip, readZip, readEntry } from './zip.js';
-import { mediaIn, mediaExists, isMediaName, noteUploaded } from './media-files.js';
+import { mediaIn, existingMedia, inParallel, isMediaName, keepableMedia, noteUploaded } from './media-files.js';
 import { readUserBytes, writeUserFile } from './user-files.js';
 import { getSettings, saveSettings, DEFAULT_SETTINGS } from './runtime.js';
 import { listConjCache, setConjCache, clearConjCacheStore } from './conj-cache.js';
 import { userData, replaceUserData, storeMode } from './data-store.js';
-import { cleanData, mergeUserData, isRecord, list, num } from './user-data.js';
+import { cleanData, mergeUserData, list, num } from './user-data.js';
+import { isRecord } from './ai/client.js';
 export const BACKUP_FORMAT = 'polyglot-backup';
 export const BACKUP_VERSION = 1;
-/** Settings keys that hold data (backed up separately) or secrets (never backed up). */
-const NOT_SETTINGS = new Set(['_wordbook', '_sets', 'saved_wrong_answers', 'ext_api_key']);
+/** Settings keys that hold data (backed up separately), the API key, or where AI requests go. */
+const NOT_SETTINGS = new Set([
+    '_wordbook', '_sets', 'saved_wrong_answers',
+    'ext_api_key', 'ext_base_url', 'provider', 'model', '_model_history', 'route_chat_source', 'route_model',
+]);
 /**
  * Only known setting keys are restored. This also keeps keys such as
  * "__proto__" in a crafted file from reaching Object.assign.
@@ -45,7 +47,8 @@ export function createBackup(settings, data, conjugations, now = new Date()) {
         format: BACKUP_FORMAT,
         version: BACKUP_VERSION,
         exportedAt: now.toISOString(),
-        settings: Object.fromEntries(Object.entries(settings).filter(([k]) => !NOT_SETTINGS.has(k))),
+        // Known settings only: a key left by an old version (say, an API key) never leaks into a backup
+        settings: Object.fromEntries(Object.entries(settings).filter(([k]) => RESTORABLE.has(k))),
         wordbook: data.wordbook,
         sets: data.sets,
         wrongAnswers: data.wrongAnswers,
@@ -84,7 +87,7 @@ export function parseBackup(text) {
 // ── Effects ───────────────────────────────────────────────────────────────────
 export const BACKUP_JSON = 'polyglot-backup.json';
 const MEDIA_DIR = 'media/';
-/** Saves a backup file (a zip when words have media); returns how many words and media files it holds. */
+/** Saves a backup file (a zip when words have media); returns how many words and media files it holds, and how many files on the server could not be read into it. */
 export async function downloadBackup() {
     const backup = createBackup(getSettings(), userData(), await listConjCache());
     const name = `Polyglot_Backup_${backup.exportedAt.slice(0, 10)}`;
@@ -92,16 +95,21 @@ export async function downloadBackup() {
     const media = storeMode() === 'file' ? [...mediaIn(backup.wordbook)] : [];
     if (!media.length) {
         downloadText(json, `${name}.json`, 'application/json');
-        return { words: backup.wordbook.length, media: 0 };
+        return { words: backup.wordbook.length, media: 0, missing: 0 };
     }
     const files = [{ name: BACKUP_JSON, data: new TextEncoder().encode(json) }];
+    const unread = [];
     for (const file of media) {
         const data = await readUserBytes(file);
         if (data)
             files.push({ name: MEDIA_DIR + file, data });
+        else
+            unread.push(file);
     }
     downloadBlob(buildZip(files), `${name}.zip`);
-    return { words: backup.wordbook.length, media: files.length - 1 };
+    // A file already gone from the server is no loss; one that is there but could not be read is
+    const missing = (await existingMedia(unread)).size;
+    return { words: backup.wordbook.length, media: files.length - 1, missing };
 }
 /** Opens a backup zip; null when the zip is not a Polyglot backup. */
 export async function openBackupZip(file) {
@@ -114,15 +122,26 @@ export async function openBackupZip(file) {
         restoreMedia: async (words) => {
             let failed = 0;
             const written = [];
-            for (const name of mediaIn(words)) {
+            // Only the sound / picture types Polyglot keeps: a crafted backup could hold an
+            // .svg or .xhtml that would run scripts on ST's origin if its URL were opened
+            const keepable = (name) => keepableMedia(name, 'sound') || keepableMedia(name, 'image');
+            const packed = [...mediaIn(words)].filter(name => isMediaName(name) && entries.has(MEDIA_DIR + name));
+            const inZip = packed.filter(keepable);
+            failed += packed.length - inZip.length;
+            const present = await existingMedia(inZip);
+            const missing = inZip.flatMap(name => {
                 const entry = entries.get(MEDIA_DIR + name);
-                if (!entry || !isMediaName(name) || await mediaExists(name))
-                    continue;
-                if (await writeUserFile(name, await readEntry(file, entry)) === 'ok')
+                return entry && !present.has(name) ? [{ name, entry }] : [];
+            });
+            await inParallel(missing, 6, async ({ name, entry }) => {
+                const ok = await readEntry(file, entry)
+                    .then(bytes => writeUserFile(name, bytes))
+                    .then(r => r === 'ok', () => false);
+                if (ok)
                     written.push(name);
                 else
                     failed++;
-            }
+            });
             noteUploaded(written);
             return failed;
         },

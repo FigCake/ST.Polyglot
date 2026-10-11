@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  features/speaking.ts
-// ════════════════════════════
 // Listening / speaking drill over the wordbook, one card at a time:
 //
 //   Dictation  hear the word, type it → similarity score
@@ -9,9 +6,7 @@
 //
 // Design rules:
 //   • speak / runPronunciationCheck are injected via SpeakingDeps.
-//   • Card pool = every wordbook entry with a word.
-//
-// Dependencies: utils.ts, html.ts, i18n.ts, wordbook.ts
+//   • Card pool = every entry in the current wordbook scope with a word.
 import { shuffleArray, similarityScore } from '../utils.js';
 import { html, setHtml } from '../html.js';
 import { scopedWordbook } from '../wordbook.js';
@@ -24,9 +19,9 @@ const MODE_CHOICES = [
 // ── Scoring ───────────────────────────────────────────────────────────────────
 /** Re-exported under its historical name (used by speaking.test.ts). */
 export { levenshtein as _levenshtein } from '../utils.js';
-// eslint-disable-next-line no-misleading-character-class
-const NOT_TEXT = /[^a-z0-9À-žЀ-ӿ؀-ۿऀ-ॿ぀-ヿ一-鿿가-힣ᄀ-ᇿ ]/gu;
-const comparable = (s) => s.toLowerCase().trim().replace(NOT_TEXT, '');
+/** Anything but letters, combining marks (accents, Thai and Indic vowel signs) and digits, in every script. */
+const NOT_TEXT = /[^\p{L}\p{M}\p{N} ]/gu;
+const comparable = (s) => s.normalize('NFC').toLowerCase().trim().replace(NOT_TEXT, '');
 /** Similarity (0–100) of a typed answer to the target, ignoring case and punctuation. */
 export function _dictationScore(target, input) {
     const a = comparable(target), b = comparable(input);

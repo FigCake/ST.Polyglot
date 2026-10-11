@@ -1,11 +1,5 @@
-// ════════════════════════════
-// Polyglot  ui/reanalysis-bar.ts
-// ════════════════════════════
 // Runs AI re-analysis of wordbook entries with a progress bar and a Stop button.
 // Used by the wordbook toolbar (selected words) and the settings tab (all words).
-//
-// Dependencies: html.ts, i18n.ts, ui.manager.ts, wordbook.ts, runtime.ts,
-//               features/reanalysis.ts
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { askConfirm, notify } from '../ui.manager.js';

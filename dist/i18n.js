@@ -1,18 +1,10 @@
-// ════════════════════════════
-// Polyglot  i18n.ts
-// ════════════════════════════
-// UI string translation system.
+// UI string translation.
 //
-// Design rules:
-//   • t(key, vars?) reads native_lang from extension_settings directly —
-//     same pattern as wordbook.ts / annotator.ts, no index.ts dependency.
-//   • Variable substitution via {varName} syntax:
-//       t('wb.nWords', { n: 5 })  →  "5 words"  /  "5 palabras"  (per active lang)
+//   • t(key, vars?) reads native_lang from extension_settings directly, since
+//     runtime.ts imports this module.
+//   • {varName} placeholders: t('wb.nWords', { n: 5 }) → "5 words" / "5 palabras".
 //   • Keys are typed (I18nKey): a misspelt key is a compile error.
-//   • Missing translation for a non-English lang → falls back to English.
-//   • 'custom' native_lang → falls back to English.
-//
-// Dependencies: constants.ts, ST internals (extension_settings)
+//   • A missing translation, or 'custom' native_lang, falls back to English.
 import { KEY } from './constants.js';
 // @ts-expect-error — no type declarations for ST internals
 import { extension_settings } from '../../../../extensions.js';
@@ -78,11 +70,15 @@ const EN = {
     'pnl.set.backup': 'Back up (JSON)',
     'pnl.set.backupDone': 'Backup saved ({n} words).',
     'pnl.set.backupDoneMedia': 'Backup saved ({n} words, {m} sound/image files).',
+    'pnl.set.backupMissing': '{n} sound/image file(s) could not be read and are not in the backup.',
+    'pnl.set.backupFailed': 'Could not save the backup: {err}',
     'pnl.set.restoreAsk': 'Backup from {date} with {n} words. Merge it into your current data, or replace everything with it?',
     'pnl.set.restoreMerge': 'Merge',
     'pnl.set.restoreReplace': 'Replace',
     'pnl.set.restoreMerged': 'Restored: {added} new word(s), {merged} merged.',
-    'pnl.set.restoreReplaced': 'Replaced with the backup ({n} words).',
+    'pnl.set.restoreReplaced': 'Replaced with the backup ({n} words). Your previous data was downloaded as a backup first.',
+    'pnl.set.restoreNotLoaded': 'Your data has not loaded yet. Try again in a moment.',
+    'pnl.set.restoreNoSafety': 'Replace cancelled: a complete backup of your current data could not be saved first.',
     'pnl.set.restoreInvalid': 'This file is not a Polyglot backup.',
     'pnl.set.restoreNewer': 'This backup was made by a newer Polyglot version. Update the extension first.',
     // ── AI requests ───────────────────────────────────────────────────────────
@@ -269,6 +265,7 @@ const EN = {
     'qz.genFail': 'Quiz generation failed: {msg}',
     // ── Checker ───────────────────────────────────────────────────────────────
     'chk.looksGood': 'Looks good ✓',
+    'chk.changed': 'The input changed while checking. Suggested: {text}',
     'chk.error': 'An error occurred while checking.',
     'chk.btnTitle': 'Polyglot: check / translate input',
     // ── Annotator ─────────────────────────────────────────────────────────────
@@ -423,11 +420,15 @@ const KO = {
     'pnl.set.backup': '백업 (JSON)',
     'pnl.set.backupDone': '백업을 저장했습니다 (단어 {n}개).',
     'pnl.set.backupDoneMedia': '백업을 저장했습니다 (단어 {n}개, 음성·이미지 파일 {m}개).',
+    'pnl.set.backupMissing': '음성·이미지 파일 {n}개를 읽지 못해 백업에 넣지 못했습니다.',
+    'pnl.set.backupFailed': '백업을 저장하지 못했습니다: {err}',
     'pnl.set.restoreAsk': '{date}에 만든 백업 (단어 {n}개)입니다. 현재 데이터에 합칠까요, 아니면 전부 백업으로 바꿀까요?',
     'pnl.set.restoreMerge': '합치기',
     'pnl.set.restoreReplace': '바꾸기',
     'pnl.set.restoreMerged': '복원했습니다: 새 단어 {added}개, 합친 단어 {merged}개.',
-    'pnl.set.restoreReplaced': '백업으로 바꿨습니다 (단어 {n}개).',
+    'pnl.set.restoreReplaced': '백업으로 바꿨습니다 (단어 {n}개). 바꾸기 전 데이터는 먼저 백업 파일로 내려받았습니다.',
+    'pnl.set.restoreNotLoaded': '아직 데이터를 불러오지 못했습니다. 잠시 후 다시 시도하세요.',
+    'pnl.set.restoreNoSafety': '바꾸기를 취소했습니다: 현재 데이터의 전체 백업을 먼저 저장하지 못했습니다.',
     'pnl.set.restoreInvalid': 'Polyglot 백업 파일이 아닙니다.',
     'pnl.set.restoreNewer': '더 새 버전의 Polyglot으로 만든 백업입니다. 확장 프로그램을 먼저 업데이트하세요.',
     // ── AI requests ───────────────────────────────────────────────────────────
@@ -614,6 +615,7 @@ const KO = {
     'qz.genFail': '퀴즈 생성 실패: {msg}',
     // ── Checker ───────────────────────────────────────────────────────────────
     'chk.looksGood': 'Looks good ✓',
+    'chk.changed': '확인하는 동안 입력이 바뀌었습니다. 제안: {text}',
     'chk.error': '교정 중 오류가 발생했습니다.',
     'chk.btnTitle': 'Polyglot: 입력 교정 / 번역',
     // ── Annotator ─────────────────────────────────────────────────────────────
@@ -768,11 +770,15 @@ const IT = {
     'pnl.set.backup': 'Backup (JSON)',
     'pnl.set.backupDone': 'Backup salvato ({n} parole).',
     'pnl.set.backupDoneMedia': 'Backup salvato ({n} parole, {m} file audio/immagine).',
+    'pnl.set.backupMissing': 'Impossibile leggere {n} file audio/immagine: non sono nel backup.',
+    'pnl.set.backupFailed': 'Impossibile salvare il backup: {err}',
     'pnl.set.restoreAsk': 'Backup del {date} con {n} parole. Unirlo ai dati attuali o sostituire tutto?',
     'pnl.set.restoreMerge': 'Unisci',
     'pnl.set.restoreReplace': 'Sostituisci',
     'pnl.set.restoreMerged': 'Ripristinato: {added} nuove parole, {merged} unite.',
-    'pnl.set.restoreReplaced': 'Sostituito con il backup ({n} parole).',
+    'pnl.set.restoreReplaced': 'Sostituito con il backup ({n} parole). I dati precedenti sono stati prima scaricati come backup.',
+    'pnl.set.restoreNotLoaded': 'I tuoi dati non sono ancora stati caricati. Riprova tra poco.',
+    'pnl.set.restoreNoSafety': 'Sostituzione annullata: non è stato possibile salvare prima un backup completo dei dati attuali.',
     'pnl.set.restoreInvalid': 'Questo file non è un backup di Polyglot.',
     'pnl.set.restoreNewer': 'Questo backup proviene da una versione più recente di Polyglot. Aggiorna prima l\'estensione.',
     // ── AI requests ───────────────────────────────────────────────────────────
@@ -958,6 +964,7 @@ const IT = {
     'qz.genFail': 'Generazione quiz fallita: {msg}',
     // ── Checker ───────────────────────────────────────────────────────────────
     'chk.looksGood': 'Sembra corretto ✓',
+    'chk.changed': 'Il testo è cambiato durante il controllo. Suggerimento: {text}',
     'chk.error': 'Si è verificato un errore durante il controllo.',
     'chk.btnTitle': 'Polyglot: controlla / traduci input',
     // ── Annotator ─────────────────────────────────────────────────────────────
@@ -1112,11 +1119,15 @@ const ES = {
     'pnl.set.backup': 'Copia de seguridad (JSON)',
     'pnl.set.backupDone': 'Copia guardada ({n} palabras).',
     'pnl.set.backupDoneMedia': 'Copia guardada ({n} palabras, {m} archivos de audio/imagen).',
+    'pnl.set.backupMissing': 'No se pudieron leer {n} archivos de audio/imagen: no están en la copia.',
+    'pnl.set.backupFailed': 'No se pudo guardar la copia: {err}',
     'pnl.set.restoreAsk': 'Copia del {date} con {n} palabras. ¿Combinarla con tus datos actuales o reemplazarlo todo?',
     'pnl.set.restoreMerge': 'Combinar',
     'pnl.set.restoreReplace': 'Reemplazar',
     'pnl.set.restoreMerged': 'Restaurado: {added} palabras nuevas, {merged} combinadas.',
-    'pnl.set.restoreReplaced': 'Reemplazado por la copia ({n} palabras).',
+    'pnl.set.restoreReplaced': 'Reemplazado por la copia ({n} palabras). Tus datos anteriores se descargaron antes como copia.',
+    'pnl.set.restoreNotLoaded': 'Tus datos aún no se han cargado. Inténtalo de nuevo en un momento.',
+    'pnl.set.restoreNoSafety': 'Reemplazo cancelado: no se pudo guardar antes una copia completa de tus datos actuales.',
     'pnl.set.restoreInvalid': 'Este archivo no es una copia de Polyglot.',
     'pnl.set.restoreNewer': 'Esta copia es de una versión más reciente de Polyglot. Actualiza primero la extensión.',
     // ── AI requests ───────────────────────────────────────────────────────────
@@ -1302,6 +1313,7 @@ const ES = {
     'qz.genFail': 'Error al generar el quiz: {msg}',
     // ── Checker ───────────────────────────────────────────────────────────────
     'chk.looksGood': '¡Se ve bien ✓',
+    'chk.changed': 'El texto cambió durante la revisión. Sugerencia: {text}',
     'chk.error': 'Se produjo un error al verificar.',
     'chk.btnTitle': 'Polyglot: verificar / traducir entrada',
     // ── Annotator ─────────────────────────────────────────────────────────────
@@ -1404,30 +1416,15 @@ const ES = {
 // ── Language registry ─────────────────────────────────────────────────────────
 const _DICTS = { en: EN, ko: KO, it: IT, es: ES };
 // ── Public API ────────────────────────────────────────────────────────────────
-/**
- * Returns the translated string for `key` in the user's current native language.
- *
- * - Reads `extension_settings[KEY.module].native_lang` at call time (live setting).
- * - Falls back to English if the current lang has no translation for the key.
- * - Substitutes `{varName}` placeholders using the optional `vars` object.
- *
- * @example
- *   t('wb.nWords', { n: 5 })   // → "5 words"  (or the active language equivalent)
- *   t('fl.again')               // → "Again"    (or the active language equivalent)
- */
+/** `key` in the current native language (read live), falling back to English; fills `{varName}` from `vars`. */
 export function t(key, vars) {
     const tag = extension_settings[KEY.module]?.native_lang ?? 'en';
     const dict = _DICTS[tag] ?? EN;
     const str = dict[key] ?? EN[key] ?? key;
     return _substitute(str, vars);
 }
-/**
- * Returns the current UI language tag (e.g. 'ko', 'en', 'it', 'es').
- * Returns 'en' for 'custom' or unknown values.
- */
+/** The UI language tag (e.g. 'ko'); 'en' for 'custom' or unknown values. */
 export function currentLang() {
     const tag = extension_settings[KEY.module]?.native_lang ?? 'en';
     return tag in _DICTS ? tag : 'en';
 }
-// NOTE: Keys added after initial generation
-// Add to each dict as needed — missing keys fall back to English automatically.

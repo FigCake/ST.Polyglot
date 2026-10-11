@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  furigana/model.ts
-// ════════════════════════════
 // Furigana as data: ruby spans over a message's plain text.
 //
 //   text ──chunks──▶ AI: [surface, reading] pairs, in order
@@ -20,8 +17,39 @@ export const hasKanji = (text) => KANJI_CHAR.test(text);
 export const isKana = (text) => KANA_ONLY.test(text);
 /** Katakana → hiragana (ー and ・ are kept). */
 export const toHiragana = (text) => text.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
-const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // ── One word ──────────────────────────────────────────────────────────────────
+/**
+ * Readings for the kanji runs between `literals` (the kana around them) so the
+ * whole reading lines up: the first fit with the shortest runs first, which is
+ * what a lazy regex ^lit0(.+?)lit1(.+?)…$ finds — but remembering dead ends, so
+ * a long reading with many runs takes polynomial time, not exponential.
+ */
+function fitRuns(literals, hira) {
+    if (!hira.startsWith(literals[0]))
+        return null;
+    const runs = literals.length - 1;
+    const out = [];
+    const dead = new Set();
+    /** Fits run i, which starts at `pos`, and every run after it. */
+    const fit = (i, pos) => {
+        const key = i * (hira.length + 1) + pos;
+        if (dead.has(key))
+            return false;
+        const next = literals[i + 1];
+        for (let end = pos + 1; end + next.length <= hira.length; end++) {
+            if (!hira.startsWith(next, end))
+                continue;
+            const after = end + next.length;
+            if (i + 1 === runs ? after === hira.length : fit(i + 1, after)) {
+                out[i] = hira.slice(pos, end);
+                return true;
+            }
+        }
+        dead.add(key);
+        return false;
+    };
+    return fit(0, literals[0].length) ? out : null;
+}
 /**
  * Ruby spans for one word, relative to the word: one per run of kanji, with
  * the kana between them matched against the reading.
@@ -39,17 +67,17 @@ export function wordSpans(surface, reading, { strict = false } = {}) {
     const runs = [...surface.matchAll(KANJI_RUN)].map(m => ({ start: m.index, end: m.index + m[0].length }));
     if (!runs.length || !hira || !isKana(hira))
         return [];
-    // Kanji runs become groups; everything else must appear literally in the reading
-    let pattern = '^';
+    // Everything between the kanji runs must appear literally in the reading
+    const literals = [];
     let cursor = 0;
     for (const run of runs) {
-        pattern += escapeRegExp(toHiragana(surface.slice(cursor, run.start))) + '(.+?)';
+        literals.push(toHiragana(surface.slice(cursor, run.start)));
         cursor = run.end;
     }
-    pattern += escapeRegExp(toHiragana(surface.slice(cursor))) + '$';
-    const match = new RegExp(pattern, 'u').exec(hira);
+    literals.push(toHiragana(surface.slice(cursor)));
+    const match = fitRuns(literals, hira);
     if (match)
-        return runs.map((run, i) => [run.start, run.end, match[i + 1]]);
+        return runs.map((run, i) => [run.start, run.end, match[i]]);
     if (strict)
         return [];
     // Fallback: one ruby from the first kanji to the last, minus kana shared at both ends

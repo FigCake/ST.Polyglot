@@ -1,10 +1,5 @@
-// ════════════════════════════
-// Polyglot  features/match.ts
-// ════════════════════════════
 // Word ↔ meaning matching game: pick a word and a meaning; a correct pair locks,
 // a wrong pair flashes and resets. Up to MAX_PAIRS random vocabulary entries.
-//
-// Dependencies: utils.ts, html.ts, i18n.ts, wordbook.ts, constants.ts
 import { CEFR_LEVELS } from '../constants.js';
 import { shuffleArray } from '../utils.js';
 import { html, setHtml } from '../html.js';

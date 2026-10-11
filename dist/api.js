@@ -1,16 +1,9 @@
-// ════════════════════════════
-// Polyglot  api.ts
-// ════════════════════════════
 // AI provider router — complete() entry point and per-provider backends.
 //
-// Design rules:
-//   • No DOM, no ST state reads.  getSettings() is NOT called here.
-//   • complete() takes an explicit `s: Settings`; runtime.ts binds the live
-//     settings and wraps it in the JSON client (ai/client.ts).
-//   • ST imports are limited to getRequestHeaders / secret_state — both are
-//     pure request utilities with no side effects.
-//
-// Dependencies: constants.ts, types.ts, ST internals (getRequestHeaders, secret_state)
+// No DOM, and getSettings() is never called: complete() takes `s: Settings`,
+// and runtime.ts binds the live settings and wraps it in the JSON client
+// (ai/client.ts). From ST it only reads request headers, which keys are set,
+// and the current chat-completion connection.
 // @ts-expect-error — no type declarations for ST internals
 import { getRequestHeaders } from '../../../../../script.js';
 // @ts-expect-error — no type declarations for ST internals
@@ -18,8 +11,7 @@ import { getContext } from '../../../../extensions.js';
 // @ts-expect-error — no type declarations for ST internals
 import { SECRET_KEYS, secret_state } from '../../../../secrets.js';
 // ── Provider config tables ────────────────────────────────────────────────────
-// Exported so settings-ui.ts can build the model dropdown without duplicating data.
-/** Maps Polyglot provider key → ST chat_completion_source value. */
+/** Polyglot provider key → ST chat_completion_source value. */
 export const PROVIDER_SOURCE = {
     openai: 'openai',
     claude: 'claude',
@@ -28,7 +20,7 @@ export const PROVIDER_SOURCE = {
     deepseek: 'deepseek',
     vertexai: 'vertexai',
 };
-/** Per-provider model suggestions (autocomplete hints — any model string is accepted). */
+/** Model suggestions for the settings dropdown; any model string is accepted. */
 export const PROVIDER_MODELS = {
     openai: [
         'gpt-5.2', 'gpt-5.1', 'gpt-5.1-chat-latest',
@@ -70,7 +62,7 @@ export const ROUTE_MODEL_KEY = new Map([
     ['groq', 'groq_model'],
     ['custom', 'custom_model'],
 ]);
-/** Maps provider key → ST SECRET_KEYS value (for pre-flight key validation). */
+/** Provider key → ST SECRET_KEYS value, to check the key is set before sending. */
 const PROVIDER_SECRET_KEY = {
     openai: SECRET_KEYS.OPENAI,
     claude: SECRET_KEYS.CLAUDE,
@@ -112,7 +104,9 @@ function answerParts(parts) {
 export function readReply(data) {
     const choice = data?.choices?.[0];
     const content = choice?.message?.content;
-    const text = (typeof content === 'string' ? content : answerParts(content)) ?? // OpenAI-compatible
+    // ST wraps Claude replies as choices[0] with content[0]'s text — '' when that block
+    // is thinking — and keeps the original blocks in data.content
+    const text = ((typeof content === 'string' ? content : answerParts(content)) || undefined) ?? // OpenAI-compatible
         answerParts(data?.content) ?? // Anthropic
         answerParts(data?.candidates?.[0]?.content?.parts) ?? // Gemini
         '';
@@ -162,19 +156,57 @@ async function postChat({ url, headers, body, signal, errorLabel, networkHint })
             const detail = await resp.text().catch(() => '');
             throw new Error(`${errorLabel} ${resp.status}: ${detail.slice(0, 200)}`);
         }
-        return readReply(await resp.json());
+        const data = await resp.json();
+        // ST passes some upstream failures (bad key, quota, a blocked prompt) as 200 + { error }
+        if (data?.error) {
+            const message = typeof data.error === 'object' ? data.error.message : data.error;
+            throw new Error(`${errorLabel}: ${typeof message === 'string' && message ? message : 'the provider returned an error'}`);
+        }
+        return readReply(data);
     }
     finally {
         request.release();
     }
 }
 const ST_GENERATE_URL = '/api/backends/chat-completions/generate';
+/** Sources whose requests ST sends through its reverse proxy when one is set (as ST's own client does). */
+const PROXY_SOURCES = new Set(['claude', 'openai', 'mistralai', 'makersuite', 'vertexai', 'deepseek', 'xai', 'zai', 'moonshot']);
+/**
+ * What ST's own client adds to a request for this source and model, which its
+ * backend relies on: OpenAI reasoning models (o1/o3/o4, gpt-5+) take
+ * max_completion_tokens and no temperature; Claude gets reasoning_effort
+ * 'auto', which keeps ST from turning on extended thinking (slow, and
+ * Polyglot only needs the answer).
+ */
+function sourceFields(source, model, maxTokens) {
+    const reasoningModel = /^(openai\/)?(o1|o3|o4)/.test(model) || /gpt-[5-9]/.test(model);
+    if (['openai', 'openrouter', 'azure_openai'].includes(source) && reasoningModel) {
+        return { max_tokens: undefined, max_completion_tokens: maxTokens, temperature: undefined };
+    }
+    if (source === 'claude')
+        return { reasoning_effort: 'auto' };
+    return {};
+}
+/** The parts of ST's connection settings its backend needs to reach the endpoint: Custom URL, reverse proxy. */
+function connectionFields(source, ccs) {
+    const fields = {};
+    if (source === 'custom') {
+        const params = (v) => getContext().substituteParams?.(String(v ?? '')) ?? String(v ?? '');
+        Object.assign(fields, {
+            custom_url: ccs.custom_url ?? '',
+            custom_include_body: params(ccs.custom_include_body),
+            custom_exclude_body: params(ccs.custom_exclude_body),
+            custom_include_headers: params(ccs.custom_include_headers),
+        });
+    }
+    if (ccs.reverse_proxy && PROXY_SOURCES.has(source)) {
+        Object.assign(fields, { reverse_proxy: ccs.reverse_proxy, proxy_password: ccs.proxy_password ?? '' });
+    }
+    return fields;
+}
 const ST_NETWORK_HINT = 'Network request failed. Make sure the SillyTavern server is running.';
 // ── Public API ────────────────────────────────────────────────────────────────
-/**
- * Sends one system + user prompt to the provider chosen in settings.
- * Settings are passed in (this module never reads ST state); runtime.ts binds them.
- */
+/** Sends one system + user prompt to the provider chosen in settings (runtime.ts binds `s`). */
 export function complete(s, system, user, signal = null) {
     switch (s.provider || 'st') {
         case 'st': return completeViaST(system, user, s, signal);
@@ -202,6 +234,9 @@ async function completeViaST(system, user, s, signal) {
             model,
             messages: buildMessages(system, user),
             max_tokens: s.max_tokens,
+            // Only when this is ST's own connection: its URL and proxy belong to it
+            ...(!s.route_chat_source || s.route_chat_source === ccs.chat_completion_source ? connectionFields(source, ccs) : {}),
+            ...sourceFields(source, model, s.max_tokens),
             ...(source === 'vertexai' && {
                 vertexai_auth_mode: ccs.vertexai_auth_mode ?? 'full',
                 vertexai_region: ccs.vertexai_region ?? 'global',
@@ -227,7 +262,10 @@ async function completeViaProvider(system, user, s, signal) {
         signal,
         errorLabel: `${s.provider.toUpperCase()} API`,
         networkHint: ST_NETWORK_HINT,
-        body: { chat_completion_source: source, model: s.model, messages: buildMessages(system, user), max_tokens: s.max_tokens },
+        body: {
+            chat_completion_source: source, model: s.model, messages: buildMessages(system, user), max_tokens: s.max_tokens,
+            ...sourceFields(source, s.model, s.max_tokens),
+        },
     });
 }
 /** Any OpenAI-compatible endpoint with a user-supplied base URL and key. */

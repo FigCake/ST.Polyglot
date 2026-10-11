@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  wordbook.ts
-// ════════════════════════════
 // Wordbook data layer — CRUD, sets, CSV/TXT export, CSV parsing.
 //
 // One shared wordbook holds every chat's words; each entry lists the chats it
@@ -12,25 +9,17 @@
 //     callers (ui/wordbook-ui.ts) handle it.
 //   • Writes always go through loadWordbook() (all entries); scopedWordbook()
 //     is for reading what the user sees, never for saving back.
-//
-// Dependencies: constants.ts, types.ts, conj-cache.ts, ui.manager.ts (notify only),
-//               storage.ts, runtime.ts, data-store.ts, wordbook-model.ts
 import { KEY, SRS as SRS_CFG } from './constants.js';
 import { getSettings, getLang } from './runtime.js';
 import { wordbookData, setsData, replaceUserData, flush, storeMode } from './data-store.js';
 import { clearConjCacheStore, setConjCache, deleteConjCache } from './conj-cache.js';
-import { notify } from './ui.manager.js';
+import { notify, escapeHtml } from './ui.manager.js';
 import { downloadText } from './export/download.js';
 import { t } from './i18n.js';
 import { chatValue, currentChatId } from './storage.js';
 import { inScope, tagChat, mergeWordbooks, removeChats, removeWords, moveChats, chatOverview, findDuplicates, mergeGroup, editEntry, } from './wordbook-model.js';
-// ════════════════════════════
-// Wordbook read / write
-// ════════════════════════════
-/**
- * The shared wordbook — every chat's words (a live array: mutate, then saveWordbook()).
- * Use scopedWordbook() for what the user should see or study.
- */
+// ── Wordbook read / write ─────────────────────────────────────────────────────
+/** Every chat's words, as a live array: mutate, then saveWordbook(). Use scopedWordbook() for display. */
 export function loadWordbook() {
     return wordbookData();
 }
@@ -47,7 +36,6 @@ export function scopedWordbook(scope = currentScope()) {
     const chatId = currentChatId();
     return loadWordbook().filter(e => inScope(e, scope, chatId));
 }
-/** Deletes conjugation tables of words that left the wordbook. */
 function forget(deleted) {
     deleted.forEach(deleteConjCache);
 }
@@ -106,9 +94,8 @@ export function editWord(word, patch) {
 /** Before v1.5 each chat stored its own wordbook in its metadata. */
 const legacyChatWordbook = chatValue(KEY.wordbook);
 /**
- * Moves the open chat's old per-chat wordbook into the shared one, tagged with
- * this chat. Runs whenever a chat opens; the chat's copy is removed only once
- * the shared wordbook has been saved. Returns how many entries moved.
+ * Moves the open chat's pre-1.5 wordbook into the shared one, tagged with this
+ * chat. The chat's copy is removed only once the shared wordbook has been saved.
  */
 export async function migrateChatWordbook() {
     const chatId = currentChatId();
@@ -123,13 +110,8 @@ export async function migrateChatWordbook() {
     legacyChatWordbook.delete();
     return incoming.length;
 }
-// ════════════════════════════
-// Conjugation cache reset
-// ════════════════════════════
-/**
- * Clears every cached conjugation table and resets conj_cached flags.
- * IDB wipe → conj-cache.ts; wordbook flag reset is here (needs loadWordbook/saveWordbook).
- */
+// ── Conjugation cache reset ───────────────────────────────────────────────────
+/** Clears every cached conjugation table and resets the entries' conj_cached flags. */
 export async function clearAllConjCache() {
     await clearConjCacheStore();
     const wb = loadWordbook();
@@ -141,9 +123,7 @@ export async function clearAllConjCache() {
     if (changed)
         saveWordbook(wb);
 }
-// ════════════════════════════
-// Word sets CRUD
-// ════════════════════════════
+// ── Word sets CRUD ────────────────────────────────────────────────────────────
 export function getSets() { return setsData(); }
 export function saveSets(sets) { replaceUserData({ sets }); }
 export function newSetId() { return 'set_' + Date.now() + '_' + Math.random().toString(36).slice(2); }
@@ -156,32 +136,17 @@ export function createSet(name) {
 }
 export function deleteSet(id) {
     saveSets(getSets().filter(s => s.id !== id));
-    // Also remove this set from all words
     const wb = loadWordbook();
     wb.forEach(w => { w.setIds = (w.setIds || []).filter(s => s !== id); });
     saveWordbook(wb);
-}
-/**
- * Removes sets that have no words assigned to them.
- * Called once at startup to clean up orphans left by import bugs or
- * interrupted operations.
- */
-export function pruneOrphanSets() {
-    const sets = getSets();
-    if (sets.length === 0)
-        return;
-    const wb = loadWordbook();
-    const usedIds = new Set(wb.flatMap(w => w.setIds || []));
-    const pruned = sets.filter(s => usedIds.has(s.id));
-    if (pruned.length !== sets.length)
-        saveSets(pruned);
 }
 export function toggleWordInSet(word, setId) {
     const wb = loadWordbook();
     const entry = wb.find(w => w.word === word);
     if (!entry)
         return;
-    const idx = (entry.setIds || []).indexOf(setId);
+    entry.setIds ??= []; // old chat wordbooks have entries without it
+    const idx = entry.setIds.indexOf(setId);
     if (idx === -1)
         entry.setIds.push(setId);
     else
@@ -190,9 +155,7 @@ export function toggleWordInSet(word, setId) {
 }
 /**
  * Adds a word (stored under its base form) to the wordbook and the open chat.
- * A word that already exists is only added to the open chat.
- *
- * @returns 'added', 'tagged' (existing word joined this chat), or null (nothing changed).
+ * 'tagged' = an existing word joined this chat; null = nothing changed.
  */
 export function addToWordbook(wordData, { quiet = false } = {}) {
     const wordbook = loadWordbook();
@@ -222,6 +185,12 @@ export function addToWordbook(wordData, { quiet = false } = {}) {
         reading: wordData.reading,
         original_form: surfaceForm,
         context_meaning: wordData.context_meaning || (surfaceForm ? wordData.meaning : undefined),
+        // What a lookup already found (AI data: checked), so it need not be re-analysed
+        ...(typeof wordData.pos === 'string' && wordData.pos && { pos: wordData.pos }),
+        ...(typeof wordData.ipa === 'string' && wordData.ipa && { ipa: wordData.ipa }),
+        ...(typeof wordData.notes === 'string' && wordData.notes && { notes: wordData.notes }),
+        ...(Array.isArray(wordData.collocations) && wordData.collocations.length
+            && { collocations: wordData.collocations.filter((c) => typeof c === 'string') }),
         setIds: [],
         chats: chatId ? [chatId] : [],
         dateAdded: new Date().toISOString(),
@@ -235,50 +204,48 @@ export function addToWordbook(wordData, { quiet = false } = {}) {
         setConjCache(canonical, conjData, getLang()); // fire-and-forget IDB write
     return 'added';
 }
-// ════════════════════════════
-// Export
-// ════════════════════════════
+// ── Export ────────────────────────────────────────────────────────────────────
 export function exportToCSV(wordbook) {
     if (!wordbook.length) {
         notify(t('wb.noExport'), 'warn');
         return;
     }
-    // Escape double quotes (RFC 4180) and collapse any embedded newlines so each
-    // wordbook entry maps to exactly one CSV row.
-    const esc = (v) => String(v || '').replace(/[\n\r]/g, ' ').replace(/"/g, '""');
-    const rows = [
-        '"word","base_form","meaning","level","original_form","context_meaning"',
-        ...wordbook.map(e => `"${esc(e.word)}","${esc(e.base_form)}","${esc(e.meaning)}","${esc(e.level)}","${esc(e.original_form)}","${esc(e.context_meaning)}"`)
-    ].join('\n');
-    downloadText(rows, 'Polyglot_Wordbook.csv');
+    downloadText(wordbookCsv(wordbook), 'Polyglot_Wordbook.csv');
 }
-/** Exports wordbook as a tab-separated TXT compatible with popular flashcard apps. */
+/** The CSV export's text: RFC 4180 quoting; newlines collapse so each entry is one row. */
+export function wordbookCsv(wordbook) {
+    const esc = (v) => String(v || '').replace(/[\n\r]/g, ' ').replace(/"/g, '""');
+    return [
+        '"word","base_form","meaning","level","original_form","context_meaning"',
+        ...wordbook.map(e => `"${esc(e.word)}","${esc(e.base_form)}","${esc(e.meaning)}","${esc(e.level)}","${esc(e.original_form)}","${esc(e.context_meaning)}"`),
+    ].join('\n');
+}
+/** Tab-separated TXT in the format Anki and similar flashcard apps import. */
 export function exportToFlashcardTxt(wordbook) {
     if (!wordbook.length) {
         notify(t('wb.noExport'), 'warn');
         return;
     }
-    // Generic metadata header recognised by major flashcard apps
+    downloadText(flashcardTxt(wordbook), 'Polyglot_Flashcards.txt');
+}
+/** The TXT export's text, with the metadata header major flashcard apps recognise. */
+export function flashcardTxt(wordbook) {
     const content = '#separator:tab\n#html:true\n#tags column:4\n';
+    // The file says #html:true, so text is escaped: a meaning written by the AI
+    // or imported from someone else must not run as markup in the flashcard app
+    const cell = (v) => escapeHtml(String(v || '').replace(/[\t\n\r]/g, ' '));
     const rows = wordbook.map(e => {
-        const word = String(e.word || '').replace(/[\t\n\r]/g, ' ');
-        const meaning = String(e.meaning || '').replace(/[\t\n\r]/g, ' ');
-        const base = String(e.base_form || '').replace(/[\t\n\r]/g, ' ');
-        const level = String(e.level || '').replace(/[\t\n\r]/g, ' ');
-        let back = meaning;
+        const word = cell(e.word), base = cell(e.base_form);
+        let back = cell(e.meaning);
         if (base && base !== word)
             back += `<br><br><i style="color:gray;">Base: ${base}</i>`;
-        const orig = String(e.original_form || '').replace(/[\t\n\r]/g, ' ');
-        const ctx = String(e.context_meaning || '').replace(/[\t\n\r]/g, ' ');
-        return `${word}\t${back}\t${level}\tPolyglot\t${orig}\t${ctx}`;
+        return `${word}\t${back}\t${cell(e.level)}\tPolyglot\t${cell(e.original_form)}\t${cell(e.context_meaning)}`;
     }).join('\n');
-    downloadText(content + rows, 'Polyglot_Flashcards.txt');
+    return content + rows;
 }
 // PDF flashcard export → see export/pdf.ts
-// ════════════════════════════
-// CSV parsing utilities
-// ════════════════════════════
-/** CSV line splitter that correctly handles quoted fields containing newlines. */
+// ── CSV parsing utilities ─────────────────────────────────────────────────────
+/** Splits CSV into records, keeping newlines inside quoted fields. */
 export function splitCsvLines(text) {
     const lines = [];
     let curLine = '';
@@ -286,8 +253,9 @@ export function splitCsvLines(text) {
     for (let i = 0; i < text.length; i++) {
         const char = text[i];
         if (char === '"') {
+            // An escaped quote stays escaped: splitting cells unescapes it
             if (inQuotes && text[i + 1] === '"') {
-                curLine += '"';
+                curLine += '""';
                 i++;
                 continue;
             }
@@ -309,6 +277,3 @@ export function splitCsvLines(text) {
         lines.push(curLine);
     return lines;
 }
-// ════════════════════════════
-// Migrations
-// ════════════════════════════

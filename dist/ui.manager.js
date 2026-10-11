@@ -1,6 +1,4 @@
-// ════════════════════════════
-// Polyglot  ui.manager.ts
-// ════════════════════════════
+// ── Types ─────────────────────────────────────────────────────────────────────
 // ── HTML escaping ─────────────────────────────────────────────────────────────
 const _esc = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
 export function escapeHtml(str) {
@@ -8,12 +6,8 @@ export function escapeHtml(str) {
         return '';
     return String(str).replace(/[&<>"']/g, c => _esc[c]);
 }
-export function generateId() {
-    return crypto.randomUUID();
-}
 // ── Element factory ───────────────────────────────────────────────────────────
 /**
- * Thin element factory.
  * props: attrs → setAttribute  |  dataset → dataset  |  html → innerHTML  |  * → direct prop
  * String children become XSS-safe text nodes.
  */
@@ -144,15 +138,17 @@ export function askInput(question, { initial = '', hint = '' } = {}) {
         wrap.addEventListener('pointerdown', (e) => { if (e.target === wrap)
             finish(null); });
         document.body.appendChild(wrap);
-        // Register ESC on document (not just the field) so it works even when
-        // focus is on the Cancel/OK buttons after Tab navigation.
-        // stopPropagation prevents ESC from bubbling up to a parent PgPanel and closing it too.
+        // On window, not the field, so keys work with focus on the buttons too.
+        // stopPropagation keeps ESC from also closing a parent PgPanel.
         const onKey = (e) => {
+            if (e.isComposing)
+                return; // an IME's Enter commits the text, it does not submit
             if (e.key === 'Escape') {
                 e.stopPropagation();
                 finish(null);
             }
-            if (e.key === 'Enter')
+            // Enter on a focused button is that button's click (Cancel must cancel)
+            if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement))
                 finish(field.value);
         };
         window.addEventListener('keydown', onKey, true); // capture: runs before the panel's own Escape
@@ -160,12 +156,9 @@ export function askInput(question, { initial = '', hint = '' } = {}) {
     });
 }
 // ── Panel system ──────────────────────────────────────────────────────────────
-/** Module-level registry — maps panelId → PgPanel so dismissPanel can reach live instances. */
-const _panelRegistry = new Map();
-/**
- * Self-contained floating panel.
- * Each instance owns its own DOM and lifecycle.
- */
+/** Open panels by id, so opening one again closes the old instance cleanly. */
+const openPanels = new Map();
+/** Floating panel; each instance owns its DOM and lifecycle. */
 export class PgPanel {
     _alive;
     _onKeyDown;
@@ -175,11 +168,18 @@ export class PgPanel {
     box;
     body;
     constructor(node, { panelId, heading = '', extra = '', footer, onDismiss } = {}) {
-        this.panelId = panelId || generateId();
+        this.panelId = panelId || crypto.randomUUID();
         this._alive = false;
         this._onDismiss = typeof onDismiss === 'function' ? onDismiss : null;
-        this._onKeyDown = (e) => { if (e.key === 'Escape')
-            this.dismiss(); };
+        // The panel sits beside the chat, which stays usable: an Escape meant for ST (stop a
+        // generation, cancel an edit), an IME or a popup must not close it — only one pressed
+        // while focus is inside the panel
+        this._onKeyDown = (e) => {
+            if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing)
+                return;
+            if (e.target instanceof Node && this.box.contains(e.target))
+                this.dismiss();
+        };
         const hasHeading = Boolean(heading);
         const closeBtn = el('button', {
             className: hasHeading ? 'pg-box-x' : 'pg-box-x pg-box-x-float',
@@ -215,7 +215,8 @@ export class PgPanel {
         this.box = el('div', {
             className: ['pg-box', extra].filter(Boolean).join(' '),
             id: `pg-box-${this.panelId}`,
-            attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': heading || 'Panel' },
+            // tabindex: a click anywhere in the panel puts focus in it (for its Escape)
+            attrs: { role: 'dialog', 'aria-modal': 'true', 'aria-label': heading || 'Panel', tabindex: '-1' },
         }, boxKids);
         this.wrap = el('div', {
             className: 'pg-dim',
@@ -225,7 +226,8 @@ export class PgPanel {
             this.dismiss(); });
     }
     mount() {
-        document.getElementById(`pg-dim-${this.panelId}`)?.remove();
+        openPanels.get(this.panelId)?.dismiss();
+        openPanels.set(this.panelId, this);
         this._alive = true;
         document.body.appendChild(this.wrap);
         document.addEventListener('keydown', this._onKeyDown);
@@ -237,33 +239,18 @@ export class PgPanel {
         this._alive = false;
         this.wrap.remove();
         document.removeEventListener('keydown', this._onKeyDown);
-        _panelRegistry.delete(this.panelId);
+        if (openPanels.get(this.panelId) === this)
+            openPanels.delete(this.panelId);
         this._onDismiss?.();
     }
     get isOpen() { return this._alive; }
 }
-/** Convenience wrapper — constructs and mounts a PgPanel in one call. */
+/** Constructs and mounts a PgPanel. */
 export function openPanel(node, cfg = {}) {
-    const panel = new PgPanel(node, cfg).mount();
-    if (panel.panelId)
-        _panelRegistry.set(panel.panelId, panel);
-    return panel;
-}
-/**
- * Dismisses the panel with the given panelId via its PgPanel instance,
- * so that keydown listeners and onDismiss callbacks are properly cleaned up.
- */
-export function dismissPanel(panelId) {
-    const panel = _panelRegistry.get(panelId);
-    if (panel) {
-        panel.dismiss(); // dismiss() already calls _panelRegistry.delete(this.panelId)
-    }
+    return new PgPanel(node, cfg).mount();
 }
 // ── Tab view ──────────────────────────────────────────────────────────────────
-/**
- * Builds a tabbed view with lazy-initialising panes.
- * Each pane carries a render() called once on first activation; result is cached.
- */
+/** Tabbed view whose panes render once, on first activation. */
 export function buildTabView(panes, activePaneId = null) {
     const activeId = activePaneId || (panes[0]?.id ?? '');
     const nodeCache = new Map();

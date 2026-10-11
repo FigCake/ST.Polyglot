@@ -1,13 +1,7 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/edit-form.ts
-// ════════════════════════════
 // Edit every field of a wordbook row in place: word, base form, meanings,
 // level, part of speech, reading (Japanese) or pronunciation.
 //
 // Renaming onto a word that already exists merges the two entries.
-//
-// Dependencies: constants.ts, utils.ts, html.ts, i18n.ts, ui.manager.ts,
-//               runtime.ts, wordbook.ts
 import { CEFR_LEVELS, POS_TAGS } from '../../constants.js';
 import { isJapanese, levelLabel } from '../../utils.js';
 import { html, setHtml } from '../../html.js';

@@ -1,19 +1,15 @@
-// ════════════════════════════
-// Polyglot  ui/tap/lookup.ts
-// ════════════════════════════
 // Select text in a message → a small tooltip:
 //
 //   mouse   [Look up]                          (double-click translates instead)
 //   touch   [Look up] [Translate sentence]     (touch has no double-click)
 //
 // Look up shows the word in the Learn tab; Translate is handed to tap-translate.
-//
-// Dependencies: constants.ts, html.ts, i18n.ts, plain-text.ts, ui/learning-panel.ts, ui/tap/sentence.ts
 import { DELAY } from '../../constants.js';
 import { html, setHtml } from '../../html.js';
 import { t } from '../../i18n.js';
 import { lookUpWord } from '../learning-panel.js';
 import { messageTextOf, sentenceAround } from './sentence.js';
+import { ST_SEL } from '../../st-dom.js';
 import { plainText, plainOffsetIn, selectionText } from '../../plain-text.js';
 const MAX_SELECTION = 200;
 const TOOLTIP_OFFSET = { above: 44, below: 8, margin: 4 };
@@ -77,7 +73,7 @@ export function setupTextSelectionTooltip(actions) {
     const onSelectionEnd = (e) => {
         if (tooltip?.contains(e.target))
             return;
-        if (!document.getElementById('chat')?.contains(e.target)) {
+        if (!document.querySelector(ST_SEL.chat)?.contains(e.target)) {
             removeSelectionTooltip();
             return;
         }
@@ -103,7 +99,7 @@ export function setupTextSelectionTooltip(actions) {
     // #chat may not exist yet at startup
     let scrollBound = false;
     const bindScroll = () => {
-        const chat = document.getElementById('chat');
+        const chat = document.querySelector(ST_SEL.chat);
         if (!chat || scrollBound)
             return;
         chat.addEventListener('scroll', removeSelectionTooltip, { passive: true });

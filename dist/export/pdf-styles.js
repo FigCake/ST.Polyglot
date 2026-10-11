@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  export/pdf-styles.ts
-// ════════════════════════════
 // Print stylesheet for the A5 flashcard deck (see export/pdf.ts).
 // Kept apart from the templates so markup and design can be edited independently.
 export const PDF_STYLES = /* css */ `

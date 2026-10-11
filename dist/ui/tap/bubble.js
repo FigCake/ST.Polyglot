@@ -1,11 +1,5 @@
-// ════════════════════════════
-// Polyglot  ui/tap/bubble.ts
-// ════════════════════════════
 // The inline translation bubble shown under a tapped sentence:
 // loading skeleton → translation (+ literal, key verbs, actions) or an error.
-//
-// Dependencies: html.ts, i18n.ts, conj-cache.ts, runtime.ts, features/conjugation.ts,
-//               ui/wordbook-ui.ts (addToWordbook), ui/tap/deep-analysis.ts
 import { html, setHtml } from '../../html.js';
 import { t } from '../../i18n.js';
 import { getConjCache } from '../../conj-cache.js';

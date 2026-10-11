@@ -1,11 +1,6 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/duplicates.ts
-// ════════════════════════════
 // "Find duplicates": groups of the same word among the visible entries
 // (case / spacing variants, a form and its base word), merged one group
 // at a time or all at once. The first entry of a group is kept.
-//
-// Dependencies: html.ts, i18n.ts, ui.manager.ts, wordbook.ts
 import { html, setHtml } from '../../html.js';
 import { t } from '../../i18n.js';
 import { notify } from '../../ui.manager.js';

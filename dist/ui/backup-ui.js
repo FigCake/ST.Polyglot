@@ -1,17 +1,26 @@
-// ════════════════════════════
-// Polyglot  ui/backup-ui.ts
-// ════════════════════════════
 // Buttons for backup.ts: save a backup, and restore one (merge or replace)
 // from a .json file or a .zip with media.
-//
-// Dependencies: backup.ts, data-store.ts, i18n.ts, ui.manager.ts
 import { downloadBackup, parseBackup, restoreBackup, openBackupZip, withoutMedia, } from '../backup.js';
 import { storeMode } from '../data-store.js';
 import { askChoice, notify } from '../ui.manager.js';
 import { t, currentLang } from '../i18n.js';
-export async function saveBackup() {
-    const { words, media } = await downloadBackup();
-    notify(media ? t('pnl.set.backupDoneMedia', { n: words, m: media }) : t('pnl.set.backupDone', { n: words }), 'ok', 3000);
+/**
+ * Downloads a backup; false (after telling the user) when it could not be
+ * made, or — with `complete` — when some media files could not be read into it.
+ */
+export async function saveBackup(complete = false) {
+    try {
+        const { words, media, missing } = await downloadBackup();
+        notify(media ? t('pnl.set.backupDoneMedia', { n: words, m: media }) : t('pnl.set.backupDone', { n: words }), 'ok', 3000);
+        if (missing)
+            notify(t('pnl.set.backupMissing', { n: missing }), 'warn', 8000);
+        return !(complete && missing);
+    }
+    catch (err) {
+        console.error('[Polyglot] Backup failed:', err);
+        notify(t('pnl.set.backupFailed', { err: err instanceof Error ? err.message : String(err) }), 'err', 6000);
+        return false;
+    }
 }
 const formatDate = (iso) => iso ? new Date(iso).toLocaleString(currentLang(), { dateStyle: 'medium', timeStyle: 'short' }) : '?';
 /** Asks merge / replace for a backup file (.json, or .zip with media) and applies it. Returns true when data changed. */
@@ -32,6 +41,11 @@ async function restore(text, archive) {
         return false;
     }
     let { backup } = parsed;
+    // Until the data file has loaded, a restore could only be merged in later, without its media
+    if (storeMode() === 'loading' || storeMode() === 'offline') {
+        notify(t('pnl.set.restoreNotLoaded'), 'warn', 6000);
+        return false;
+    }
     const mode = await askChoice(t('pnl.set.restoreAsk', { date: formatDate(backup.exportedAt), n: backup.wordbook.length }), [
         { value: 'cancel', label: t('confirmNo') },
         { value: 'replace', label: t('pnl.set.restoreReplace') },
@@ -39,6 +53,14 @@ async function restore(text, archive) {
     ]);
     if (!mode || mode === 'cancel')
         return false;
+    if (mode === 'replace') {
+        // Nothing replaced can be brought back otherwise (its media files are deleted too),
+        // so the safety backup must hold everything
+        if (!await saveBackup(true)) {
+            notify(t('pnl.set.restoreNoSafety'), 'err', 8000);
+            return false;
+        }
+    }
     // Media first, so no word points at a file that is not there yet
     if (storeMode() !== 'file')
         backup = withoutMedia(backup);

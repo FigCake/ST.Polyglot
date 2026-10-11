@@ -1,14 +1,8 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/list.ts
-// ════════════════════════════
 // The wordbook word list: one row per entry, filtered by the toolbar.
 //
 // Rows are plain markup; a single delegated click / change handler on the list
 // reads `data-action` and the row's `data-word`, so re-rendering never needs
 // to re-bind anything.
-//
-// Dependencies: constants.ts, utils.ts, html.ts, i18n.ts, wordbook.ts, conj-cache.ts,
-//               runtime.ts, speech.ts, features/conjugation.ts, ui/wordbook/*
 import { POS_LABELS } from '../../constants.js';
 import { levelClass, levelLabel } from '../../utils.js';
 import { html, setHtml } from '../../html.js';

@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/filters.ts
-// ════════════════════════════
 // Wordbook list filters (level pill, set, part of speech, search) — pure.
 export const emptyFilter = () => ({ level: 'all', setId: 'all', pos: '', query: '' });
 export function isFiltered(f) {

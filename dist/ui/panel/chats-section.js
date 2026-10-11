@@ -1,11 +1,5 @@
-// ════════════════════════════
-// Polyglot  ui/panel/chats-section.ts
-// ════════════════════════════
 // "Words by chat": how many words each chat has in the shared wordbook, with
 // multi-select to move them into the open chat or delete them.
-//
-// Dependencies: html.ts, i18n.ts, ui.manager.ts, storage.ts, wordbook.ts,
-//               ui/wordbook-ui.ts
 import { html, setHtml } from '../../html.js';
 import { t } from '../../i18n.js';
 import { askConfirm, notify } from '../../ui.manager.js';

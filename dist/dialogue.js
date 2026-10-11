@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  dialogue.ts
-// ════════════════════════════
 // Finds the dialogue in a message: text inside quotation marks — the lines a
 // learner wants to study in "dialogue only" mode, without the narration.
 //

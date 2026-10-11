@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  html.ts
-// ════════════════════════════
 // Auto-escaping `html` tagged template for string-built markup.
 //
 //   html`<b>${userText}</b>`          → userText is escaped

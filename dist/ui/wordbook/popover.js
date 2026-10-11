@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/popover.ts
-// ════════════════════════════
 // Small popover showing a word's original form and its meaning in context.
 import { html, setHtml } from '../../html.js';
 const EDGE = 8;

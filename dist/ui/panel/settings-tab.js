@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/panel/settings-tab.ts
-// ════════════════════════════
 // Panel settings tab: wordbook data tools, study options, appearance.
 //
 // Design rules:
@@ -9,9 +6,6 @@
 //       data-setting="…"  → written straight to settings on input/change,
 //                           then SETTING_EFFECTS[setting] runs (if any)
 //   • Adding a button or option is one markup line plus one table entry.
-//
-// Dependencies: runtime.ts, html.ts, ui.manager.ts, wordbook.ts, data-store.ts, export/pdf.ts,
-//               conj-cache.ts, annotator.ts, furigana/messages.ts, ui/wordbook-ui.ts, ui/panel/chrome.ts
 import { getSettings, updateSettings, getLang } from '../../runtime.js';
 import { html, setHtml } from '../../html.js';
 import { askConfirm, notify } from '../../ui.manager.js';
@@ -180,7 +174,7 @@ const ACTIONS = {
     'import': () => triggerImport(),
     'csv': () => exportToCSV(scopedWordbook()),
     'txt': () => exportToFlashcardTxt(scopedWordbook()),
-    'backup': (_, btn) => withBusy(btn, saveBackup),
+    'backup': (_, btn) => withBusy(btn, async () => { await saveBackup(); }),
     'pdf': (_, btn) => exportPdf(btn),
     'reanalyse': reanalyse,
     'licenses': () => showLicenses(),

@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  export/pdf.ts
-// ════════════════════════════
 // Print-ready A5 flashcard deck:
 //   • one front page + one back page per wordbook entry
 //   • a conjugation-table section at the end (one verb per page)

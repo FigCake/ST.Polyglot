@@ -1,15 +1,9 @@
-// ════════════════════════════
-// Polyglot  ui/learning-panel.ts
-// ════════════════════════════
 // The learning side panel: Wordbook · Learn · Settings tabs.
 //
 // Tabs are built lazily on first visit (buildTabView). The Learn tab is kept
 // while the panel is open so a new lookup can be shown in it.
 //
 // Word lookups live here too: they always end in this panel's detail card.
-//
-// Dependencies: ui.manager.ts, speech.ts, prompts.ts, runtime.ts, ai/client.ts,
-//               ui/wordbook-ui.ts, ui/panel/*
 import { openPanel, buildTabView } from '../ui.manager.js';
 import { abortActiveRecognition } from '../speech.js';
 import { t } from '../i18n.js';
@@ -22,6 +16,8 @@ import { buildSettingsTab } from './panel/settings-tab.js';
 import { PANEL_ID, PANEL_BOX_ID, restorePanelChrome } from './panel/chrome.js';
 export const PANEL_TABS = ['wordbook', 'learn', 'settings'];
 let learnTab = null;
+/** The word the Learn tab shows when it is first built (it is built when first activated). */
+let pendingWord = null;
 function activateTab(panel, tab) {
     const btn = panel.querySelector(`.pg-nav-tab[data-tab-id="${tab}"]`);
     if (btn && !btn.classList.contains('active'))
@@ -38,11 +34,15 @@ export function openLearningPanel(initialTab = 'learn', wordData = null) {
             activateTab(existing, initialTab);
             return;
         }
-        learnTab?.showDetail(wordData);
+        if (learnTab)
+            learnTab.showDetail(wordData);
+        else
+            pendingWord = wordData; // not built yet (the panel opened on another tab)
         if (initialTab === 'learn')
             activateTab(existing, 'learn');
         return;
     }
+    pendingWord = wordData;
     const tabs = buildTabView([
         {
             name: t('tab.wordbook'), id: 'wordbook',
@@ -54,7 +54,11 @@ export function openLearningPanel(initialTab = 'learn', wordData = null) {
         },
         {
             name: t('tab.learn'), id: 'learn',
-            render: () => (learnTab = new LearnTab(wordData, { lookup: w => lookUpWord(w), save: addToWordbook })).el,
+            render: () => {
+                learnTab = new LearnTab(pendingWord, { lookup: w => lookUpWord(w), save: addToWordbook });
+                pendingWord = null;
+                return learnTab.el;
+            },
         },
         {
             name: t('tab.settings'), id: 'settings',
@@ -68,6 +72,7 @@ export function openLearningPanel(initialTab = 'learn', wordData = null) {
             abortActiveRecognition();
             unmountWordbook();
             learnTab = null;
+            pendingWord = null;
         },
     });
     restorePanelChrome();

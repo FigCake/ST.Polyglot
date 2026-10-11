@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/message-decor.ts
-// ════════════════════════════
 // What Polyglot draws over a chat message's text, as ordered layers:
 //
 //   1. dialogue     marks on lines of dialogue + their translate buttons ("dialogue only")
@@ -13,9 +10,8 @@
 //
 // ST replaces a message's HTML on streaming, edits and re-renders; one
 // observer per decorated message redraws the layers when that happens.
-//
-// Dependencies: constants.ts
 import { DELAY } from '../constants.js';
+import { mesTextOf } from '../st-dom.js';
 const ORDER = ['dialogue', 'annotation', 'furigana'];
 /** Marks every element a layer inserts, so a re-rendered (clean) message can be recognised. */
 export const DECOR_CLASS = 'pg-decor';
@@ -23,8 +19,6 @@ export const DECOR_CLASS = 'pg-decor';
 const MAX_REDRAWS = 20;
 const messages = new Map();
 const OBSERVE = { childList: true, subtree: true };
-const mesSelector = (mesId) => `.mes[mesid="${CSS.escape(mesId)}"]`;
-const textOf = (mesId) => document.querySelector(`${mesSelector(mesId)} .mes_text`);
 /**
  * Runs a DOM change on a message without its observer reacting to it. The
  * observer resumes on the next frame; a re-render that happened in between
@@ -83,7 +77,7 @@ function untrack(mesId) {
 // ── Public API ────────────────────────────────────────────────────────────────
 /** Sets (or, with null, removes) one layer of a message and redraws its layers. */
 export function setLayer(mesId, layer, decoration) {
-    const textEl = textOf(mesId);
+    const textEl = mesTextOf(mesId);
     if (!textEl) {
         if (!decoration)
             clearLayer(mesId, layer);
@@ -128,7 +122,7 @@ export function resetLayers(layer) {
 /** Stops tracking messages that left the DOM (deleted), so their observers can be collected. */
 export function pruneDetachedDecor() {
     for (const mesId of [...messages.keys()])
-        if (!textOf(mesId))
+        if (!mesTextOf(mesId))
             untrack(mesId);
 }
 // ── Restoring after a chat loads ──────────────────────────────────────────────
@@ -150,7 +144,7 @@ export function untilRendered(key, mesIds, restore) {
             return;
         let appeared = false;
         for (const mesId of pending)
-            if (textOf(mesId)) {
+            if (mesTextOf(mesId)) {
                 pending.delete(mesId);
                 appeared = true;
             }

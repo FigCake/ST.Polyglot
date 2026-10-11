@@ -1,43 +1,29 @@
-// ════════════════════════════
-// Polyglot  conj-cache.ts
-// ════════════════════════════
-// IndexedDB persistence layer for conjugation tables.
-//
-// Design rules:
-//   • Pure I/O — no DOM, no API calls, no ST imports.
-//   • No dependency on getLang() or wordbook state.
-//     Callers pass `lang` explicitly so this module stays side-effect-free.
-//   • clearConjCacheStore() only wipes the IDB store.
-//     Resetting wordbook `conj_cached` flags is the caller's responsibility
-//     (see clearAllConjCache() in index.ts).
-//
-// Dependencies: constants.ts, types.ts only.
+// IndexedDB storage for conjugation tables. No DOM, no AI calls, no ST imports.
+// It knows nothing of settings or the wordbook: callers pass `lang`, and
+// clearConjCacheStore() leaves the entries' `conj_cached` flags to the caller
+// (see clearAllConjCache() in wordbook.ts).
 import { KEY } from './constants.js';
 // ── DB handle ─────────────────────────────────────────────────────────────────
-/** Opens (and lazily creates) the conjugation IndexedDB. */
+let dbPromise = null;
+/** The conjugation IndexedDB, opened (and created) once and shared by every call. */
 function _getConjDB() {
-    return new Promise((resolve, reject) => {
+    dbPromise ??= new Promise((resolve, reject) => {
         const req = indexedDB.open(KEY.conjDB, KEY.conjDBVersion);
         req.onupgradeneeded = () => {
             req.result.createObjectStore(KEY.conjStore);
         };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
+        req.onsuccess = () => {
+            const db = req.result;
+            // Another tab is upgrading the database: let it, and reopen on next use
+            db.onversionchange = () => { db.close(); dbPromise = null; };
+            resolve(db);
+        };
+        req.onerror = () => { dbPromise = null; reject(req.error); };
     });
+    return dbPromise;
 }
 // ── Public API ────────────────────────────────────────────────────────────────
-/**
- * Reads a cached conjugation table.
- *
- * Returns `null` if:
- *   • the word has no cached entry, or
- *   • the cached entry's language differs from `currentLang`
- *     (user switched learning languages since the table was fetched).
- *
- * @param word        Canonical wordbook key (base form).
- * @param currentLang Current learning language from settings — used for
- *                    invalidation only; not stored here.
- */
+/** Cached table for a word (base form), or null when missing or cached for another language. */
 export async function getConjCache(word, currentLang) {
     try {
         const db = await _getConjDB();
@@ -48,7 +34,6 @@ export async function getConjCache(word, currentLang) {
         });
         if (!entry)
             return null;
-        // Invalidate when the user has switched learning languages
         if (entry.lang !== currentLang)
             return null;
         return entry.data;
@@ -57,14 +42,7 @@ export async function getConjCache(word, currentLang) {
         return null; // IDB unavailable or blocked — caller falls back to API
     }
 }
-/**
- * Writes a conjugation table to IndexedDB.
- *
- * @param word        Canonical wordbook key.
- * @param data        Parsed conjugation response from the AI.
- * @param currentLang Current learning language — stored alongside data for
- *                    future invalidation checks.
- */
+/** Saves a table under the word's base form, tagged with the learning language. */
 export async function setConjCache(word, data, currentLang) {
     try {
         const db = await _getConjDB();
@@ -82,10 +60,7 @@ export async function setConjCache(word, data, currentLang) {
         // IDB write failed — table still displays correctly, just won't be cached
     }
 }
-/**
- * Removes the cached table for a single word.
- * Called when a wordbook entry is deleted.
- */
+/** Called when a wordbook entry is deleted or its base form changes. */
 export async function deleteConjCache(word) {
     try {
         const db = await _getConjDB();
@@ -99,18 +74,11 @@ export async function deleteConjCache(word) {
         });
     }
     catch (e) {
-        // IDB delete failed — stale cache may remain, but wordbook entry is still removed.
-        // Non-critical: the cache will be invalidated on next language switch.
+        // Non-critical: a stale table may remain until the next language switch clears the store.
         console.warn('[Polyglot] conj-cache: deleteConjCache failed for word:', word, e);
     }
 }
-/**
- * Wipes every entry from the IDB store.
- *
- * NOTE: This does NOT reset `conj_cached` flags on wordbook entries.
- *       Callers (index.ts `clearAllConjCache`) are responsible for that step
- *       so this module stays free of wordbook state.
- */
+/** Wipes the store. Does NOT reset `conj_cached` flags (wordbook.ts `clearAllConjCache` does). */
 export async function clearConjCacheStore() {
     try {
         const db = await _getConjDB();
@@ -124,8 +92,7 @@ export async function clearConjCacheStore() {
         });
     }
     catch (e) {
-        // IDB clear failed — cached conjugation tables may persist.
-        // Non-critical, but log so the issue is visible in devtools.
+        // Non-critical, but log it so it shows in devtools.
         console.warn('[Polyglot] conj-cache: clearConjCacheStore failed', e);
     }
 }
@@ -139,7 +106,6 @@ export async function listConjCache() {
             req.onsuccess = () => {
                 const cursor = req.result;
                 if (!cursor) {
-                    db.close();
                     resolve(out);
                     return;
                 }
@@ -148,7 +114,7 @@ export async function listConjCache() {
                     out.push({ word: String(cursor.key), lang: entry.lang, data: entry.data });
                 cursor.continue();
             };
-            req.onerror = () => { db.close(); reject(req.error); };
+            req.onerror = () => reject(req.error);
         });
     }
     catch {

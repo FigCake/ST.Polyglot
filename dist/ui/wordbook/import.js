@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/import.ts
-// ════════════════════════════
 // Imports a CSV (Polyglot export) or tab-separated TXT (flashcard-app export)
 // into the wordbook and the open chat, as a new set named after the file.
 //
@@ -10,7 +7,7 @@
 //   TXT  word ⇥ meaning(HTML, may contain "Base: …") ⇥ level ⇥ tags ⇥ original_form ⇥ context_meaning
 //
 // A .json file goes to the backup restore (ui/backup-ui.ts) instead, and an
-// Anki package to its import dialog (ui/wordbook/anki-dialog.ts).
+// Anki package to its import dialog (ui/wordbook/deck-dialog.ts).
 //
 // parseWordbookFile() is pure and unit-tested; importWordbookFile() applies it.
 import { CEFR_LEVELS, SRS as SRS_CFG } from '../../constants.js';
@@ -21,7 +18,8 @@ import { currentChatId } from '../../storage.js';
 import { tagChat } from '../../wordbook-model.js';
 import { loadWordbook, saveWordbook, createSet, deleteSet, splitCsvLines } from '../../wordbook.js';
 import { restoreFromFile } from '../backup-ui.js';
-import { importAnkiFile } from './anki-dialog.js';
+import { importAnkiFile } from './deck-dialog.js';
+import { fieldText } from '../../deck-import/fields.js';
 const VALID_LEVELS = new Set([...CEFR_LEVELS, 'grammar', 'sentence', 'idiom']);
 const HEADER_ROW = /^["']?word["']?[,\t]/i;
 /** Splits one CSV line, honouring quotes and "" escapes. */
@@ -46,15 +44,8 @@ function csvCells(line) {
     cells.push(cur);
     return cells;
 }
-/** Removes wrapping quotes and flashcard-app media tags. */
-const cleanCell = (s = '') => s.replace(/^"|"$/g, '').replace(/<img[^>]*>/gi, '').replace(/\[sound:[^\]]*\]/gi, '').trim();
-const ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#039;': "'" };
-const htmlToText = (s) => s
-    .replace(/<br\s*\/?>\s*/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&(?:amp|lt|gt|quot|#039);/g, e => ENTITIES[e])
-    .replace(/\s+/g, ' ')
-    .trim();
+/** Removes flashcard-app media tags. */
+const withoutMedia = (s = '') => s.replace(/<img[^>]*>/gi, '').replace(/\[sound:[^\]]*\]/gi, '').trim();
 function normaliseLevel(s) {
     const v = s.trim();
     if (VALID_LEVELS.has(v.toUpperCase()))
@@ -73,25 +64,32 @@ function columnIndex(header, tsv) {
 }
 /** Rows that have at least a word and a meaning; comments and blanks are skipped. */
 export function parseWordbookFile(text) {
-    const tsv = text.includes('\t');
+    // Tab-separated when the first record is (a tab inside a CSV field does not count)
+    const first = text.split('\n').find(l => l.trim() && !l.startsWith('#')) ?? '';
+    const tsv = /^#separator:tab/m.test(text) || (first.includes('\t') && !first.startsWith('"'));
     const lines = (tsv ? text.split('\n') : splitCsvLines(text)).filter(l => l.trim() && !l.startsWith('#'));
-    const split = (line) => (tsv ? line.split('\t') : csvCells(line)).map(cleanCell);
+    // CSV cells are unquoted by csvCells; TSV cells may still be wrapped in quotes
+    const split = (line) => (tsv ? line.split('\t').map(c => c.replace(/^"|"$/g, '')) : csvCells(line)).map(withoutMedia);
+    // A flashcard TXT holds HTML (#html:true): its text cells are decoded too
+    const plain = (s) => (tsv ? fieldText(s) : s);
     const header = lines.length && HEADER_ROW.test(lines[0].trim()) ? split(lines.shift()) : null;
     const col = columnIndex(header, tsv);
-    const cell = (cells, c) => (col[c] === undefined ? '' : cells[col[c]] ?? '');
+    const raw = (cells, c) => (col[c] === undefined ? '' : cells[col[c]] ?? '');
+    const cell = (cells, c) => plain(raw(cells, c));
     const rows = [];
     for (const line of lines) {
         const cells = split(line);
         const word = cell(cells, 'word');
-        const rawMeaning = cell(cells, 'meaning');
+        const rawMeaning = raw(cells, 'meaning');
         if (!word || !rawMeaning)
             continue;
-        const hintedBase = /Base:\s*([^<]+)/i.exec(rawMeaning)?.[1].trim();
+        const hinted = /Base:\s*([^<]+)/i.exec(rawMeaning)?.[1];
+        const hintedBase = hinted ? plain(hinted).trim() : undefined;
         const level = cell(cells, 'level');
         rows.push({
             word,
             base_form: cell(cells, 'base_form') || hintedBase || word,
-            meaning: htmlToText(rawMeaning).replace(/\s*Base:[^.]*$/i, '').trim(),
+            meaning: fieldText(rawMeaning).replace(/\s*Base:[^.]*$/i, '').trim(),
             level: level ? normaliseLevel(level) : 'A1',
             original_form: cell(cells, 'original_form') || undefined,
             context_meaning: cell(cells, 'context_meaning') || undefined,

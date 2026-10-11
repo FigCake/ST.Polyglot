@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  anki/zstd.ts
-// ════════════════════════════
 // Zstandard decompression (RFC 8878), for Anki packages: Anki 2.1.50+ stores
 // the collection and every media file zstd-compressed, and browsers'
 // DecompressionStream has no zstd.
@@ -10,7 +7,9 @@
 //                          + sequences (FSE-coded literal length, offset, match length)
 //
 // Decoding only, no dictionaries; the content checksum is not verified (the
-// zip's CRC already covers the bytes). Skippable frames are skipped.
+// zip's CRC, which readEntry checks, already covers the bytes). Skippable
+// frames are skipped. Output is capped (a tiny frame can describe gigabytes)
+// and must match the size a frame header states.
 //
 // Pure — no DOM, no I/O.
 export class ZstdError extends Error {
@@ -18,17 +17,28 @@ export class ZstdError extends Error {
 const fail = (why) => { throw new ZstdError(`zstd: ${why}`); };
 const highBit = (n) => 31 - Math.clz32(n);
 // ── Output ────────────────────────────────────────────────────────────────────
-/** A growing byte buffer; matches copy from what was written before. */
+/** Largest output zstdDecompress produces by default. */
+export const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
+/** A growing byte buffer, up to `max` bytes; matches copy from what was written before. */
 class Output {
+    max;
     buf;
     len = 0;
-    constructor(size) { this.buf = new Uint8Array(Math.max(size, 1024)); }
+    constructor(size, max) {
+        this.max = max;
+        this.buf = new Uint8Array(Math.min(Math.max(size, 1024), max));
+    }
     reserve(n) {
+        if (!(n >= 0))
+            fail('bad length');
+        if (this.len + n > this.max)
+            fail(`output larger than ${this.max} bytes`);
         if (this.len + n <= this.buf.length)
             return;
         let size = this.buf.length * 2;
         while (size < this.len + n)
             size *= 2;
+        size = Math.min(size, this.max);
         const next = new Uint8Array(size);
         next.set(this.buf.subarray(0, this.len));
         this.buf = next;
@@ -44,7 +54,7 @@ class Output {
         this.len += n;
     }
     match(offset, n) {
-        if (offset > this.len || offset <= 0)
+        if (!(offset > 0 && offset <= this.len))
             fail('match offset out of range');
         this.reserve(n);
         const b = this.buf;
@@ -404,6 +414,8 @@ function decompressBlock(data, start, end, out, state) {
     const { literals, next } = readLiterals(block, start, state);
     let p = next;
     // Number of sequences
+    if (p >= end)
+        fail('missing sequences section');
     const b0 = block[p];
     let count;
     if (b0 < 128) {
@@ -418,7 +430,11 @@ function decompressBlock(data, start, end, out, state) {
         count = block[p + 1] + (block[p + 2] << 8) + 0x7f00;
         p += 3;
     }
+    if (p > end)
+        fail('truncated sequences header');
     if (!count) {
+        if (p !== end)
+            fail('bytes after an empty sequences section');
         out.bytes(literals, 0, literals.length);
         return;
     }
@@ -436,11 +452,16 @@ function decompressBlock(data, start, end, out, state) {
     let lit = 0;
     for (let i = 0; i < count; i++) {
         const ofCode = OF.symbol[sOF], mlCode = ML.symbol[sML], llCode = LL.symbol[sLL];
+        if (ofCode === undefined || mlCode === undefined || llCode === undefined)
+            fail('bad sequence state');
         if (ofCode > 31)
             fail('offset code too large');
         const ofValue = 2 ** ofCode + bits.read(ofCode);
         const mlen = ML_BASE[mlCode] + bits.read(ML_BITS[mlCode]);
         const llen = LL_BASE[llCode] + bits.read(LL_BITS[llCode]);
+        // The stream must end exactly at its start; once over-read it is corrupt
+        if (bits.left < 0)
+            fail('sequence stream over-read');
         let offset;
         if (ofValue > 3) {
             offset = ofValue - 3;
@@ -478,25 +499,32 @@ function decompressBlock(data, start, end, out, state) {
 // ── Frames ────────────────────────────────────────────────────────────────────
 const MAGIC = 0xfd2fb528;
 const u32 = (d, p) => (d[p] | (d[p + 1] << 8) | (d[p + 2] << 16) | (d[p + 3] << 24)) >>> 0;
-/** Decompresses one or more concatenated zstd frames. */
-export function zstdDecompress(data) {
-    const out = new Output(data.length * 4);
+/** Decompresses one or more concatenated zstd frames, producing at most `maxBytes`. */
+export function zstdDecompress(data, maxBytes = MAX_OUTPUT_BYTES) {
+    const out = new Output(data.length * 4, maxBytes);
     let p = 0;
     while (p < data.length) {
         if (p + 4 > data.length)
             fail('truncated');
         const magic = u32(data, p);
-        if ((magic & 0xfffffff0) === 0x184d2a50) {
+        if ((magic & 0xfffffff0) === 0x184d2a50) { // skippable frame
+            if (p + 8 > data.length)
+                fail('truncated');
             p += 8 + u32(data, p + 4);
             continue;
-        } // skippable frame
+        }
         if (magic !== MAGIC)
             fail('not a zstd frame');
         p += 4;
+        if (p + 1 > data.length)
+            fail('truncated frame header');
         const desc = data[p++];
         const fcsFlag = desc >> 6, single = (desc >> 5) & 1, checksum = (desc >> 2) & 1, dictFlag = desc & 3;
         if (desc & 8)
             fail('reserved bit set');
+        const headerEnd = p + (single ? 0 : 1) + [0, 1, 2, 4][dictFlag] + [single ? 1 : 0, 2, 4, 8][fcsFlag];
+        if (headerEnd > data.length)
+            fail('truncated frame header');
         if (!single)
             p++; // window descriptor (the output keeps everything)
         if (dictFlag) {
@@ -509,16 +537,22 @@ export function zstdDecompress(data) {
             p += size;
         }
         const fcsSize = [single ? 1 : 0, 2, 4, 8][fcsFlag];
+        let stated = -1;
         if (fcsSize) {
-            let size = 0;
+            if (fcsSize === 8 && (data[p + 6] || data[p + 7]))
+                fail(`output larger than ${maxBytes} bytes`);
+            stated = 0;
             for (let i = Math.min(fcsSize, 6) - 1; i >= 0; i--)
-                size = size * 256 + data[p + i];
+                stated = stated * 256 + data[p + i];
             if (fcsSize === 2)
-                size += 256;
-            if (size < 2 ** 31)
-                out.reserve(size);
+                stated += 256;
+            if (out.len + stated > maxBytes)
+                fail(`output larger than ${maxBytes} bytes`);
+            // A header can claim any size: grow ahead only as far as the input could plausibly reach
+            out.reserve(Math.min(stated, data.length * 64));
             p += fcsSize;
         }
+        const frameStart = out.len;
         const state = { reps: [1, 4, 8] };
         for (let last = 0; !last;) {
             if (p + 3 > data.length)
@@ -534,6 +568,8 @@ export function zstdDecompress(data) {
                 p += size;
             }
             else if (type === 1) {
+                if (p >= data.length)
+                    fail('truncated block');
                 out.fill(data[p], size);
                 p += 1;
             }
@@ -546,8 +582,12 @@ export function zstdDecompress(data) {
             else
                 fail('reserved block type');
         }
+        if (stated >= 0 && out.len - frameStart !== stated)
+            fail('frame size does not match its header');
         if (checksum)
             p += 4;
+        if (p > data.length)
+            fail('truncated');
     }
     return out.buf.slice(0, out.len);
 }

@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  features/quiz-sanitize.ts
-// ════════════════════════════
 // Validates and repairs AI-generated quiz questions before they are rendered.
 //
 // Why: a quiz only shows its score / retry / save-wrong controls once every
@@ -21,17 +18,23 @@ export function answerKey(s) {
     return s.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 const asText = (v) => typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '';
-/** Accepts an array, or an object such as { A: "…", B: "…" }. Drops blanks and duplicates. */
-function readOptions(raw) {
+/**
+ * Accepts an array, or an object such as { A: "…", B: "…" }. Drops blanks and
+ * duplicates (by answerKey); of variants that differ only in case or spacing,
+ * the one spelled exactly like the answer is kept, so a capitalisation
+ * question never ends up marking the wrong spelling correct.
+ */
+function readOptions(raw, answer) {
     const list = Array.isArray(raw) ? raw : (raw && typeof raw === 'object') ? Object.values(raw) : [];
-    const seen = new Set();
-    return list.map(asText).filter(opt => {
+    const byKey = new Map();
+    for (const opt of list.map(asText)) {
+        if (!opt)
+            continue;
         const key = answerKey(opt);
-        if (!opt || seen.has(key))
-            return false;
-        seen.add(key);
-        return true;
-    });
+        if (!byKey.has(key) || opt === answer)
+            byKey.set(key, opt);
+    }
+    return [...byKey.values()];
 }
 /**
  * Finds the option the answer refers to: an exact/normalised match, or a
@@ -72,7 +75,7 @@ export function sanitizeQuestion(raw, random = Math.random) {
     const q = raw;
     const question = asText(q.question);
     let answer = asText(q.answer);
-    let options = readOptions(q.options);
+    let options = readOptions(q.options, answer);
     if (!question || !answer)
         return null;
     const idx = findAnswerIndex(answer, options);

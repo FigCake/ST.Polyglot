@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  speech.ts
-// ════════════════════════════
 // Text-to-speech and pronunciation scoring (Web Speech API).
 //
 // Design rules:
@@ -8,8 +5,6 @@
 //     pronunciationScore) have no DOM access and are unit-tested.
 //   • Only one recognition session is tracked at a time so closing the panel
 //     can stop the microphone (abortActiveRecognition).
-//
-// Dependencies: utils.ts, ui.manager.ts (notify), html.ts, i18n.ts
 import { similarityScore } from './utils.js';
 import { notify } from './ui.manager.js';
 import { html, setHtml } from './html.js';
@@ -211,7 +206,9 @@ export function runPronunciationCheck(target, lang, micBtn, resultEl, onSettled)
     const alive = () => document.contains(resultEl);
     setMicState(micBtn, true);
     setResult(resultEl, 'listening', t('tts.listening'));
-    micBtn.onclick = (e) => { e.stopPropagation(); recognition.abort(); };
+    // While listening, a tap stops; it must not reach the feature's own click listener
+    const stop = (e) => { e.stopPropagation(); recognition.abort(); };
+    micBtn.onclick = stop;
     const fail = (message) => { setResult(resultEl, 'error', message); onSettled?.(); };
     recognition.onresult = (ev) => {
         if (!alive() || !settle())
@@ -243,6 +240,9 @@ export function runPronunciationCheck(target, lang, micBtn, resultEl, onSettled)
     // onend always fires last, after result or error.
     recognition.onend = () => {
         clearTimeout(silentFailTimer);
+        // Back to the feature: its listener starts the next attempt
+        if (micBtn.onclick === stop)
+            micBtn.onclick = null;
         if (!alive())
             return;
         if (settle())

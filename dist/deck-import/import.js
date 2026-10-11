@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  anki/import.ts
-// ════════════════════════════
 // Puts Anki rows into the wordbook, with their media.
 //
 //   rows ─▶ media used by the rows ─▶ user files  pg-media-<hash>.<ext>
@@ -10,23 +7,17 @@
 // (or two decks sharing a file) stores each file once; a file already on the
 // server is not uploaded again. Existing words keep their text: an import
 // only fills what is empty and adds the word to the deck's set.
-//
-// Dependencies: constants.ts, runtime.ts, storage.ts, data-store.ts,
-//               user-files.ts, media-files.ts, wordbook.ts, wordbook-model.ts, anki/fields.ts
 import { SRS as SRS_CFG } from '../constants.js';
 import { getNativeLang } from '../runtime.js';
 import { currentChatId } from '../storage.js';
 import { storeMode } from '../data-store.js';
 import { writeUserFile } from '../user-files.js';
-import { mediaExists, noteUploaded } from '../media-files.js';
+import { existingMedia, inParallel, keepableMedia, noteUploaded } from '../media-files.js';
 import { loadWordbook, saveWordbook, getSets, createSet } from '../wordbook.js';
 import { mergeWordbooks } from '../wordbook-model.js';
 // ── Media ─────────────────────────────────────────────────────────────────────
-const AUDIO = new Set(['mp3', 'ogg', 'oga', 'opus', 'wav', 'm4a', 'aac', 'flac', 'webm']);
-const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'svg']);
 const extOf = (name) => /\.([a-z0-9]+)$/i.exec(name)?.[1].toLowerCase() ?? '';
-/** Whether a media file of this name can be kept (a known audio or image type). */
-export const keepableMedia = (name, kind) => (kind === 'sound' ? AUDIO : IMAGE).has(extOf(name));
+export { keepableMedia };
 /** A 64-bit content fingerprint (two FNV-1a passes), as hex. */
 export function bytesHash(bytes) {
     let a = 0x811c9dc5, b = 0x01000193 ^ bytes.length;
@@ -38,42 +29,63 @@ export function bytesHash(bytes) {
 }
 /** The user-files name for a media file's bytes. */
 export const mediaFileName = (bytes, original) => `pg-media-${bytesHash(bytes)}.${extOf(original)}`;
+/** Files read, named and checked together: bounds memory and the size of each existence check. */
+const MEDIA_BATCH = 200;
+/** Uploads running at once (browsers allow about six connections per server). */
+const UPLOADS_AT_ONCE = 6;
 /**
  * Stores the media the rows use; returns package name → stored name for the
- * files that made it. Runs a few uploads at a time.
+ * files that made it. Works through the files in batches: read and name a
+ * batch, ask the server once which of them it has, upload the rest a few at
+ * a time.
  */
 export async function storeMedia(names, read, onProgress, signal) {
     const stored = new Map();
-    const written = [];
-    let done = 0, failed = 0, next = 0;
-    const worker = async () => {
-        while (next < names.length && !signal?.aborted) {
-            const name = names[next++];
-            try {
-                const bytes = await read(name);
-                if (!bytes) {
-                    failed++;
-                    continue;
-                }
-                const file = mediaFileName(bytes, name);
-                if (await mediaExists(file))
-                    stored.set(name, file);
-                else if (await writeUserFile(file, bytes, signal) === 'ok') {
-                    stored.set(name, file);
-                    written.push(file);
-                }
-                else
-                    failed++;
-            }
-            catch {
+    const written = new Set();
+    let done = 0, failed = 0;
+    const tick = () => onProgress({ done: ++done, total: names.length });
+    for (let i = 0; i < names.length && !signal?.aborted; i += MEDIA_BATCH) {
+        const files = new Map();
+        for (const name of names.slice(i, i + MEDIA_BATCH)) {
+            const bytes = await read(name).catch(() => null);
+            if (bytes)
+                files.set(name, { file: mediaFileName(bytes, name), bytes });
+            else {
                 failed++;
-            }
-            finally {
-                onProgress({ done: ++done, total: names.length });
+                tick();
             }
         }
-    };
-    await Promise.all([worker(), worker(), worker()]);
+        const unique = [...new Set([...files.values()].map(f => f.file))].filter(f => !written.has(f));
+        const present = await existingMedia(unique);
+        const toUpload = [];
+        for (const entry of files) {
+            const [name, { file }] = entry;
+            if (present.has(file) || written.has(file)) {
+                stored.set(name, file);
+                tick();
+            }
+            else
+                toUpload.push(entry);
+        }
+        // Two package names with the same content upload once
+        const uploads = new Map();
+        await inParallel(toUpload, UPLOADS_AT_ONCE, async ([name, { file, bytes }]) => {
+            if (signal?.aborted)
+                return;
+            let upload = uploads.get(file);
+            if (!upload) {
+                upload = writeUserFile(file, bytes, signal).then(r => r === 'ok', () => false);
+                uploads.set(file, upload);
+            }
+            if (await upload) {
+                stored.set(name, file);
+                written.add(file);
+            }
+            else
+                failed++;
+            tick();
+        });
+    }
     // Accounted for at the next save: kept if the words using them are added, deleted otherwise
     noteUploaded(written);
     return { stored, failed };

@@ -1,13 +1,9 @@
-// ════════════════════════════
-// Polyglot  plain-text.ts
-// ════════════════════════════
 // The text a reader sees in a message, without what Polyglot added to it:
 // furigana readings (<rt>, <rp>) and translation bubbles. Every feature that
 // reads message text — tap translation, look-up, annotation, furigana —
 // goes through here, so a ruby reading never leaks into a prompt or the
 // clipboard.
-//
-// Dependencies: none (DOM only)
+import { ST_SEL } from './st-dom.js';
 /** Elements whose text is not part of the message's own text. */
 const NOT_TEXT = new Set(['SCRIPT', 'STYLE', 'RT', 'RP']);
 const ADDED = '.pg-tap-bubble';
@@ -82,7 +78,7 @@ export function setupPlainCopy() {
         const host = range.commonAncestorContainer instanceof Element
             ? range.commonAncestorContainer
             : range.commonAncestorContainer.parentElement;
-        if (!host?.closest('#chat') || (!host.closest('ruby') && !host.querySelector('ruby')))
+        if (!host?.closest(ST_SEL.chat) || (!host.closest('ruby') && !host.querySelector('ruby')))
             return;
         e.clipboardData.setData('text/plain', selectionText(sel));
         e.preventDefault();

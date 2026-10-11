@@ -1,14 +1,6 @@
-// ════════════════════════════
-// Polyglot  prompts.ts
-// ════════════════════════════
-// All AI prompt-builder functions.
-// Pure string functions — no side effects, no DOM, no API calls.
-// Dependencies: none (nativeLang is passed in as a resolved string by callers).
+// All AI prompt builders. Pure string functions: no side effects, no DOM, no API calls.
 // ── Language helpers ──────────────────────────────────────────────────────────
-/**
- * Returns language-specific instructions for extracting the base form of a word.
- * Used inside annotatorPrompt and quickLookupPrompt.
- */
+/** Language-specific rules for finding a word's base form (annotatorPrompt, quickLookupPrompt). */
 export function baseFormRule(lang) {
     const l = lang.toLowerCase();
     if (['spanish', 'espanol', 'español', 'portuguese', 'português'].some(x => l.includes(x)))
@@ -34,12 +26,6 @@ function readingField(lang, of) {
         : ['', ''];
 }
 // ── Prompt builders ───────────────────────────────────────────────────────────
-/**
- * @param text       Text to check / translate
- * @param lang       Learning language (e.g. "Spanish")
- * @param level      CEFR level (e.g. "B1")
- * @param nativeLang User's native language name (e.g. "English", "Spanish")
- */
 export function checkerPrompt(text, lang, level, nativeLang) {
     return `You are a ${lang} language tutor for CEFR ${level} learners.
 The user wants to express something in ${lang}.
@@ -59,12 +45,6 @@ Return ONLY valid JSON (no markdown, no extra text):
 Text:
 <text>${text}</text>`;
 }
-/**
- * @param text       Message text to annotate
- * @param lang       Learning language (e.g. "Spanish")
- * @param level      CEFR level (e.g. "B1")
- * @param nativeLang User's native language name (e.g. "English", "Spanish")
- */
 export function annotatorPrompt(text, lang, level, nativeLang) {
     const rule = baseFormRule(lang);
     const reading = readingField(lang, 'the BASE FORM');
@@ -104,14 +84,7 @@ Return ONLY:
 Text:
 <text>${text}</text>`;
 }
-/**
- * Generates N multiple-choice questions from recent chat history.
- * @param chatHistory  Recent chat messages joined as a string
- * @param lang         Learning language
- * @param level        CEFR level
- * @param nativeLang   User's native language name
- * @param questionCount Number of questions to generate (default 5)
- */
+/** Multiple-choice questions from recent chat history (messages joined into one string). */
 export function quizPrompt(chatHistory, lang, level, nativeLang, questionCount = 5) {
     const types = questionCount <= 5
         ? `Cover ALL of these types (one each):
@@ -152,10 +125,7 @@ Return ONLY:
 Text:
 <text>${chatHistory}</text>`;
 }
-/**
- * Cloze (fill-in-the-blank) quiz — CEFR-level based, independent of chat history.
- * Targets prepositions, verb conjugations, and idioms with 20 questions.
- */
+/** 20 fill-in-the-blank questions (prepositions, verbs, idioms) at the CEFR level; no chat history. */
 export function clozeQuizPrompt(lang, level, nativeLang) {
     return `You are an expert ${lang} language tutor. Create exactly 20 fill-in-the-blank questions for a CEFR ${level} learner whose native language is ${nativeLang}.
 
@@ -188,9 +158,8 @@ Return ONLY valid JSON:
 }`;
 }
 /**
- * Reading comprehension half mock exam — CEFR-level based, independent of chat history.
- * Modelled after real language proficiency tests (DELE, DALF, JLPT, Goethe, etc.)
- * Contains 25 questions across two sections.
+ * Half-length mock reading exam at the CEFR level, modelled on DELE, DALF, JLPT,
+ * Goethe, etc. 25 questions in two sections; no chat history.
  */
 export function readingExamPrompt(lang, level, nativeLang) {
     return `You are an expert ${lang} language examiner. Create a half-length mock reading exam for a CEFR ${level} learner whose native language is ${nativeLang}.
@@ -231,13 +200,7 @@ Return ONLY valid JSON:
 
 For Section B questions set "passage" to the reading text. For Section A set "passage" to null.`;
 }
-/**
- * @param word       Word to look up
- * @param context    Surrounding sentence (may be empty)
- * @param lang       Learning language
- * @param level      CEFR level
- * @param nativeLang User's native language name
- */
+/** Looks up one word; `context` is the surrounding sentence and may be empty. */
 export function quickLookupPrompt(word, context, lang, level, nativeLang) {
     const rule = baseFormRule(lang);
     const reading = readingField(lang, 'the BASE FORM');
@@ -265,12 +228,7 @@ Return ONLY:
   "word_family": [{ "form": "...", "pos": "...", "meaning": "..." }]
 }`;
 }
-/**
- * Tap-to-translate: natural + literal translation of a full sentence.
- * @param sentence   Sentence to translate
- * @param lang       Source language (the learning language)
- * @param nativeLang Target language (the user's native language)
- */
+/** Tap-to-translate: natural + literal translation of a sentence into the native language. */
 export function tapTranslatePrompt(sentence, lang, nativeLang) {
     const reading = readingField(lang, 'the base form');
     return `You are a ${lang}-to-${nativeLang} translation assistant.
@@ -295,12 +253,7 @@ Return ONLY valid JSON:
 
 Sentence: "${sentence}"`;
 }
-/**
- * Conjugation table prompt.
- * @param base       Dictionary/infinitive form of the verb
- * @param lang       Learning language
- * @param nativeLang User's native language name (for translation and tense labels)
- */
+/** Conjugation table for a verb's base form; `nativeLang` is for the translation and tense labels. */
 export function verbConjugationPrompt(base, lang, nativeLang) {
     return `You are a ${lang} grammar expert.
 Generate a conjugation table for the ${lang} verb: "${base}"
@@ -338,13 +291,7 @@ Return ONLY valid JSON — no preamble, no fences:
   ]
 }`;
 }
-/**
- * Generates a short, natural example sentence for a flashcard.
- * @param word       Base/dictionary form of the word
- * @param lang       Target learning language
- * @param level      CEFR level (controls sentence difficulty)
- * @param nativeLang User's native language (for the optional translation)
- */
+/** A short example sentence for a flashcard, pitched at `level`, with a native-language translation. */
 export function exampleSentencePrompt(word, lang, level, nativeLang) {
     return `Create a short example sentence in ${lang} for a CEFR ${level} learner using the word "${word}".
 
@@ -356,15 +303,7 @@ Rules:
 Return ONLY valid JSON (no markdown, no extra text):
 { "sentence": "...", "translation": "..." }`;
 }
-/**
- * Deep Analysis prompt — full syntactic breakdown of a sentence.
- * Language-neutral: works for any learning language.
- * Returns dependency-annotated tokens, grammar point explanations, and a summary.
- *
- * @param sentence   The sentence to analyse (as it appears in the chat)
- * @param lang       Learning language (e.g. "Italian", "Spanish", "Japanese", "German")
- * @param nativeLang User's native language (e.g. "English", "Spanish")
- */
+/** Full syntactic breakdown of a sentence: dependency tokens, grammar points and a summary. */
 export function deepAnalysisPrompt(sentence, lang, nativeLang) {
     return `You are an expert ${lang} grammar tutor. Perform a deep syntactic and dependency analysis of the following ${lang} sentence for a language learner whose native language is ${nativeLang}.
 
@@ -423,14 +362,11 @@ Return ONLY valid JSON — no preamble, no markdown fences:
 - "point": name the feature in ${lang} (not in ${nativeLang}).
 - "explanation": concrete, learner-focused, written in ${nativeLang}.`;
 }
-/**
- * Batch reanalysis — analyses up to BATCH_SIZE words in a single API call.
- * Returns a JSON array in the same order as the input words.
- */
 /** Field rules for "meaning" / "level", asked only for entries that lack them. */
 const FILL_RULES = (nativeLang) => `- "meaning": ONLY for words marked [needs meaning] — the dictionary meaning of the base form in ${nativeLang}, short (1–6 words). Otherwise "".
 - "level": ONLY for words marked [needs level] — CEFR level A1|A2|B1|B2|C1|C2. Otherwise "".`;
 const needs = (w) => `${w.needsMeaning ? ' [needs meaning]' : ''}${w.needsLevel ? ' [needs level]' : ''}`;
+/** Re-analyses a batch of words in one request; the answer is a JSON array in input order. */
 export function batchReanalysisPrompt(words, lang, nativeLang) {
     const wordList = words
         .map((w, i) => `${i + 1}. word: "${w.word}", base_form: "${w.base_form}"${needs(w)}`)
@@ -477,15 +413,8 @@ Field rules (apply to EVERY word):
 ${FILL_RULES(nativeLang)}`;
 }
 /**
- * Single-word re-analysis — enriches an existing wordbook entry with
- * POS tag, IPA, and collocations without touching user-owned fields
- * (meaning, notes, srs_*, setIds).
- * Used as fallback when batch reanalysis fails to parse.
- *
- * @param word       Surface/display form of the word as stored
- * @param base_form  Current stored base/dictionary form
- * @param lang       Learning language (e.g. "Italian")
- * @param nativeLang User's native language name (e.g. "English", "Spanish")
+ * Single-word re-analysis: POS tag, IPA and collocations, plus meaning / level
+ * only where missing. The fallback for words a batch request did not answer.
  */
 export function reanalysisPrompt(word, base_form, lang, nativeLang, fill = {}) {
     return `You are a precise ${lang} linguistics assistant.
@@ -534,14 +463,7 @@ Field rules:
     Each string: max 40 characters. ${nativeLang} glosses allowed after " — ".
 ${FILL_RULES(nativeLang)}`;
 }
-/**
- * Generates a conjugation drill quiz from cached conjugation table data.
- * The caller passes the full ConjData JSON as a string.
- * @param conjJson   JSON string of ConjData (base, tenses with rows)
- * @param lang       Learning language
- * @param nativeLang User's native language
- * @param count      Number of questions to generate (default 10)
- */
+/** A conjugation drill from a cached table (`conjJson` is ConjData as a JSON string). */
 export function conjDrillPrompt(conjJson, lang, nativeLang, count = 10) {
     return `You are a ${lang} grammar drill coach.
 Using the conjugation table below, generate exactly ${count} multiple-choice questions testing the learner's knowledge of verb forms.
@@ -565,13 +487,7 @@ Return ONLY valid JSON — no preamble, no fences:
   ]
 }`;
 }
-/**
- * Generates a targeted exam from saved wrong answers.
- * Each wrong answer produces 2 new similar questions of the same type.
- * @param wrongAnswers  Array of WrongAnswer objects (max 5)
- * @param lang          Learning language
- * @param nativeLang    User's native language
- */
+/** A targeted exam: 2 new questions of the same type for each saved wrong answer. */
 export function targetedExamPrompt(wrongAnswers, lang, nativeLang) {
     const items = wrongAnswers.map((w, i) => `${i + 1}. [type: ${w.type}] Q: "${w.question}" | Correct answer: "${w.answer}" | Rule: "${w.explanation}"`).join('\n');
     return `You are a ${lang} language tutor creating a targeted remedial exam.

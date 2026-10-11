@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ai/client.ts
-// ════════════════════════════
 // The one way features talk to the model. Every request expects JSON:
 //
 //   reply ─▶ extractJson ─▶ accept(value) ─▶ ✓ complete result

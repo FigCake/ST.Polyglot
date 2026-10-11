@@ -1,9 +1,5 @@
 /* ── themes/theme-dark.css ── */
-/* ════════════════════════════
-   Polyglot — themes/theme-dark.css
-   Dark mode (default) token overrides
-   Applied to :root — active when no data-pg-theme attribute is set.
-   ════════════════════════════ */
+/* Dark theme tokens (the default): on :root, used when the panel has no data-pg-theme */
 
 :root {
     /* ST theme tokens (fallback) */
@@ -79,16 +75,7 @@
 
 
 /* ── themes/theme-light.css ── */
-/* ════════════════════════════
-   Polyglot — themes/theme-light.css
-   Light mode token overrides
-   Activated by data-pg-theme="light" on #pg-box-pg-learning-panel
-   ════════════════════════════ */
-
-/* ════════════════════════════
-   🌕 Light theme
-   Activated by data-pg-theme="light" on #pg-box-pg-learning-panel
-   ════════════════════════════ */
+/* Light theme tokens, used when the panel has data-pg-theme="light" */
 
 #pg-box-pg-learning-panel[data-pg-theme="light"],
 .pg-sidebar[data-pg-theme="light"] {
@@ -185,10 +172,7 @@
 
 
 /* ── themes/theme-breeze.css ── */
-/* ════════════════════════════
-   Polyglot — themes/theme-breeze.css
-   Breeze theme
-   ════════════════════════════ */
+/* Breeze theme */
 
 #pg-box-pg-learning-panel[data-pg-theme="breeze"],
 .pg-sidebar[data-pg-theme="breeze"] {
@@ -310,10 +294,7 @@
 
 
 /* ── themes/theme-milk.css ── */
-/* ════════════════════════════
-   Polyglot — themes/theme-milk.css
-   Milk theme
-   ════════════════════════════ */
+/* Milk theme */
 
 #pg-box-pg-learning-panel[data-pg-theme="milk"],
 .pg-sidebar[data-pg-theme="milk"] {
@@ -443,11 +424,7 @@
 
 
 /* ── style-base.css ── */
-/* ════════════════════════════
-   Polyglot — style-base.css
-   Shared structure, keyframes, accessibility
-   (Token values live in themes/theme-*.css)
-   ════════════════════════════ */
+/* Shared structure, keyframes, accessibility. Token values live in themes/theme-*.css. */
 
 /* ── Design tokens ────────────────────────────────────────────────────────────
    Layer system:
@@ -462,9 +439,7 @@
 
 
 
-/* ════════════════════════════
-   Keyframes
-   ════════════════════════════ */
+/* ── Keyframes ── */
 
 @keyframes pg-pulse {
     0%, 100% { opacity: 0.75; }
@@ -482,27 +457,15 @@
 }
 
 
-/* ═══════════════════════════════════════════════════════════════
-   Accessibility: respect OS-level "Reduce Motion" preference.
-   Disables all Polyglot animations and transitions globally so
-   users with vestibular disorders or motion sensitivity are not
-   affected by pg-shake, pg-pop, pg-conj-slide-in, etc.
-   The sidebar already has its own override (line ~144); this
-   block covers every other animation/transition in the extension.
-   ════════════════════════════════════════════════════════════════ */
+/* ── Reduced motion: no Polyglot animations or transitions when the OS asks for less motion ── */
 
 
 /* ── style-layout.css ── */
-/* ════════════════════════════
-   Polyglot — style-layout.css
-   Sidebar, panel, tab structure
-   ════════════════════════════ */
+/* Sidebar, panel, tab structure */
 
-/* ════════════════════════════
-   🗂️ Sidebar panel
-   ════════════════════════════ */
+/* ── 🗂️ Sidebar panel ── */
 
-/* ═ Sidebar overlay — transparent, non-blocking (unlike modal pg-dim) */
+/* Sidebar overlay — transparent, non-blocking (unlike modal pg-dim) */
 #pg-dim-pg-learning-panel {
     background:      transparent;
     backdrop-filter: none;
@@ -616,7 +579,7 @@
     }
 }
 
-/* ═ Tiimo-style tab pill container — wraps the entire tab row */
+/* Tiimo-style tab pill container — wraps the entire tab row */
 .pg-sidebar .pg-nav-menu {
     background: rgba(255,255,255,0.07) !important;
     border-radius: 100px !important;
@@ -714,7 +677,7 @@
     }
 }
 
-/* ═ Close button (also used in #pg-box-pg-learning-panel override) */
+/* Close button (also used in #pg-box-pg-learning-panel override) */
 .pg-box-x {
     width: 28px;
     height: 28px;
@@ -757,9 +720,7 @@
     color: var(--pg-t1) !important;
 }
 
-/* ════════════════════════════
-   🖼️ Background image — 3-layer liquid glass
-   ════════════════════════════ */
+/* ── 🖼️ Background image — 3-layer liquid glass ── */
 
 /*
    Layer model (back → front):
@@ -858,9 +819,7 @@
 }
 
 
-/* ════════════════════════════
-   🎓 Study tab layout
-   ════════════════════════════ */
+/* ── 🎓 Study tab layout ── */
 
 /* Learn tab root — flex column, scroll handled by children */
 .pg-learn-tab {
@@ -952,9 +911,7 @@
 }
 
 
-/* ════════════════════════════
-   ⚙️ Panel settings tab
-   ════════════════════════════ */
+/* ── ⚙️ Panel settings tab ── */
 
 /* The `hidden` attribute must win over component display rules inside the panel */
 .pg-sidebar [hidden] { display: none !important; }
@@ -1032,7 +989,7 @@
 
 .pg-quiz-container { margin-top: 10px; }
 
-/* ═ Small text links (licenses) */
+/* Small text links (licenses) */
 .pg-link-btn {
     background: none;
     border: none;
@@ -1048,7 +1005,7 @@
 .pg-link-btn:hover { opacity: 1; }
 .pg-pset-footer { display: flex; justify-content: center; padding: 12px 0 4px; }
 
-/* ═ Document dialog (open-source licenses) */
+/* Document dialog (open-source licenses) */
 .pg-dim .pg-dialog.pg-doc-dialog { max-width: 720px; max-height: 85vh; }
 .pg-doc-title { margin: 0; font-size: 1.05em; }
 .pg-doc-body { overflow-y: auto; min-height: 0; flex: 1; }
@@ -1070,16 +1027,14 @@
     vertical-align: top;
 }
 
+/* The panel box is focusable only so Escape works after a click inside it: no outline */
+.pg-box:focus { outline: none; }
+
 
 /* ── style-components.css ── */
-/* ════════════════════════════
-   Polyglot — style-components.css
-   Buttons, chips, badges, cards
-   ════════════════════════════ */
+/* Buttons, chips, badges, cards */
 
-/* ════════════════════════════
-   🪄 Input toolbar button
-   ════════════════════════════ */
+/* ── 🪄 Input toolbar button ── */
 
 #pg-wand-btn {
     display: inline-flex;
@@ -1104,7 +1059,7 @@
     opacity: 0.6;
 }
 
-/* ═ ST default connection info box */
+/* ST default connection info box */
 .pg-st-info-box {
     display: flex;
     align-items: flex-start;
@@ -1121,9 +1076,7 @@
 .pg-st-live      { display: block; margin-top: 3px; opacity: 1; font-size: 0.92em; }
 
 
-/* ════════════════════════════
-   📖 Annotate button states
-   ════════════════════════════ */
+/* ── 📖 Annotate button states ── */
 
 .mes_button.pg-annotate-btn.pg-btn-active {
     color: var(--pg-t1) !important;
@@ -1133,16 +1086,14 @@
     opacity: 0.35 !important;
     pointer-events: none;
 }
-/* ═ 🌍 Open-panel button — highlighted while the panel is open */
+/* 🌍 Open-panel button — highlighted while the panel is open */
 .mes_button.pg-open-btn.pg-btn-active {
     color: var(--pg-t1) !important;
     opacity: 1 !important;
 }
 
 
-/* ════════════════════════════
-   ふ Furigana
-   ════════════════════════════ */
+/* ── ふ Furigana ── */
 
 ruby.pg-ruby {
     ruby-position: over;
@@ -1163,9 +1114,7 @@ body.pg-furi-hover ruby.pg-ruby:hover rt { visibility: visible; }
 body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 
 
-/* ════════════════════════════
-   📖 Clickable word highlights
-   ════════════════════════════ */
+/* ── 📖 Clickable word highlights ── */
 
 .pg-clickable-word {
     cursor: pointer;
@@ -1182,9 +1131,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .pg-hl-idiom   { background-color: rgba(140, 120, 240, 0.22); }
 
 
-/* ════════════════════════════
-   📝 Word detail view
-   ════════════════════════════ */
+/* ── 📝 Word detail view ── */
 
 .pg-word-detail-header {
     display: flex;
@@ -1230,7 +1177,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     opacity: 0.9;
 }
 
-/* ═ Grammar section */
+/* Grammar section */
 .pg-grammar-section {
     margin-bottom: 10px;
     font-size: 0.9em;
@@ -1244,7 +1191,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     margin-right: 5px;
 }
 
-/* ═ Shared button base styles */
+/* Shared button base styles */
 .pg-btn-compact {
     font-size: 0.8em !important;
     padding: 4px 10px !important;
@@ -1260,13 +1207,13 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     cursor: default !important;
 }
 
-/* ═ Small variant — used for wordbook import/export buttons */
+/* Small variant — used for wordbook import/export buttons */
 .pg-btn-sm {
     padding: 4px 8px !important;
     font-size: 0.8em !important;
 }
 
-/* ═ Uniform height (28px) for controls inside the flashcard control row */
+/* Uniform height (28px) for controls inside the flashcard control row */
 .pg-flash-controls .pg-btn,
 .pg-flash-controls .pg-icon-btn,
 .pg-wb-set-row .pg-btn,
@@ -1279,11 +1226,9 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     justify-content: center;
 }
 
-/* ════════════════════════════
-   🗨️ Dialogs & toasts (showConfirm / showToast)
-   ════════════════════════════ */
+/* ── 🗨️ Dialogs & toasts (showConfirm / showToast) ── */
 
-/* ═ Overlay backdrop */
+/* Overlay backdrop */
 .pg-dim {
     position: fixed;
     inset: 0;
@@ -1294,7 +1239,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     justify-content: center;
     backdrop-filter: blur(2px);
 
-    /* ═ Dialog box */
+    /* Dialog box */
     .pg-dialog {
         background: var(--pg-surface, #23262e);
         border: 1px solid var(--pg-border, rgba(255,255,255,0.12));
@@ -1308,7 +1253,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
         flex-direction: column;
         gap: 14px;
 
-        /* ═ Message text */
+        /* Message text */
         .pg-dialog-txt {
             margin: 0;
             font-size: 0.95em;
@@ -1317,7 +1262,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
             white-space: pre-wrap;
         }
 
-        /* ═ Label */
+        /* Label */
         .pg-field-lbl {
             font-size: 0.9em;
             color: var(--pg-t1, #e0e0e0);
@@ -1325,7 +1270,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
             display: block;
         }
 
-        /* ═ Input field */
+        /* Input field */
         .pg-field-inp {
             width: 100%;
             box-sizing: border-box;
@@ -1341,7 +1286,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
             &:focus { border-color: var(--pg-t1, #7c9ef5); }
         }
 
-        /* ═ Button row */
+        /* Button row */
         .pg-dialog-row {
             display: flex;
             gap: 8px;
@@ -1352,7 +1297,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 
 /* ─ Icon-style buttons that inherit .pg-btn — strip border/bg entirely ─ */
 .pg-learn-back-btn,
-/* ═ Base button styles */
+/* Base button styles */
 .pg-btn {
     display: inline-flex;
     align-items: center;
@@ -1401,7 +1346,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 .pg-btn-secondary:hover { background: rgba(255,255,255,0.13); }
 
-/* ═ Toast notifications */
+/* Toast notifications */
 #pg-notis {
     position: fixed;
     bottom: 24px;
@@ -1437,7 +1382,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     }
 }
 
-/* ═ CEFR level badge */
+/* CEFR level badge */
 .pg-level-badge {
     padding: 4px 8px;
     border-radius: var(--pg-radius-pill);
@@ -1456,9 +1401,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .level-idiom          { background: rgba(240, 110,  75, 0.28); }
 
 
-/* ════════════════════════════
-   🏷️ POS badge chip (clickable filter)
-   ════════════════════════════ */
+/* ── 🏷️ POS badge chip (clickable filter) ── */
 
 .pg-pos-chip {
     display: inline-flex;
@@ -1491,9 +1434,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 
 
-/* ════════════════════════════
-   🔤 IPA chip (display only)
-   ════════════════════════════ */
+/* ── 🔤 IPA chip (display only) ── */
 
 .pg-ipa-chip {
     display: inline-block;
@@ -1507,9 +1448,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 
 
-/* ════════════════════════════
-   🔗 Collocations chip row
-   ════════════════════════════ */
+/* ── 🔗 Collocations chip row ── */
 
 
 /* ── Wordbook item secondary info — hidden by default, expanded on tap ── */
@@ -1571,9 +1510,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 
 
-/* ════════════════════════════
-   📝 pos_info row
-   ════════════════════════════ */
+/* ── 📝 pos_info row ── */
 
 .pg-wb-pos-info {
     font-size: 0.75em;
@@ -1583,9 +1520,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 
 
-/* ════════════════════════════
-   ⏳ Loading — skeleton shimmer
-   ════════════════════════════ */
+/* ── ⏳ Loading — skeleton shimmer ── */
 
 @keyframes pg-shimmer {
     0%   { background-position: -200% center; }
@@ -1651,9 +1586,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .pg-skeleton-quiz > .pg-skeleton-opt:nth-of-type(6)  { width: 78%; }
 
 
-/* ════════════════════════════
-   🔔 Progress snackbar
-   ════════════════════════════ */
+/* ── 🔔 Progress snackbar ── */
 
 .pg-snackbar {
     position: fixed;
@@ -1706,11 +1639,9 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 
 
-/* ════════════════════════════
-   Settings panel — ST native inline form overrides
-   ════════════════════════════ */
+/* ── Settings panel — ST native inline form overrides ── */
 
-/* ═ Extension settings drawer (ST's Extensions panel) */
+/* Extension settings drawer (ST's Extensions panel) */
 #pg-settings-panel [hidden] { display: none !important; }
 #pg-settings-panel .pg-set-field { margin-bottom: 6px; align-items: center; }
 #pg-settings-panel .pg-set-field > label:first-child:not(.checkbox_label) { min-width: 70px; }
@@ -1736,9 +1667,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 #pg-settings-panel .pg-tokens-row input[type="number"] { width: 70px; flex: none; }
 
 
-/* ════════════════════════════
-   💬 Dialogue only
-   ════════════════════════════ */
+/* ── 💬 Dialogue only ── */
 
 .mes_text .pg-dlg {
     background: rgba(140, 170, 255, 0.10);
@@ -1747,11 +1676,9 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     -webkit-box-decoration-break: clone;
 }
 
-/* ════════════════════════════
-   🗂️ Anki import · word pictures
-   ════════════════════════════ */
+/* ── 🗂️ Anki import · word pictures ── */
 
-.pg-anki-dialog .pg-doc-body { display: flex; flex-direction: column; gap: 12px; }
+.pg-deck-dialog .pg-doc-body { display: flex; flex-direction: column; gap: 12px; }
 .pg-anki-type {
     border: 1px solid var(--pg-border, rgba(255,255,255,0.15));
     border-radius: var(--pg-radius-sm, 6px);
@@ -1787,14 +1714,9 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 
 
 /* ── style-features.css ── */
-/* ════════════════════════════
-   Polyglot — style-features.css
-   Feature-specific styles
-   ════════════════════════════ */
+/* Feature-specific styles */
 
-/* ════════════════════════════
-   📚 Wordbook tab
-   ════════════════════════════ */
+/* ── 📚 Wordbook tab ── */
 
 .pg-wordbook-item {
     background: var(--pg-layer-1);
@@ -1898,11 +1820,9 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 
 
-/* ════════════════════════════
-   🎯 Quiz tab
-   ════════════════════════════ */
+/* ── 🎯 Quiz tab ── */
 
-/* ═ Quiz mode selector grid */
+/* Quiz mode selector grid */
 .pg-quiz-modes {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1938,7 +1858,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .pg-qmode-title { font-size: 12px; font-weight: 600; color: var(--pg-t1); line-height: 1.3; word-break: break-word; overflow-wrap: break-word; }
 .pg-qmode-desc  { font-size: 11px; color: var(--pg-t3); line-height: 1.4; word-break: break-word; overflow-wrap: break-word; }
 
-/* ═ Reading passage block */
+/* Reading passage block */
 .pg-quiz-passage {
     background: rgba(255,255,255,0.06);
     border: none;
@@ -1952,7 +1872,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     word-break: break-word;
 }
 
-/* ═ Reading exam header */
+/* Reading exam header */
 .pg-exam-header {
     display: flex;
     align-items: center;
@@ -2019,9 +1939,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 
 
-/* ════════════════════════════
-   🔍 Text-selection quick-lookup tooltip
-   ════════════════════════════ */
+/* ── 🔍 Text-selection quick-lookup tooltip ── */
 
 .pg-sel-tooltip {
     position: absolute;
@@ -2061,9 +1979,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .pg-sel-btn:active { transform: scale(0.96); }
 
 
-/* ════════════════════════════
-   💬 Tap-to-translate bubble
-   ════════════════════════════ */
+/* ── 💬 Tap-to-translate bubble ── */
 
 .pg-tap-bubble {
     display: block;
@@ -2087,7 +2003,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     box-shadow: 0 4px 24px rgba(0,0,0,0.35);
 }
 
-/* ═ Loading state */
+/* Loading state */
 .pg-tap-loading {
     color: var(--pg-t1);
     opacity: 0.55;
@@ -2095,14 +2011,14 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     padding-right: 13px !important;
 }
 
-/* ═ Error state */
+/* Error state */
 .pg-tap-error {
     color: var(--pg-err);
     font-size: 0.82em;
     padding-right: 13px !important;
 }
 
-/* ═ Main translation text */
+/* Main translation text */
 .pg-tap-translation {
     font-size: 0.91em;
     font-weight: 500;
@@ -2111,7 +2027,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     margin-bottom: 2px;
 }
 
-/* ═ Literal translation (shown only when it differs from the natural translation) */
+/* Literal translation (shown only when it differs from the natural translation) */
 .pg-tap-literal {
     font-size: max(12px, 0.77em);
     color: var(--pg-t1);
@@ -2121,7 +2037,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     line-height: 1.4;
 }
 
-/* ═ Key verb chip row */
+/* Key verb chip row */
 .pg-tap-verbs {
     display: flex;
     flex-wrap: wrap;
@@ -2154,7 +2070,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     font-style: italic;
 }
 
-/* ═ Close button — small square with a CSS × */
+/* Close button — small square with a CSS × */
 .pg-tap-close {
     position: absolute;
     top: 4px;
@@ -2192,7 +2108,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     background: rgba(255,255,255,0.20);
 }
 
-/* ═ 📊 Conjugation-table button (inside verb chip) */
+/* 📊 Conjugation-table button (inside verb chip) */
 .pg-tap-conj-btn {
     background: none !important;
     border: none !important;
@@ -2210,9 +2126,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     opacity: 1;
 }
 
-/* ════════════════════════════
-   Verb conjugation popup
-   ════════════════════════════ */
+/* ── Verb conjugation popup ── */
 
 .pg-conj-overlay {
     position: fixed;
@@ -2250,7 +2164,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     to   { opacity: 1; transform: translateY(0)   scale(1); }
 }
 
-/* ═ Header */
+/* Header */
 .pg-conj-header {
     display: flex;
     align-items: center;
@@ -2312,7 +2226,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     background: rgba(255,255,255,0.18) !important;
 }
 
-/* ═ Body */
+/* Body */
 .pg-conj-body {
     overflow-y: auto;
     padding: 16px;
@@ -2333,7 +2247,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     font-size: 0.86em;
 }
 
-/* ═ 3-column tense grid */
+/* 3-column tense grid */
 .pg-conj-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -2402,9 +2316,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 
 
-/* ════════════════════════════
-   Wordbook — filters + set management
-   ════════════════════════════ */
+/* ── Wordbook — filters + set management ── */
 
 .pg-wb-filters {
     margin-bottom: 10px;
@@ -2441,7 +2353,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     opacity: 1;
 }
 
-/* ═ ② Word count label */
+/* ② Word count label */
 .pg-wb-count {
     font-size: max(12px, 0.75em);
     color: var(--pg-t1);
@@ -2536,8 +2448,8 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .pg-set-check input { cursor: pointer; }
 .pg-set-check:hover { opacity: 1; }
 
-/* ═ Top import / export button row */
-/* ═ Wordbook search bar */
+/* Top import / export button row */
+/* Wordbook search bar */
 .pg-wb-search-row {
     position: relative;
     display: flex;
@@ -2585,7 +2497,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 .pg-wb-search-clear:hover { opacity: 0.85; }
 
-/* ═ Search match highlight */
+/* Search match highlight */
 mark.pg-wb-hl {
     background: rgba(255, 220, 80, 0.35);
     color: inherit;
@@ -2637,9 +2549,7 @@ mark.pg-wb-hl {
 }
 
 
-/* ════════════════════════════
-   Quiz — question-type badges, correct/wrong colours, score
-   ════════════════════════════ */
+/* ── Quiz — question-type badges, correct/wrong colours, score ── */
 
 .pg-quiz-type-badge {
     display: inline-block;
@@ -2743,9 +2653,7 @@ mark.pg-wb-hl {
 }
 
 
-/* ════════════════════════════
-   Matching game
-   ════════════════════════════ */
+/* ── Matching game ── */
 
 .pg-match-setup {
     padding: 4px 0 10px;
@@ -2856,7 +2764,7 @@ mark.pg-wb-hl {
 }
 
 
-/* ═ Override ST's default close-button styles */
+/* Override ST's default close-button styles */
 #pg-box-pg-learning-panel .pg-box-x {
     width: 26px !important;
     height: 26px !important;
@@ -2901,9 +2809,7 @@ mark.pg-wb-hl {
 /* title bar omitted when title='' — handled in ui.manager.js */
 
 
-/* ════════════════════════════
-   🔊 Pronunciation buttons
-   ════════════════════════════ */
+/* ── 🔊 Pronunciation buttons ── */
 
 .pg-speak-btn {
     background: none !important;
@@ -2921,7 +2827,7 @@ mark.pg-wb-hl {
 }
 .pg-speak-btn:hover { opacity: 1; }
 
-/* ═ Pronunciation button inside the detail tab header */
+/* Pronunciation button inside the detail tab header */
 .pg-word-detail-header .pg-speak-btn,
 .pg-word-detail-header .pg-dict-btn {
     font-size: 1.05em;
@@ -2941,7 +2847,7 @@ mark.pg-wb-hl {
     opacity: 1;
 }
 
-/* ═ Wordbook list — fix head layout */
+/* Wordbook list — fix head layout */
 .pg-wb-head-left {
     display: flex;
     align-items: baseline;
@@ -2951,9 +2857,7 @@ mark.pg-wb-hl {
 }
 
 
-/* ════════════════════════════
-   🃏 Flashcard
-   ════════════════════════════ */
+/* ── 🃏 Flashcard ── */
 
 .pg-flash-controls {
     display: flex;
@@ -3031,7 +2935,7 @@ mark.pg-wb-hl {
     color: var(--pg-t3);
     font-style: italic;
 }
-/* ═ TTS + pronunciation-check button row — pushed to bottom via flex flow */
+/* TTS + pronunciation-check button row — pushed to bottom via flex flow */
 .pg-flash-btn-row {
     margin-top: auto;
     padding-top: 12px;
@@ -3046,7 +2950,7 @@ mark.pg-wb-hl {
     font-size: 0.9em;
 }
 
-/* ═ 🎤 Pronunciation check button */
+/* 🎤 Pronunciation check button */
 .pg-flash-mic {
     background: none !important;
     border: none !important;
@@ -3066,7 +2970,7 @@ mark.pg-wb-hl {
     animation: pg-mic-pulse 1s ease-in-out infinite;
 }
 
-/* ═ Pronunciation evaluation result area */
+/* Pronunciation evaluation result area */
 .pg-pronun-result {
     min-height: 0;
     overflow: hidden;
@@ -3091,7 +2995,7 @@ mark.pg-wb-hl {
     color: var(--pg-err);
 }
 
-/* ═ Score-based background colours */
+/* Score-based background colours */
 .pg-pronun-excellent { padding: 8px 12px; background: rgba(110,212,140,0.14); }
 .pg-pronun-good      { padding: 8px 12px; background: color-mix(in srgb, #7cb4e0 14%, transparent); }
 .pg-pronun-fair      { padding: 8px 12px; background: color-mix(in srgb, #e0a040 14%, transparent); }
@@ -3139,7 +3043,7 @@ mark.pg-wb-hl {
     padding: 5px 8px !important;
 }
 
-/* ═ Contextual meaning — shown below meaning when different from base meaning */
+/* Contextual meaning — shown below meaning when different from base meaning */
 .pg-flash-ctx {
     font-size: max(12px, 0.78em);
     color: var(--pg-t1);
@@ -3148,7 +3052,7 @@ mark.pg-wb-hl {
     margin-top: 4px;
 }
 
-/* ═ User note — shown on card back when a note exists */
+/* User note — shown on card back when a note exists */
 .pg-flash-notes {
     font-size: max(12px, 0.75em);
     color: var(--pg-t1);
@@ -3163,7 +3067,7 @@ mark.pg-wb-hl {
     line-height: 1.5;
 }
 
-/* ════ Flashcard example sentence ════ */
+/* ── Flashcard example sentence ── */
 .pg-flash-example-wrap {
     margin-top: 10px;
     padding: 6px 10px;
@@ -3194,9 +3098,7 @@ mark.pg-wb-hl {
 
 
 
-/* ════════════════════════════
-   🔁 SRS toggle button & badge
-   ════════════════════════════ */
+/* ── 🔁 SRS toggle button & badge ── */
 
 .pg-srs-toggle {
     white-space: nowrap;
@@ -3226,9 +3128,7 @@ mark.pg-wb-hl {
     margin-left: 2px;
 }
 
-/* ════════════════════════════
-   🎯 SRS rating buttons — pill style
-   ════════════════════════════ */
+/* ── 🎯 SRS rating buttons — pill style ── */
 
 .pg-srs-rating {
     display: flex;
@@ -3286,9 +3186,7 @@ mark.pg-wb-hl {
     color: rgba(130,170,255,0.95);
 }
 
-/* ════════════════════════════
-   🎉 SRS session-complete screen
-   ════════════════════════════ */
+/* ── 🎉 SRS session-complete screen ── */
 
 .pg-srs-complete {
     display: flex;
@@ -3318,9 +3216,7 @@ mark.pg-wb-hl {
 }
 
 
-/* ════════════════════════════
-   Context popover (wordbook original_form click)
-   ════════════════════════════ */
+/* ── Context popover (wordbook original_form click) ── */
 
 .pg-wb-ctx-btn {
     display: block;
@@ -3376,9 +3272,7 @@ mark.pg-wb-hl {
     opacity: 0.85;
 }
 
-/* ════════════════════════════
-   🔤 Detail tab — word family section
-   ════════════════════════════ */
+/* ── 🔤 Detail tab — word family section ── */
 
 .pg-det-family {
     margin: 10px 0 8px;
@@ -3436,7 +3330,7 @@ mark.pg-wb-hl {
     border-radius: 3px;
 }
 
-/* ═ Note button — accent highlight when the word already has a note */
+/* Note button — accent highlight when the word already has a note */
 .pg-wb-note-btn {
     font-size: 12px;
     border: none !important;
@@ -3449,7 +3343,7 @@ mark.pg-wb-hl {
     opacity: 1;
 }
 
-/* ═ Notes preview — shown below meaning when a note exists */
+/* Notes preview — shown below meaning when a note exists */
 .pg-wb-notes-preview {
     font-size: max(12px, 0.78em);
     color: var(--pg-t1);
@@ -3468,13 +3362,13 @@ mark.pg-wb-hl {
 }
 .pg-wb-notes-preview:hover { opacity: 0.85; }
 
-/* ═ Inline editor container */
+/* Inline editor container */
 .pg-wb-note-editor {
     margin-top: 6px;
     animation: pg-bubble-in 0.15s ease;
 }
 
-/* ═ Textarea */
+/* Textarea */
 .pg-wb-note-textarea {
     width: 100%;
     box-sizing: border-box;
@@ -3495,7 +3389,7 @@ mark.pg-wb-hl {
     border-color: rgba(255,255,255,0.35);
 }
 
-/* ═ Action row below textarea */
+/* Action row below textarea */
 .pg-wb-note-actions {
     display: flex;
     align-items: center;
@@ -3520,9 +3414,7 @@ mark.pg-wb-hl {
 }
 
 
-/* ════════════════════════════
-   📝 Detail tab — notes section
-   ════════════════════════════ */
+/* ── 📝 Detail tab — notes section ── */
 
 .pg-det-notes-wrap {
     margin: 12px 0;
@@ -3649,9 +3541,7 @@ mark.pg-wb-hl {
     background: rgba(255,255,255,0.30);
 }
 
-/* ════════════════════════════
-   ☑ Wordbook bulk select
-   ════════════════════════════ */
+/* ── ☑ Wordbook bulk select ── */
 
 .pg-wb-count-row {
     display: flex;
@@ -3700,9 +3590,7 @@ mark.pg-wb-hl {
     margin-right: 4px;
 }
 
-/* ════════════════════════════
-   📖 Tap bubble save buttons
-   ════════════════════════════ */
+/* ── 📖 Tap bubble save buttons ── */
 
 .pg-tap-actions {
     display: flex;
@@ -3712,7 +3600,7 @@ mark.pg-wb-hl {
     gap: 4px;
 }
 
-/* ═ Deep Analysis button — matches save-sentence exactly */
+/* Deep Analysis button — matches save-sentence exactly */
 .pg-tap-deep {
     font-size: max(12px, 0.70em);
     padding: 2px 7px;
@@ -3744,7 +3632,7 @@ mark.pg-wb-hl {
 .pg-tap-save-sentence:hover    { color: var(--pg-t1); background: rgba(255,255,255,0.09); }
 .pg-tap-save-sentence:disabled { opacity: 0.40; cursor: default; }
 
-/* ═ ＋ Save word button — icon only, no border, scale on hover */
+/* ＋ Save word button — icon only, no border, scale on hover */
 .pg-tap-save-btn {
     border: none;
     background: transparent;
@@ -3759,9 +3647,7 @@ mark.pg-wb-hl {
 .pg-tap-save-btn:hover    { opacity: 1; background: transparent; }
 .pg-tap-save-btn:disabled { opacity: 0.30; cursor: default; }
 
-/* ════════════════════════════
-   🔍 Deep Analysis result panel
-   ════════════════════════════ */
+/* ── 🔍 Deep Analysis result panel ── */
 
 .pg-deep-area {
     margin-top: 8px;
@@ -3777,13 +3663,13 @@ mark.pg-wb-hl {
 }
 .pg-deep-error { opacity: 0.85; }
 
-/* ═ Dependency arc SVG container */
+/* Dependency arc SVG container */
 .pg-deep-arc-wrap {
     margin-bottom: 4px;
     padding-bottom: 2px;
 }
 
-/* ═ Token strip */
+/* Token strip */
 .pg-deep-tokens {
     display: flex;
     flex-wrap: wrap;
@@ -3829,7 +3715,7 @@ mark.pg-wb-hl {
 .pg-deep-role-prep { background: color-mix(in srgb, #50b8c8 15%, transparent); border-color: color-mix(in srgb, #50b8c8 30%, transparent); }
 .pg-deep-role-pron { background: color-mix(in srgb, #f08050 15%, transparent); border-color: color-mix(in srgb, #f08050 30%, transparent); }
 
-/* ═ Grammar points */
+/* Grammar points */
 .pg-deep-grammar {
     display: flex;
     flex-direction: column;
@@ -3856,7 +3742,7 @@ mark.pg-wb-hl {
     color: var(--pg-t2);
 }
 
-/* ═ Summary */
+/* Summary */
 .pg-deep-summary {
     font-size: max(12px, 0.78em);
     color: var(--pg-t1);
@@ -3901,9 +3787,7 @@ mark.pg-wb-hl {
     }
 }
 
-/* ════════════════════════════
-   🎤 Speaking tab (Dictation / Shadowing)
-   ════════════════════════════ */
+/* ── 🎤 Speaking tab (Dictation / Shadowing) ── */
 
 .pg-speak-controls {
     display: flex;
@@ -4049,7 +3933,7 @@ mark.pg-wb-hl {
 .pg-speak-next    { margin-top: 8px; }
 .pg-speak-restart { margin-top: 12px; }
 
-/* ═ Deep analysis — dependency arcs (colours by direction) */
+/* Deep analysis — dependency arcs (colours by direction) */
 .pg-deep-arc-wrap { overflow-x: auto; }
 .pg-deep-arcs     { display: block; min-width: 100%; }
 .pg-deep-arcs path {
@@ -4067,7 +3951,7 @@ mark.pg-wb-hl {
 .pg-deep-arc-fwd  { color: #4f9cf9; }
 .pg-deep-arc-back { color: #e07b3a; }
 
-/* ═ Loading skeletons (tap bubble, deep analysis, detail card) */
+/* Loading skeletons (tap bubble, deep analysis, detail card) */
 .pg-tap-skeleton > .pg-skeleton,
 .pg-deep-skeleton > .pg-skeleton,
 .pg-detail-skeleton > .pg-skeleton {
@@ -4098,7 +3982,7 @@ mark.pg-wb-hl {
 .pg-word-detail-header .pg-dict-btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 .pg-detail-save { margin-top: 10px; }
 
-/* ═ Wordbook: this chat / all chats switch */
+/* Wordbook: this chat / all chats switch */
 .pg-wb-scope {
     display: flex;
     gap: 2px;
@@ -4123,7 +4007,7 @@ mark.pg-wb-hl {
 .pg-wb-scope-btn.active { background: var(--pg-layer-2); color: var(--pg-t1); }
 .pg-wb-scope-btn:focus-visible { outline: 1.5px solid rgba(255,255,255,0.5); outline-offset: 1px; }
 
-/* ═ Settings: words by chat */
+/* Settings: words by chat */
 .pg-pset-chats { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
 .pg-chats-head { display: flex; flex-direction: column; gap: 2px; }
 .pg-chats-list {
@@ -4165,9 +4049,7 @@ mark.pg-wb-hl {
 .pg-chats-actions { display: flex; gap: 6px; }
 .pg-chats-actions .pg-btn { flex: 1; }
 
-/* ════════════════════════════
-   ✏️ Wordbook: inline edit and duplicates
-   ════════════════════════════ */
+/* ── ✏️ Wordbook: inline edit and duplicates ── */
 
 .pg-wb-edit {
     display: grid;

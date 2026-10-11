@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  features/reanalysis.ts
-// ════════════════════════════
 // AI batch re-analysis — enriches existing wordbook entries with
 // pos, ipa, collocations, a verified base_form, and fills an empty
 // meaning or CEFR level (e.g. after a CSV / Anki import).
@@ -15,59 +12,47 @@
 //     Never touches: notes, srs_*, setIds, dateAdded, example*.
 //   • When base_form changes, conj_cached is reset to false so stale
 //     conjugation tables are not shown for the new base form.
+//   • A field the reply does not give leaves the entry's value alone; a reply
+//     the client had to repair after it was cut off is never applied (its
+//     last value may be half-written): the batch's words go one by one.
 //   • AbortController allows the user to stop mid-batch at any time.
 //   • On abort or error the wordbook is saved with whatever was completed.
-//
-// Dependencies: constants.ts, types.ts, prompts.ts, utils.ts,
-//               wordbook.ts, conj-cache.ts
 import { POS_TAGS, CEFR_LEVELS } from '../constants.js';
 import { reanalysisPrompt, batchReanalysisPrompt } from '../prompts.js';
 import { loadWordbook, saveWordbook } from '../wordbook.js';
 import { deleteConjCache } from '../conj-cache.js';
 import { isRecord, unionBy, AiResponseError } from '../ai/client.js';
 // ── Module-level abort tracker ─────────────────────────────────────────────────
-// Only one reanalysis run can be active at a time.
 let _reanalysisAbort = null;
-/** True while a reanalysis run is in progress. */
 export function isReanalysisRunning() {
     return _reanalysisAbort !== null;
 }
-/** Aborts the current run if one is active. */
 export function abortReanalysis() {
     _reanalysisAbort?.abort();
 }
-// ── Internal helpers ───────────────────────────────────────────────────────────
-/**
- * Validates and sanitises a raw AI response into a safe ReanalysisResult.
- * Unknown pos tags are coerced to 'phrase' to avoid storing garbage values.
- */
+const text = (v) => (typeof v === 'string' ? v.trim() : undefined);
+/** Cleans a raw AI result; an unknown POS tag becomes 'phrase'. */
 function _sanitise(raw) {
-    const pos = POS_TAGS.includes(raw.pos)
-        ? raw.pos
-        : 'phrase';
-    const level = String(raw.level ?? '').trim().toUpperCase();
+    const pos = text(raw.pos);
+    const level = text(raw.level)?.toUpperCase();
     return {
-        meaning: typeof raw.meaning === 'string' ? raw.meaning.trim().slice(0, 200) : '',
-        level: CEFR_LEVELS.includes(level) ? level : '',
-        base_form_verified: (raw.base_form_verified ?? '').trim() || '',
-        pos,
-        pos_label: (raw.pos_label ?? '').trim(),
-        ipa: (raw.ipa ?? '').trim(),
+        meaning: text(raw.meaning)?.slice(0, 200),
+        level: level && CEFR_LEVELS.includes(level) ? level : undefined,
+        base_form_verified: text(raw.base_form_verified),
+        pos: pos === undefined ? undefined : POS_TAGS.includes(pos) ? pos : 'phrase',
+        ipa: text(raw.ipa),
         collocations: Array.isArray(raw.collocations)
             ? raw.collocations
                 .filter((c) => typeof c === 'string' && c.trim().length > 0)
-                .map(c => c.trim().slice(0, 80)) // hard cap per item
-                .slice(0, 4) // max 4 items
-            : [],
+                .map(c => c.trim().slice(0, 80))
+                .slice(0, 4)
+            : undefined,
     };
 }
-/**
- * Applies a sanitised ReanalysisResult to a WordbookEntry in-place.
- * Returns true if any field actually changed (for dirty-tracking).
- */
+/** Applies a cleaned result to the entry in place. Returns true if anything changed. */
 function _applyResult(entry, result, originalWord, nativeLang) {
     let changed = false;
-    // meaning / level — filled only when missing
+    // Meaning and level are filled only when missing
     if (!entry.meaning?.trim() && result.meaning) {
         entry.meaning = result.meaning;
         entry.meaning_lang ??= nativeLang;
@@ -77,33 +62,28 @@ function _applyResult(entry, result, originalWord, nativeLang) {
         entry.level = result.level;
         changed = true;
     }
-    // pos
     if (result.pos && entry.pos !== result.pos) {
         entry.pos = result.pos;
         changed = true;
     }
-    // ipa — treat empty string and undefined as equivalent (both mean "no IPA").
-    // Comparing directly avoids a false positive where result.ipa='' and
-    // entry.ipa=undefined would repeatedly trigger changed=true on every run.
+    // '' and undefined both mean "no IPA"; otherwise every run would count as a change
     const nextIpa = result.ipa || undefined;
-    if (nextIpa !== entry.ipa) {
+    if (result.ipa !== undefined && nextIpa !== entry.ipa) {
         entry.ipa = nextIpa;
         changed = true;
     }
-    // collocations
-    if (result.collocations.length > 0 ||
-        (entry.collocations && entry.collocations.length > 0)) {
+    if (result.collocations &&
+        (result.collocations.length > 0 || (entry.collocations && entry.collocations.length > 0))) {
         const next = result.collocations.length > 0 ? result.collocations : undefined;
         if (JSON.stringify(entry.collocations) !== JSON.stringify(next)) {
             entry.collocations = next;
             changed = true;
         }
     }
-    // base_form — only update if the AI returned something non-empty and different
     if (result.base_form_verified &&
         result.base_form_verified !== entry.base_form) {
         entry.base_form = result.base_form_verified;
-        // Invalidate conjugation cache — the base form changed
+        // The cached table was for the old base form
         entry.conj_cached = false;
         deleteConjCache(originalWord);
         changed = true;
@@ -137,10 +117,7 @@ function applyAll(results, nativeLang) {
     if (dirty)
         saveWordbook(wordbook);
 }
-/**
- * Runs AI re-analysis on a subset (or all) of the wordbook.
- * Progress is reported via onProgress, completion via onDone; the caller renders the UI.
- */
+/** Re-analyses some or all of the wordbook. Reports through onProgress / onDone; the caller renders the UI. */
 export async function runReanalysis(deps, options = {}) {
     _reanalysisAbort?.abort(); // only one run at a time
     const abort = new AbortController();
@@ -166,13 +143,16 @@ export async function runReanalysis(deps, options = {}) {
     };
     const analyseOne = async (entry) => {
         try {
-            const { data } = await deps.ai.json({
+            const { data, partial } = await deps.ai.json({
                 prompt: reanalysisPrompt(entry.word, entry.base_form, lang, nativeLang, gaps(entry)),
                 signal,
                 accept: acceptResult,
             });
             failures = 0;
-            applyAll([{ word: entry.word, result: data }], nativeLang);
+            if (partial)
+                console.warn('[Polyglot] reanalysis reply was cut off; not applied for', entry.word);
+            else
+                applyAll([{ word: entry.word, result: data }], nativeLang);
         }
         catch (err) {
             if (!signal.aborted)
@@ -186,15 +166,21 @@ export async function runReanalysis(deps, options = {}) {
             options.onProgress?.(processed, total, batch[0].word);
             let answered = new Set();
             try {
-                const { data } = await deps.ai.json({
+                const { data, partial } = await deps.ai.json({
                     prompt: batchReanalysisPrompt(batch.map(e => ({ word: e.word, base_form: e.base_form, ...gaps(e) })), lang, nativeLang),
                     signal,
                     accept: acceptBatch,
                     merge: unionBy(r => r.word),
                 });
                 failures = 0;
-                applyAll(data.map(r => ({ word: r.word, result: _sanitise(r) })), nativeLang);
-                answered = new Set(data.map(r => r.word));
+                // A cut-off reply's last item may be half-written, and which one is last is unknown after merging
+                if (!partial) {
+                    // Only the words asked about: a reply may name others (an echo slip, or text in an imported entry)
+                    const asked = new Set(batch.map(e => e.word));
+                    const items = data.filter(r => asked.has(r.word));
+                    applyAll(items.map(r => ({ word: r.word, result: _sanitise(r) })), nativeLang);
+                    answered = new Set(items.map(r => r.word));
+                }
             }
             catch (err) {
                 if (signal.aborted)

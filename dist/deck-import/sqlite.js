@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  anki/sqlite.ts
-// ════════════════════════════
 // A read-only SQLite file reader: enough to scan the tables of an Anki
 // collection without shipping a SQLite engine (sql.js is ~1 MB of wasm).
 //
@@ -32,6 +29,8 @@ export class SqliteFile {
         const size = this.view.getUint16(16);
         this.pageSize = size === 1 ? 65536 : size;
         this.usable = this.pageSize - data[20];
+        if (this.pageSize < 512 || (this.pageSize & (this.pageSize - 1)) || this.usable < 480)
+            fail('bad page size');
         const encoding = this.view.getUint32(56);
         this.decoder = new TextDecoder(encoding === 2 ? 'utf-16le' : encoding === 3 ? 'utf-16be' : 'utf-8');
     }
@@ -45,13 +44,22 @@ export class SqliteFile {
     /** Every row of a table, in key order. */
     *rows(table) {
         const entry = this.schemaRows().find(r => r.type === 'table' && r.name === table) ?? fail(`no table ${table}`);
-        yield* this.walk(entry.root, new Set());
+        yield* this.guarded(this.walk(entry.root, new Set()));
     }
     schemaRows() {
-        this.schema ??= [...this.walk(1, new Set())].map(({ values: [type, name, , root, sql] }) => ({
+        this.schema ??= [...this.guarded(this.walk(1, new Set()))].map(({ values: [type, name, , root, sql] }) => ({
             type: String(type), name: String(name), root: Number(root), sql: String(sql ?? ''),
         }));
         return this.schema;
+    }
+    /** A damaged file can point reads past the data; that surfaces as a SqliteError. */
+    *guarded(rows) {
+        try {
+            yield* rows;
+        }
+        catch (e) {
+            throw e instanceof RangeError ? new SqliteError('sqlite: damaged file') : e;
+        }
     }
     // ── B-trees ───────────────────────────────────────────────────────────────
     *walk(page, seen) {
@@ -95,6 +103,8 @@ export class SqliteFile {
     }
     /** A cell's payload, following overflow pages when it does not fit. */
     payload(p, size, table) {
+        if (size > this.data.length)
+            fail('record larger than the file');
         const u = this.usable;
         const max = table ? u - 35 : Math.floor((u - 12) * 64 / 255) - 23;
         if (size <= max)
@@ -108,7 +118,7 @@ export class SqliteFile {
         let next = this.view.getUint32(p + local);
         const seen = new Set();
         while (filled < size) {
-            if (!next || seen.has(next))
+            if (!next || seen.has(next) || next * this.pageSize > this.data.length)
                 fail('broken overflow chain');
             seen.add(next);
             const base = (next - 1) * this.pageSize;
@@ -124,14 +134,20 @@ export class SqliteFile {
         let v = 0;
         for (let i = 0; i < 8; i++) {
             const b = data[p + i];
+            if (b === undefined)
+                fail('varint past the end');
             v = v * 128 + (b & 0x7f);
             if (b < 0x80)
                 return [v, i + 1];
         }
+        if (p + 8 >= data.length)
+            fail('varint past the end');
         return [v * 256 + data[p + 8], 9];
     }
     record(rec) {
         const [headerSize, n] = this.varint(0, rec);
+        if (headerSize > rec.length)
+            fail('record header larger than the record');
         const types = [];
         for (let p = n; p < headerSize;) {
             const [t, len] = this.varint(p, rec);
@@ -169,10 +185,12 @@ export class SqliteFile {
         return values;
     }
 }
-/** A big-endian two's-complement integer of 1–8 bytes (exact up to 2^53). */
+/** A big-endian two's-complement integer of 1–8 bytes (exact up to ±2^53). */
 function signed(b, p, size) {
+    // A negative value is read as -(~bits) - 1, so no step exceeds its magnitude
+    const negative = (b[p] & 0x80) !== 0;
     let v = 0;
     for (let i = 0; i < size; i++)
-        v = v * 256 + b[p + i];
-    return b[p] & 0x80 ? v - 2 ** (size * 8) : v;
+        v = v * 256 + (negative ? 255 - b[p + i] : b[p + i]);
+    return negative ? -v - 1 : v;
 }

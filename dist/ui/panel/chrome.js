@@ -1,9 +1,4 @@
-// ════════════════════════════
-// Polyglot  ui/panel/chrome.ts
-// ════════════════════════════
 // Learning-panel window chrome: theme, background image, floating + drag.
-//
-// Dependencies: runtime.ts (getSettings)
 import { getSettings } from '../../runtime.js';
 export const PANEL_ID = 'pg-learning-panel';
 /** PgPanel prefixes its box element id with "pg-box-". */

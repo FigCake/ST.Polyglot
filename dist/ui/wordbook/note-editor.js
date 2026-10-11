@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/note-editor.ts
-// ════════════════════════════
 // Inline note editor for a wordbook entry (list row or detail card).
 // Saves on the Save button, Ctrl/⌘+Enter or blur; Escape cancels.
 import { html, setHtml } from '../../html.js';

@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  furigana/render.ts
-// ════════════════════════════
 // Draws ruby spans onto a message's text nodes and removes them again.
 //
 //   plain text   今日は晴れ            (plain-text.ts: no readings, no bubbles)
@@ -10,8 +7,6 @@
 // Spans are placed by offset in the plain text, so they land inside
 // highlight spans as well. A span split across elements (e.g. 今<em>日</em>)
 // is skipped. Text in <code> / <pre> is left alone.
-//
-// Dependencies: plain-text.ts, ui/message-decor.ts, furigana/model.ts
 import { plainTextNodes } from '../plain-text.js';
 import { DECOR_CLASS } from '../ui/message-decor.js';
 export const RUBY_CLASS = 'pg-ruby';

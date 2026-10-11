@@ -1,10 +1,5 @@
-// ════════════════════════════
-// Polyglot  furigana/word.ts
-// ════════════════════════════
 // A single word with its reading as ruby markup — for word cards, the
 // wordbook list, flashcards, the PDF deck and tap-translation chips.
-//
-// Dependencies: html.ts, utils.ts, runtime.ts, furigana/model.ts
 import { html } from '../html.js';
 import { isKana, wordSpans } from './model.js';
 import { isJapanese } from '../utils.js';

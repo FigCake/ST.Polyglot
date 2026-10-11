@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  features/flashcard.ts
-// ════════════════════════════
 // Flashcards: browse mode, or SM-2 spaced repetition (SRS) mode.
 //
 //   front  word · part of speech · 🔊 · 🎤 pronunciation check
@@ -12,9 +9,6 @@
 // Design rules:
 //   • ST state and runtime helpers come in through FlashDeps.
 //   • One delegated click handler per session; re-rendering a card never re-binds.
-//
-// Dependencies: types.ts, prompts.ts, utils.ts, html.ts, i18n.ts, wordbook.ts,
-//               srs.ts, ai/client.ts
 import { exampleSentencePrompt } from '../prompts.js';
 import { shuffleArray } from '../utils.js';
 import { rubyWord, shownReading } from '../furigana/word.js';

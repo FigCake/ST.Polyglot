@@ -1,16 +1,12 @@
-// ════════════════════════════
-// Polyglot  ui/settings-ui.ts
-// ════════════════════════════
 // The Polyglot drawer in SillyTavern's Extensions settings: features, languages,
 // CEFR level, AI provider / model, max tokens.
 //
-// Design rules (same as ui/panel/settings-tab.ts):
-//   • Inputs carry data-setting="<key>" and are saved by one delegated handler;
-//     data-trim trims the value first.
-//   • Side effects of a change live in SETTING_EFFECTS.
+//   • Plain inputs carry data-setting="<key>" and are saved by one delegated
+//     handler (data-trim trims the value first); side effects of a change live
+//     in SETTING_EFFECTS, as in ui/panel/settings-tab.ts.
+//   • The provider and model selects, the connection override and max tokens
+//     have their own handlers in bind().
 //   • The provider block is re-rendered when the provider changes.
-//
-// Dependencies: constants.ts, api.ts, html.ts, i18n.ts, ui.manager.ts, runtime.ts, wordbook.ts
 import { CEFR_LEVELS } from '../constants.js';
 import { PROVIDER_MODELS, ROUTE_MODEL_KEY } from '../api.js';
 import { html, setHtml } from '../html.js';
@@ -19,6 +15,7 @@ import { notify } from '../ui.manager.js';
 import { getSettings, saveSettings, getContext, getLang } from '../runtime.js';
 import { isJapanese } from '../utils.js';
 import { clearAllConjCache } from '../wordbook.js';
+import { ST_SEL } from '../st-dom.js';
 const TOKENS = { min: 500, max: 100_000, step: 500, fallback: 4000 };
 const CUSTOM_MODEL = '__custom__';
 const LANGUAGES = [
@@ -276,7 +273,7 @@ function bind(root) {
 }
 /** Adds the Polyglot drawer to ST's extension settings (once). */
 export function buildSettingsPanel() {
-    const host = document.getElementById('extensions_settings');
+    const host = document.querySelector(ST_SEL.extensionsSettings);
     if (!host || document.getElementById('pg-settings-panel'))
         return;
     const root = Object.assign(document.createElement('div'), { id: 'pg-settings-panel', className: 'extension_container' });

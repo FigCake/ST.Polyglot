@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/wordbook/anki-dialog.ts
-// ════════════════════════════
 // "Import" with an Anki package (.apkg / .colpkg):
 //
 //   read the package ─▶ dialog: per note type, which field is the word,
@@ -9,14 +6,12 @@
 //
 // Each deck becomes a set. Sounds and images are kept only when the wordbook
 // lives in the server files (they are separate files next to it).
-//
-// Dependencies: html.ts, i18n.ts, ui.manager.ts, anki/*
 import { html, setHtml } from '../../html.js';
 import { t } from '../../i18n.js';
 import { notify } from '../../ui.manager.js';
-import { readAnkiPackage, AnkiFormatError } from '../../anki/package.js';
-import { describeTypes, fieldText, notesToRows, splitFurigana, TARGETS } from '../../anki/fields.js';
-import { addRows, canStoreMedia, mediaOf, storeMedia } from '../../anki/import.js';
+import { readAnkiPackage, AnkiFormatError } from '../../deck-import/package.js';
+import { describeTypes, fieldText, notesToRows, splitFurigana, TARGETS } from '../../deck-import/fields.js';
+import { addRows, canStoreMedia, mediaOf, storeMedia } from '../../deck-import/import.js';
 const TARGET_LABEL = {
     word: 'anki.fWord',
     meaning: 'anki.fMeaning',
@@ -57,7 +52,7 @@ function runDialog(fileName, pkg, types) {
         const wrap = document.createElement('div');
         wrap.className = 'pg-dim';
         setHtml(wrap, html `
-            <div class="pg-dialog pg-doc-dialog pg-anki-dialog" role="dialog" aria-modal="true">
+            <div class="pg-dialog pg-doc-dialog pg-deck-dialog" role="dialog" aria-modal="true">
                 <h3 class="pg-doc-title">${t('anki.title', { file: fileName })}</h3>
                 <div class="pg-doc-body">
                     ${types.map(({ type, count, sample, mapping }) => html `

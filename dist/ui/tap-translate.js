@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/tap-translate.ts
-// ════════════════════════════
 // Sentence translation: an inline bubble under the paragraph of a sentence in
 // an AI message. How it is asked for depends on the input used, not the device:
 //
@@ -14,12 +11,11 @@
 //   ui/tap/bubble.ts         the bubble and its actions
 //   ui/tap/deep-analysis.ts  the "Deep" breakdown inside a bubble
 //   ui/tap/lookup.ts         select text → "Look up" tooltip (re-exported here)
-//
-// Dependencies: constants.ts, prompts.ts, runtime.ts, ai/client.ts, plain-text.ts, ui/tap/*
 import { tapTranslatePrompt } from '../prompts.js';
 import { ai, getLang, getNativeLang } from '../runtime.js';
 import { isRecord } from '../ai/client.js';
 import { messageTextOf, sentenceAround } from './tap/sentence.js';
+import { ST_SEL, mesSelector, mesIdOf } from '../st-dom.js';
 import { plainText, plainOffsetIn } from '../plain-text.js';
 import { showBubble, closeBubble } from './tap/bubble.js';
 import { removeSelectionTooltip, setupTextSelectionTooltip } from './tap/lookup.js';
@@ -30,7 +26,7 @@ const MIN_SENTENCE = 3;
 const TOUCH_GRACE_MS = 800;
 /** In-flight translations, by mesId. */
 const requests = new Map();
-/** Text position under a screen point, if it lies in an AI message (and not on a highlight). */
+/** Text position under a screen point, if it lies in an AI message (not on a highlight, nor in a translation bubble). */
 function caretAt(x, y) {
     let node = null, offset = 0;
     if (document.caretRangeFromPoint) {
@@ -48,10 +44,11 @@ function caretAt(x, y) {
         }
     }
     const el = node instanceof Element ? node : node?.parentElement;
-    const message = el?.closest('.mes[is_user="false"]');
-    if (!node || !message || el?.closest('.pg-clickable-word'))
+    const message = el?.closest(ST_SEL.aiMes);
+    // A double-click in a bubble selects its text; it is not a tap on the message
+    if (!node || !message || el?.closest('.pg-clickable-word, .pg-tap-bubble'))
         return null;
-    return { node, offset, mesId: message.getAttribute('mesid') ?? '' };
+    return { node, offset, mesId: mesIdOf(message) ?? '' };
 }
 /** The sentence at the caret plus where its bubble goes (after the paragraph it is in). */
 function targetAt({ node, offset }) {
@@ -119,7 +116,7 @@ async function translateAt(caret) {
         await translateTarget(target, caret.mesId);
 }
 // ── Gestures ──────────────────────────────────────────────────────────────────
-const inChat = (target) => !!document.getElementById('chat')?.contains(target);
+const inChat = (target) => !!document.querySelector(ST_SEL.chat)?.contains(target);
 let lastTouch = -Infinity;
 function onDoubleClick(e) {
     if (performance.now() - lastTouch < TOUCH_GRACE_MS || !inChat(e.target))
@@ -141,21 +138,25 @@ function onOutsideClick(e) {
 /** Translates the sentence at the start of a selection (the touch [Translate] button). */
 function translateSelection(range) {
     const message = (range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement)
-        ?.closest('.mes[is_user="false"]');
+        ?.closest(ST_SEL.aiMes);
     if (!message)
         return;
-    void translateAt({ node: range.startContainer, offset: range.startOffset, mesId: message.getAttribute('mesid') ?? '' });
+    void translateAt({ node: range.startContainer, offset: range.startOffset, mesId: mesIdOf(message) ?? '' });
 }
 export function setupTapToTranslate() {
     document.addEventListener('touchstart', () => { lastTouch = performance.now(); }, { passive: true, capture: true });
     document.addEventListener('dblclick', onDoubleClick);
     document.addEventListener('click', onOutsideClick);
-    setupTextSelectionTooltip({ translate: translateSelection, canTranslate: range => !!messageTextOf(range.startContainer)?.closest('.mes[is_user="false"]') });
+    const inBubble = (n) => !!(n instanceof Element ? n : n.parentElement)?.closest('.pg-tap-bubble');
+    setupTextSelectionTooltip({
+        translate: translateSelection,
+        canTranslate: range => !inBubble(range.startContainer) && !!messageTextOf(range.startContainer)?.closest(ST_SEL.aiMes),
+    });
 }
 // ── Cleanup ───────────────────────────────────────────────────────────────────
 /** Closes translation bubbles — in one message, or everywhere. */
 export function removeTapBubbles(mesId = null) {
-    const scope = mesId ? `.mes[mesid="${CSS.escape(mesId)}"] ` : '';
+    const scope = mesId ? `${mesSelector(mesId)} ` : '';
     document.querySelectorAll(`${scope}.pg-tap-bubble`).forEach(closeBubble);
 }
 /** Cancels all in-flight translations (on chat switch). */

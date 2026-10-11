@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  annotator.ts
-// ════════════════════════════
 // Message annotation: asks the AI for hard words, grammar patterns and idioms
 // in a message, highlights them in place, and keeps them across re-renders.
 //
@@ -17,12 +14,9 @@
 //     this module's neighbours, so importing it here would create a cycle.
 //   • Highlighting only wraps text nodes; it never rewrites the message HTML.
 //   • Message text is read through plain-text.ts (no furigana readings).
-//
-// Dependencies: constants.ts, types.ts, utils.ts, prompts.ts, ui.manager.ts,
-//               html.ts, i18n.ts, wordbook.ts, storage.ts, runtime.ts, ai/client.ts,
-//               plain-text.ts, ui/message-decor.ts
 import { KEY, DELAY } from './constants.js';
-import { levelClass, findWord } from './utils.js';
+import { ST_SEL, mesSelector, mesIdOf, mesTextOf } from './st-dom.js';
+import { levelClass, findWord, entryList, withEntryFor } from './utils.js';
 import { annotatorPrompt } from './prompts.js';
 import { notify } from './ui.manager.js';
 import { html, setHtml } from './html.js';
@@ -35,36 +29,45 @@ import { readableText, plainText } from './plain-text.js';
 import { dialogueLines, dialogueText } from './dialogue.js';
 import { drawDialogue, stripDialogue, LINE_CLASS } from './ui/dialogue-layer.js';
 import { showFuriganaFor, hideFuriganaFor, clearChatFurigana } from './furigana/messages.js';
+import { textHash } from './furigana/model.js';
 import { setLayer, hasLayer, messagesWith, resetLayers, pruneDetachedDecor, untilRendered, cancelUntilRendered, DECOR_CLASS, } from './ui/message-decor.js';
 let openPanel = () => { };
 /** Registers openLearningPanel (called once by index.ts). */
 export function setOpenPanelFn(fn) { openPanel = fn; }
-// ════════════════════════════
-// State
-// ════════════════════════════
+// ── State ─────────────────────────────────────────────────────────────────────
 /** Results of messages currently highlighted in the DOM, by mesId. */
 const annotations = new Map();
 /** In-flight requests, by mesId. */
 const requests = new Map();
+/**
+ * Saved analyses by message index: one per text the message has shown (its
+ * swipes, edits), so swiping back brings an analysis back. Older saves hold a
+ * single analysis instead of a list.
+ */
 const store = chatValue(KEY.annotations);
+const KEEP_PER_MESSAGE = 6;
 let suppressRestore = false; // true while the chat's annotations are being cleared
-const mesSelector = (mesId) => `.mes[mesid="${CSS.escape(mesId)}"]`;
-// ════════════════════════════
-// Persistence
-// ════════════════════════════
-function persist(mesId, result) {
-    store.set({ ...store.get(), [mesId]: result });
+// ── Persistence ───────────────────────────────────────────────────────────────
+const savedList = (mesId) => entryList(store.get()?.[mesId]);
+/** The saved analysis for the text the message shows now (an older save without a hash counts as current). */
+function savedFor(mesId, textEl) {
+    const list = savedList(mesId);
+    const h = textHash(plainText(textEl));
+    return list.find(e => e.h === h) ?? list.find(e => !e.h);
 }
-function unpersist(mesId) {
+function persist(mesId, result) {
+    store.set({ ...store.get(), [mesId]: withEntryFor(savedList(mesId), result, KEEP_PER_MESSAGE) });
+}
+/** Deletes the saved analysis of one text of the message (the one `result` was made for). */
+function unpersist(mesId, result) {
     const saved = store.get();
     if (!saved || !(mesId in saved))
         return;
-    const { [mesId]: _removed, ...rest } = saved;
-    store.set(rest);
+    const { [mesId]: list, ...rest } = saved;
+    const kept = entryList(list).filter(e => e.h !== result.h);
+    store.set(kept.length ? { ...rest, [mesId]: kept } : rest);
 }
-// ════════════════════════════
-// Highlighting
-// ════════════════════════════
+// ── Highlighting ──────────────────────────────────────────────────────────────
 /** CSS class for a token: idiom / grammar, or the word's CEFR tier (a/b/c). */
 function highlightClass(token) {
     if (token.type === 'idiom')
@@ -146,31 +149,41 @@ export function stripHighlightsFromEl(textEl) {
     textEl.querySelectorAll('.pg-clickable-word').forEach(span => span.replaceWith(span.textContent ?? ''));
     textEl.normalize();
 }
-// ════════════════════════════
-// Show / hide on a message
-// ════════════════════════════
+// ── Show / hide on a message ──────────────────────────────────────────────────
 function annotateButton(msgEl) {
     return msgEl.querySelector('.pg-annotate-btn');
 }
 function show(msgEl, mesId, data) {
-    if (!msgEl.querySelector('.mes_text'))
+    if (!msgEl.querySelector(ST_SEL.mesText))
         return;
     annotations.set(mesId, data);
     setLayer(mesId, 'dialogue', data.dialogue ? { draw: drawDialogue, strip: stripDialogue } : null);
     setLayer(mesId, 'annotation', { draw: textEl => highlight(textEl, data), strip: stripHighlightsFromEl });
     annotateButton(msgEl)?.classList.add('pg-btn-active');
 }
+/** The user removes the message's analysis (📖 again): taken down and deleted, for this text only. */
 export function removeAnnotation(msgEl, mesId) {
+    const data = annotations.get(mesId);
     hideFuriganaFor(mesId);
+    takeDown(mesId);
+    annotateButton(msgEl)?.classList.remove('pg-btn-active');
+    if (data)
+        unpersist(mesId, data);
+}
+/** Removes the message's highlights from the page (what is saved stays). */
+function takeDown(mesId) {
     setLayer(mesId, 'annotation', null);
     setLayer(mesId, 'dialogue', null);
     annotations.delete(mesId);
-    annotateButton(msgEl)?.classList.remove('pg-btn-active');
-    unpersist(mesId);
 }
-// ════════════════════════════
-// Restore after load / chat switch
-// ════════════════════════════
+/** The 📖 buttons show exactly which messages are highlighted now. */
+function syncButtons() {
+    document.querySelectorAll('.pg-annotate-btn').forEach(btn => {
+        const mesId = mesIdOf(btn);
+        btn.classList.toggle('pg-btn-active', !!mesId && annotations.has(mesId));
+    });
+}
+// ── Restore after load / chat switch ──────────────────────────────────────────
 /** Forgets messages that left the DOM (deleted), so their observers can be collected. */
 function pruneDetached() {
     pruneDetachedDecor();
@@ -178,26 +191,41 @@ function pruneDetached() {
         if (!hasLayer(mesId, 'annotation'))
             annotations.delete(mesId);
 }
-/** Re-applies saved annotations to messages that are in the DOM and not yet highlighted. */
+/**
+ * Whether an analysis belongs to the text the message shows now. ST reuses an
+ * index for another swipe, a regenerated reply or after a deletion, and an edit
+ * changes the text; older saves without a hash cannot be checked and count as current.
+ */
+const stillFits = (data, textEl) => !data.h || data.h === textHash(plainText(textEl));
+/** Shows, on every message in the DOM, the saved analysis of the text it shows now (and only that). */
 export function restoreAnnotations() {
     pruneDetached();
-    if (suppressRestore || !getSettings().enabled_annotator)
+    if (suppressRestore || !getSettings().enabled_annotator) {
+        syncButtons();
         return;
-    for (const [mesId, data] of Object.entries(store.get() ?? {})) {
+    }
+    // A message whose text changed under its highlights (swiped, regenerated, edited) loses them
+    for (const [mesId, data] of annotations) {
+        const textEl = mesTextOf(mesId);
+        if (textEl && !stillFits(data, textEl))
+            forgetMessage(mesId);
+    }
+    for (const mesId of Object.keys(store.get() ?? {})) {
         if (annotations.has(mesId))
             continue;
         const msgEl = document.querySelector(mesSelector(mesId));
-        if (msgEl?.querySelector('.mes_text'))
+        const textEl = msgEl?.querySelector(ST_SEL.mesText);
+        const data = textEl && savedFor(mesId, textEl);
+        if (msgEl && data)
             show(msgEl, mesId, data);
     }
+    syncButtons();
 }
 /** ST renders messages asynchronously after a load — keep restoring until they all exist (or time runs out). */
 export function restoreWithRetry() {
     untilRendered('annotation', Object.keys(store.get() ?? {}), restoreAnnotations);
 }
-// ════════════════════════════
-// Clearing
-// ════════════════════════════
+// ── Clearing ──────────────────────────────────────────────────────────────────
 /** Cancels requests and forgets the DOM state of the previous chat (saved data is untouched). */
 export function resetChatState() {
     cancelUntilRendered('annotation');
@@ -207,21 +235,24 @@ export function resetChatState() {
     resetLayers('dialogue');
     annotations.clear();
 }
-/** A swiped message gets new text: drop its annotation and any pending request. */
+/**
+ * The message shows other text (a swipe, an edit, a regenerated reply): its
+ * highlights and pending request go; analyses saved for its texts stay, so
+ * swiping back shows that swipe's analysis again (restoreAnnotations).
+ */
 export function forgetMessage(mesId) {
     requests.get(mesId)?.abort();
     requests.delete(mesId);
-    const msgEl = document.querySelector(mesSelector(mesId));
-    if (msgEl) {
-        removeAnnotation(msgEl, mesId);
-        annotateButton(msgEl)?.classList.remove('pg-btn-busy');
+    takeDown(mesId);
+    // An older save without a hash cannot be matched to a text: it went with the text that changed
+    const list = savedList(mesId);
+    if (list.some(e => !e.h)) {
+        const { [mesId]: _old, ...rest } = store.get() ?? {};
+        const kept = list.filter(e => e.h);
+        store.set(kept.length ? { ...rest, [mesId]: kept } : rest);
     }
-    else {
-        setLayer(mesId, 'annotation', null);
-        setLayer(mesId, 'dialogue', null);
-        annotations.delete(mesId);
-        unpersist(mesId);
-    }
+    const btn = document.querySelector(mesSelector(mesId))?.querySelector('.pg-annotate-btn');
+    btn?.classList.remove('pg-btn-active', 'pg-btn-busy');
 }
 /** Deletes every saved annotation of the open chat and removes the highlights. */
 export function clearCurrentChatAnnotations() {
@@ -234,9 +265,7 @@ export function clearCurrentChatAnnotations() {
     document.querySelectorAll('.pg-annotate-btn').forEach(b => b.classList.remove('pg-btn-active'));
     setTimeout(() => { suppressRestore = false; }, 0);
 }
-// ════════════════════════════
-// Snackbar
-// ════════════════════════════
+// ── Snackbar ──────────────────────────────────────────────────────────────────
 function showSnackbar(onStop) {
     hideSnackbar();
     const el = Object.assign(document.createElement('div'), { id: 'pg-snackbar', className: 'pg-snackbar' });
@@ -255,9 +284,7 @@ function hideSnackbar() {
     el.classList.remove('pg-snackbar-visible');
     setTimeout(() => el.remove(), DELAY.snackbarFadeOut);
 }
-// ════════════════════════════
-// Run
-// ════════════════════════════
+// ── Run ───────────────────────────────────────────────────────────────────────
 function messageButton(className, title, onClick) {
     const btn = Object.assign(document.createElement('div'), {
         className: `mes_button ${className} interactable`, title, tabIndex: 0,
@@ -269,12 +296,18 @@ function messageButton(className, title, onClick) {
 export function injectAnnotateButtons() {
     if (!getSettings().enabled_annotator)
         return;
-    document.querySelectorAll('.mes[is_user="false"]').forEach(msgEl => {
-        const mesId = msgEl.getAttribute('mesid');
-        const extras = msgEl.querySelector('.extraMesButtons');
+    document.querySelectorAll(ST_SEL.aiMes).forEach(msgEl => {
+        const mesId = mesIdOf(msgEl);
+        const extras = msgEl.querySelector(ST_SEL.extraMesButtons);
         if (!mesId || !extras || msgEl.querySelector('.pg-annotate-btn'))
             return;
-        extras.prepend(messageButton('pg-annotate-btn fa-solid fa-book-open', 'Polyglot: annotate for study', () => runAnnotator(msgEl, mesId)), messageButton('pg-open-btn fa-solid fa-earth-europe', 'Open Polyglot panel', () => openPanel('learn', null)));
+        extras.prepend(
+        // The id is read on click: ST renumbers messages when one before them is deleted
+        messageButton('pg-annotate-btn fa-solid fa-book-open', 'Polyglot: annotate for study', () => {
+            const id = mesIdOf(msgEl);
+            if (id)
+                void runAnnotator(msgEl, id);
+        }), messageButton('pg-open-btn fa-solid fa-earth-europe', 'Open Polyglot panel', () => openPanel('learn', null)));
     });
 }
 /** Saves found idioms to the wordbook and this chat (when enabled). Returns how many were new. */
@@ -289,7 +322,6 @@ function saveIdioms(idioms = []) {
     }, { quiet: true }))
         .filter(r => r === 'added').length;
 }
-/** Annotates a message — or removes its annotation if it already has one. */
 /** Two cut-off analyses as one: every highlight either attempt found, without repeats. */
 function mergeAnnotations(preferred, other) {
     const list = (a, b, keyOf) => unionBy(keyOf)(a ?? [], b ?? []);
@@ -299,6 +331,9 @@ function mergeAnnotations(preferred, other) {
         idioms: list(preferred.idioms, other.idioms, i => i.phrase),
     };
 }
+/** Whether the message is annotated now. */
+export const isAnnotated = (mesId) => annotations.has(mesId);
+/** Annotates a message — or removes its annotation if it already has one. */
 export async function runAnnotator(msgEl, mesId) {
     if (!getSettings().enabled_annotator || requests.has(mesId))
         return;
@@ -306,7 +341,7 @@ export async function runAnnotator(msgEl, mesId) {
         removeAnnotation(msgEl, mesId);
         return;
     }
-    const textEl = msgEl.querySelector('.mes_text');
+    const textEl = msgEl.querySelector(ST_SEL.mesText);
     if (!textEl)
         return;
     // "Dialogue only": the quoted lines are what gets studied
@@ -319,6 +354,7 @@ export async function runAnnotator(msgEl, mesId) {
     }
     const studied = lines ? dialogueText(plain, lines) : readableText(textEl);
     const chatId = currentChatId();
+    const hash = textHash(plain);
     const btn = annotateButton(msgEl);
     const abort = new AbortController();
     requests.set(mesId, abort);
@@ -335,8 +371,13 @@ export async function runAnnotator(msgEl, mesId) {
         });
         if (abort.signal.aborted || chatId !== currentChatId())
             return;
-        const result = dialogue ? { ...data, dialogue: true } : data;
-        show(msgEl, mesId, result);
+        // The message may have been regenerated or edited while the reply was on its way
+        const textNow = mesTextOf(mesId);
+        const msgNow = textNow?.closest(ST_SEL.mes);
+        if (!textNow || !msgNow || textHash(plainText(textNow)) !== hash)
+            return;
+        const result = { ...data, h: hash, ...(dialogue && { dialogue: true }) };
+        show(msgNow, mesId, result);
         persist(mesId, result);
         const added = saveIdioms(data.idioms);
         if (added)

@@ -1,7 +1,5 @@
-// ════════════════════════════
-// Polyglot  ui/tap/sentence.ts
-// ════════════════════════════
 // Finding "the sentence the user pointed at" inside a chat message.
+import { ST_SEL } from '../../st-dom.js';
 const SENTENCE_END = /[.!?。！？\n]/;
 /**
  * The sentence containing text[start, end): expands to the nearest sentence
@@ -20,5 +18,5 @@ export function sentenceAround(text, start, end = start) {
 /** The message text element (`.mes_text`) that contains `node`, if any. */
 export function messageTextOf(node) {
     const el = node instanceof Element ? node : node?.parentElement ?? null;
-    return el?.closest('.mes_text') ?? null;
+    return el?.closest(ST_SEL.mesText) ?? null;
 }

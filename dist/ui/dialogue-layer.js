@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  ui/dialogue-layer.ts
-// ════════════════════════════
 // "Dialogue only" decoration on a message (the first decor layer): each line
 // of dialogue is marked. Double-clicking (or the touch [Translate sentence])
 // inside a marked line translates the whole line (ui/tap-translate.ts).
@@ -8,8 +5,6 @@
 // Lines are found in the plain text (plain-text.ts, dialogue.ts); marks wrap
 // text nodes only, so the plain text — and the offsets furigana and
 // highlights use — stay the same.
-//
-// Dependencies: plain-text.ts, dialogue.ts, ui/message-decor.ts
 import { plainText, plainTextNodes } from '../plain-text.js';
 import { dialogueLines } from '../dialogue.js';
 import { DECOR_CLASS } from './message-decor.js';

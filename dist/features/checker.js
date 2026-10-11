@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  features/checker.ts
-// ════════════════════════════
 // Input checker / translator (🌍 button).
 // Reads the ST send_textarea, calls the AI, and replaces the text with
 // the corrected version + explanation if a correction was made.
@@ -8,25 +5,20 @@
 // Design rules:
 //   • No direct ST state reads — settings, lang, and the AI client are injected.
 //   • setWandBusy is injected so this module has no dependency on index.ts.
-//
-// Dependencies: prompts.ts, ui.manager.ts, ai/client.ts
 import { checkerPrompt } from '../prompts.js';
 import { notify } from '../ui.manager.js';
 import { acceptObject } from '../ai/client.js';
 import { t } from '../i18n.js';
+import { ST_SEL } from '../st-dom.js';
 // ── Module-level abort tracker ────────────────────────────────────────────────
 let _checkerAbort = null;
 // ── Public API ────────────────────────────────────────────────────────────────
-/**
- * Reads the ST send_textarea, sends it to the AI checker, and replaces
- * the content with the corrected text + explanation if a change was made.
- * Shows a "Looks good ✓" notification when no correction is needed.
- */
+/** Checks the input box; shows "Looks good ✓" when nothing needs correcting. */
 export async function runChecker(deps) {
     const s = deps.getSettings();
     if (!s.enabled_checker)
         return;
-    const textarea = document.getElementById('send_textarea');
+    const textarea = document.querySelector(ST_SEL.sendTextarea);
     if (!(textarea instanceof HTMLTextAreaElement))
         return;
     const text = textarea.value.trim();
@@ -46,7 +38,11 @@ export async function runChecker(deps) {
         if (abort.signal.aborted)
             return;
         const corrected = result.corrected_text?.trim() ?? '';
-        if (corrected && corrected !== text) {
+        // The box may have been sent, cleared or typed in meanwhile: never write over that
+        if (corrected && corrected !== text && textarea.value.trim() !== text) {
+            notify(t('chk.changed', { text: corrected }), 'info', 10000);
+        }
+        else if (corrected && corrected !== text) {
             // Insert corrected text + explanation back into the input box
             const explanation = result.explanation ? `\n--\n${result.explanation}` : '';
             textarea.value = corrected + explanation;
@@ -63,8 +59,10 @@ export async function runChecker(deps) {
         notify(t('chk.error'), 'err', 3000);
     }
     finally {
-        if (_checkerAbort === abort)
+        // A newer check (a second click) owns the busy state now
+        if (_checkerAbort === abort) {
             _checkerAbort = null;
-        deps.setWandBusy(false);
+            deps.setWandBusy(false);
+        }
     }
 }

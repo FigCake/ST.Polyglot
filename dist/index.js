@@ -1,6 +1,3 @@
-// ════════════════════════════
-// Polyglot  index.ts
-// ════════════════════════════
 // Entry point: wires modules together, injects chat-UI buttons, subscribes to
 // ST events and registers slash commands. Feature logic lives elsewhere:
 //
@@ -15,12 +12,13 @@ import { buildSettingsPanel } from './ui/settings-ui.js';
 import { openLearningPanel, lookUpWord, cancelLookup, PANEL_TABS } from './ui/learning-panel.js';
 import { getSettings, getLang, getNativeLang, ai, getContext } from './runtime.js';
 import { DELAY } from './constants.js';
+import { ST_SEL, mesSelector } from './st-dom.js';
 import { runChecker } from './features/checker.js';
-import { pruneOrphanSets, migrateChatWordbook } from './wordbook.js';
+import { migrateChatWordbook } from './wordbook.js';
 import { refreshWordbook } from './ui/wordbook-ui.js';
 import { initDataStore, onDataReplaced, storeMode } from './data-store.js';
 import { notify } from './ui.manager.js';
-import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, } from './annotator.js';
+import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, } from './annotator.js';
 import { t } from './i18n.js';
 import { setupPlainCopy } from './plain-text.js';
 import { restoreFurigana, restoreFuriganaWithRetry, autoFurigana, forgetFurigana, resetFuriganaState, applyFuriganaDisplay, onFuriganaSettingChange, setupReadingEditor, } from './furigana/messages.js';
@@ -32,9 +30,7 @@ import { SlashCommandParser } from '../../../../slash-commands/SlashCommandParse
 import { SlashCommand } from '../../../../slash-commands/SlashCommand.js';
 // @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
 import { ARGUMENT_TYPE, SlashCommandNamedArgument } from '../../../../slash-commands/SlashCommandArgument.js';
-// ════════════════════════════
-// Chat-UI entry points
-// ════════════════════════════
+// ── Chat-UI entry points ──────────────────────────────────────────────────────
 const WAND_ICON = '<i class="fa-solid fa-earth-europe"></i>';
 const SPINNER_ICON = '<i class="fa-solid fa-spinner fa-spin"></i>';
 const checkerDeps = () => ({ ai, getSettings, getLang, getNativeLang, setWandBusy });
@@ -44,7 +40,7 @@ function injectWandButton() {
         return;
     if (document.getElementById('pg-wand-btn'))
         return;
-    const sendBtn = document.getElementById('send_but');
+    const sendBtn = document.querySelector(ST_SEL.sendBtn);
     if (!sendBtn?.parentNode)
         return;
     const btn = Object.assign(document.createElement('div'), {
@@ -66,7 +62,7 @@ function setWandBusy(busy) {
 function injectExtensionsMenuEntry() {
     if (document.getElementById('pg-ext-menu-btn'))
         return;
-    const menu = document.getElementById('extensionsMenu');
+    const menu = document.querySelector(ST_SEL.extensionsMenu);
     if (!menu)
         return;
     const item = Object.assign(document.createElement('div'), {
@@ -77,7 +73,7 @@ function injectExtensionsMenuEntry() {
     const label = Object.assign(document.createElement('span'), { textContent: t('ext.menuLabel') });
     item.append(icon, label);
     item.addEventListener('click', () => {
-        $('#extensionsMenu').hide(); // ST manages this menu via jQuery
+        $(ST_SEL.extensionsMenu).hide(); // ST manages this menu via jQuery
         openLearningPanel();
     });
     menu.appendChild(item);
@@ -86,10 +82,7 @@ function injectChatButtons() {
     injectWandButton();
     injectAnnotateButtons();
 }
-// ════════════════════════════
-// Chat lifecycle
-// ════════════════════════════
-const mesSelector = (mesId) => `.mes[mesid="${CSS.escape(mesId)}"]`;
+// ── Chat lifecycle ────────────────────────────────────────────────────────────
 /** Moves an old per-chat wordbook into the shared one (once per chat), then shows the open chat's words. */
 async function adoptChatWordbook() {
     refreshWordbook();
@@ -118,9 +111,7 @@ function onChatChanged() {
 function onToggle(name, handler) {
     document.addEventListener(name, e => handler(e.detail.on));
 }
-// ════════════════════════════
-// Initialisation
-// ════════════════════════════
+// ── Initialisation ────────────────────────────────────────────────────────────
 (function init() {
     setOpenPanelFn(openLearningPanel); // highlight clicks in annotator.ts open the panel
     buildSettingsPanel();
@@ -130,7 +121,6 @@ function onToggle(name, handler) {
         void initDataStore().then(() => {
             if (storeMode() !== 'file')
                 return;
-            pruneOrphanSets(); // safe only after the full data load
             void adoptChatWordbook();
         });
         injectChatButtons();
@@ -153,7 +143,19 @@ function onToggle(name, handler) {
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => {
         forgetMessage(String(id));
         forgetFurigana(String(id));
+        // Back to a swipe that was analysed: ST has already drawn its text, so its analysis shows again
+        restoreAnnotations();
+        restoreFurigana();
     });
+    // An edited or deleted message: highlights whose text no longer matches go
+    for (const type of [event_types.MESSAGE_UPDATED, event_types.MESSAGE_DELETED]) {
+        if (type)
+            eventSource.on(type, () => { restoreAnnotations(); restoreFurigana(); });
+    }
+    // Older messages loaded with "Show more messages" get buttons and their saved highlights
+    if (event_types.MORE_MESSAGES_LOADED) {
+        eventSource.on(event_types.MORE_MESSAGES_LOADED, () => { injectAnnotateButtons(); restoreAnnotations(); restoreFurigana(); });
+    }
     injectChatButtons();
     injectExtensionsMenuEntry();
     onToggle('pg:checker-toggle', on => {
@@ -170,10 +172,6 @@ function onToggle(name, handler) {
             document.querySelectorAll('.pg-annotate-btn, .pg-open-btn').forEach(b => b.remove());
     });
 })();
-// ════════════════════════════
-// Slash Commands
-// ════════════════════════════
-// ═ /pg-check
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({
     name: 'pg-check',
     callback: async () => {
@@ -182,7 +180,6 @@ SlashCommandParser.addCommandObject(SlashCommand.fromProps({
     },
     helpString: 'Polyglot: check and translate the current input box content (same as the 🌍 button).',
 }));
-// ═ /pg-annotate
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({
     name: 'pg-annotate',
     callback: async (args) => {
@@ -193,8 +190,11 @@ SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         const msgEl = document.querySelector(mesSelector(mesId));
         if (!msgEl)
             return `Message ID ${mesId} not found.`;
+        // The 📖 button toggles; the command only adds (a script running it must not delete an analysis)
+        if (isAnnotated(mesId))
+            return `Message #${mesId} is already annotated.`;
         await runAnnotator(msgEl, mesId);
-        return `Message #${mesId} annotated.`;
+        return isAnnotated(mesId) ? `Message #${mesId} annotated.` : `Message #${mesId} could not be annotated.`;
     },
     helpString: 'Polyglot: annotate a message for study. Omit mesid to annotate the last message.',
     namedArgumentList: [
@@ -207,10 +207,9 @@ SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         }),
     ],
 }));
-// ═ /pg-lookup
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({
     name: 'pg-lookup',
-    callback: async (args, value) => {
+    callback: async (_args, value) => {
         const word = value?.trim();
         if (!word)
             return 'Please provide a word. Example: /pg-lookup hablar';
@@ -227,7 +226,6 @@ SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         }),
     ],
 }));
-// ═ /pg-panel
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({
     name: 'pg-panel',
     callback: async (args) => {
