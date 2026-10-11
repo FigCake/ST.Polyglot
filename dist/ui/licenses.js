@@ -9,7 +9,7 @@ import { el, notify, showDocument } from '../ui.manager.js';
 const NOTICES_URL = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);
 const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
 /** Markdown (the subset the notices use) → elements. */
-export function renderNotices(markdown) {
+function renderNotices(markdown) {
     const root = el('div', { className: 'pg-licenses' });
     const lines = markdown.replace(/\r/g, '').split('\n');
     let text = [];

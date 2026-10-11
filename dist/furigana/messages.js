@@ -19,10 +19,11 @@ import { getSettings, getLang, ai } from '../runtime.js';
 import { notify, askInput } from '../ui.manager.js';
 import { t } from '../i18n.js';
 import { plainText } from '../plain-text.js';
+import { skippedRanges, subtractRanges, maskRanges } from '../study-scope.js';
 import { setLayer, hasLayer, messagesWith, resetLayers, untilRendered, cancelUntilRendered } from '../ui/message-decor.js';
 import { fetchReadings } from './request.js';
 import { drawRuby, stripRuby } from './render.js';
-import { hasKanji, isKana, textHash, toHiragana } from './model.js';
+import { hasKanji, isKana, kanjiChunks, textHash, toHiragana } from './model.js';
 /** Saved readings by message index: one entry per text the message has shown (older saves: a single entry). */
 const store = chatValue(KEY.furigana);
 const KEEP_PER_MESSAGE = 6;
@@ -58,13 +59,17 @@ function show(mesId, readings) {
 }
 const hide = (mesId) => setLayer(mesId, 'furigana', null);
 // ── Generating ────────────────────────────────────────────────────────────────
-/** Fetches, saves and shows readings for a message. Quiet = automatic: no notices except errors. */
-async function generate(mesId, text, quiet, lines) {
+/**
+ * Fetches, saves and shows readings for a message. Quiet = automatic: no
+ * notices except errors. Skipped parts (study-scope.ts) are not sent.
+ */
+async function generate(mesId, text, quiet, lines, skipped = []) {
     const chatId = currentChatId();
     const abort = new AbortController();
     requests.set(mesId, abort);
+    const ranges = lines ?? (skipped.length ? subtractRanges(kanjiChunks(maskRanges(text, skipped)), skipped) : undefined);
     try {
-        const { spans, uncovered } = await fetchReadings(text, ai, abort.signal, lines);
+        const { spans, uncovered } = await fetchReadings(text, ai, abort.signal, ranges);
         if (abort.signal.aborted || chatId !== currentChatId())
             return;
         // The message may have changed while we waited
@@ -107,7 +112,7 @@ export async function showFuriganaFor(mesId, lines) {
         show(mesId, ready);
         return;
     }
-    await generate(mesId, text, false, lines);
+    await generate(mesId, text, false, lines, skippedRanges(textEl));
 }
 /** The message's analysis was removed or stopped: cancel and hide its readings (kept saved). */
 export function hideFuriganaFor(mesId) {
@@ -202,7 +207,7 @@ export function autoFurigana(mesId) {
                 show(mesId, ready);
             return;
         }
-        await generate(mesId, text, true);
+        await generate(mesId, text, true, undefined, skippedRanges(textEl));
     });
 }
 /** A swiped message shows other text: its readings and request go; readings saved per text stay. */

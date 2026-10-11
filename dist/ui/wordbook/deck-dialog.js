@@ -64,7 +64,7 @@ function runDialog(fileName, pkg, types) {
                         <div class="pg-anki-map">${TARGETS.map(target => html `
                             <label>
                                 <span>${t(TARGET_LABEL[target])}</span>
-                                <select class="text_pole" data-target="${target}">
+                                <select class="pg-set-select" data-target="${target}">
                                     <option value="-1">${t('anki.none')}</option>
                                     ${type.fields.map((f, i) => html `<option value="${i}" ${mapping[target] === i && html `selected`}>${f}</option>`)}
                                 </select>

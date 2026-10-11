@@ -18,7 +18,7 @@ const fail = (why) => { throw new ZstdError(`zstd: ${why}`); };
 const highBit = (n) => 31 - Math.clz32(n);
 // ── Output ────────────────────────────────────────────────────────────────────
 /** Largest output zstdDecompress produces by default. */
-export const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
+const MAX_OUTPUT_BYTES = 512 * 1024 * 1024;
 /** A growing byte buffer, up to `max` bytes; matches copy from what was written before. */
 class Output {
     max;

@@ -50,10 +50,16 @@ export const DEFAULT_SETTINGS = Object.freeze({
     auto_save_idioms: true,
     dialogue_only: false,
     wordbook_scope: 'chat',
+    wordbook_lang_only: true,
     furigana_enabled: true,
     furigana_display: 'show',
     furigana_size: 0.65,
     furigana_auto: false,
+    skip_names: true,
+    skip_words: '',
+    skip_tags: 'status, info',
+    skip_blocks: true,
+    skip_brackets: true,
     // Learner data (wordbook, sets, wrong answers) is not a setting — see data-store.ts
 });
 const LEGACY_PROVIDER_MAP = {

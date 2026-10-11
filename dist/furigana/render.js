@@ -9,7 +9,7 @@
 // is skipped. Text in <code> / <pre> is left alone.
 import { plainTextNodes } from '../plain-text.js';
 import { DECOR_CLASS } from '../ui/message-decor.js';
-export const RUBY_CLASS = 'pg-ruby';
+const RUBY_CLASS = 'pg-ruby';
 function rubyElement(base, reading, index) {
     const ruby = document.createElement('ruby');
     ruby.className = `${RUBY_CLASS} ${DECOR_CLASS}`;

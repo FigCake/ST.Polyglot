@@ -8,12 +8,14 @@
 
 - **Input Assistant** — Translate or grammar-check your input before sending (🌍 button)
 - **Annotation** — Highlight vocabulary by CEFR level and grammar patterns on any AI message
+- **Leave out of study** — Status windows and metadata (tags such as `<status>`, code blocks, folded boxes, `[bracket]` lines) are not analysed, and character, persona and group-member names are never highlighted or saved as words; JS-Slash-Runner frontends and hidden text are always left out. Set in Extensions → Polyglot, with a check of what the last message sends
 - **Tap to Translate** — Double-click a sentence (mouse), or select text and tap **Translate sentence** (touch), for an inline translation with verb forms; ask for a deeper sentence analysis from there
 - **Quick Lookup** — Select any word to get its dictionary form, POS, IPA, and meaning
-- **Wordbook + SRS** — Save words and review them with SM-2 spaced repetition. One shared wordbook, viewable per chat or across all chats. Merge duplicates, fill missing meanings with AI re-analysis, organise words into sets
+- **Wordbook + SRS** — Save words and review them with SM-2 spaced repetition. One shared wordbook, viewable per chat or across all chats, and per study language. Merge duplicates, fill missing meanings with AI re-analysis, organise words into sets
 - **Import / Export** — Anki decks (`.apkg` / `.colpkg`, with sounds and images), CSV, and a TXT file for flashcard apps
 - **Furigana (Japanese)** — Readings over kanji with message analysis (📖) and on word cards, flashcards and the PDF deck; click a reading to correct it
-- **Study Modes** — Flashcards, quiz, cloze, reading exam, a weak-points exam built from saved wrong answers, conjugation drill, match, speaking
+- **Study Modes** — Flashcards, quiz, cloze, typed grammar gaps, reading exam, a weak-points exam built from saved wrong answers, conjugation drill, match, speaking
+- **Writing practice** — Exam-style tasks at your CEFR level (letter or email, opinion text, a scene from your chat), rated on task, organisation, accuracy and range, with corrections and a model answer
 - **PDF Export** — Print-ready A5 flashcard deck, with the conjugation tables you have opened at the end
 - **Slash commands** — `/pg-check`, `/pg-annotate`, `/pg-lookup <word>`, `/pg-panel`
 - **Themes** — Dark, light, breeze and milk; docked or floating panel

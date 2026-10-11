@@ -18,6 +18,8 @@ import { renderFlashcard } from '../../features/flashcard.js';
 import { renderSpeaking } from '../../features/speaking.js';
 import { renderMatchSetup } from '../../features/match.js';
 import { runMiniQuiz, runClozeQuiz, runReadingExam, runConjDrill, runTargetedExam, } from '../../features/quiz.js';
+import { runTypedGrammar } from '../../features/typed-quiz.js';
+import { renderWriting, leaveWriting } from '../../features/writing.js';
 // ── Feature wiring ────────────────────────────────────────────────────────────
 /** Starts a mic session and tracks it, so leaving the mode or closing the panel stops the microphone. */
 function pronounce(target, micBtn, resultEl, onSettled) {
@@ -36,13 +38,22 @@ const QUIZ_VARIANTS = [
     { id: 'quick', icon: '⚡', title: 'qz.modeQuick', desc: 'qz.modeQuickDesc', run: c => runMiniQuiz(c, quizDeps, 3, 5) },
     { id: 'full', icon: '📝', title: 'qz.modeFull', desc: 'qz.modeFullDesc', run: c => runMiniQuiz(c, quizDeps, 6, 20) },
     { id: 'cloze', icon: '✏️', title: 'qz.modeCloze', desc: 'qz.modeClozeDesc', run: c => runClozeQuiz(c, quizDeps) },
+    { id: 'typed', icon: '⌨️', title: 'qz.modeTyped', desc: 'qz.modeTypedDesc', run: c => runTypedGrammar(c, quizDeps) },
     { id: 'exam', icon: '🎓', title: 'qz.modeExam', desc: 'qz.modeExamDesc', run: c => runReadingExam(c, quizDeps) },
     { id: 'conj', icon: '🔀', title: 'qz.modeConj', desc: 'qz.modeConjDesc', run: c => runConjDrill(c, quizDeps) },
-    { id: 'targeted', icon: '🎯', title: 'qz.modeTargeted', desc: 'qz.modeTargetedDesc', run: c => runTargetedExam(c, quizDeps) },
+    { id: 'targeted', icon: '🎯', title: 'qz.modeTargeted', desc: 'qz.modeTargetedDesc', run: c => runTargetedExam(c, quizDeps), wide: true },
 ];
 function renderQuizPicker(container) {
     setHtml(container, html `
-        <div class="pg-quiz-modes">${QUIZ_VARIANTS.map(v => html `
+        <div class="pg-quiz-modes">${QUIZ_VARIANTS.map(v => v.wide ? html `
+            <button class="pg-quiz-mode-btn pg-quiz-mode-wide" data-quiz="${v.id}">
+                <span class="pg-qmode-icon">${v.icon}</span>
+                <span class="pg-qmode-text">
+                    <span class="pg-qmode-title">${t(v.title)}</span>
+                    <span class="pg-qmode-desc">${t(v.desc)}</span>
+                </span>
+                <span class="pg-qmode-count">${t('qz.wrongCount', { n: wrongAnswersData().length })}</span>
+            </button>` : html `
             <button class="pg-quiz-mode-btn" data-quiz="${v.id}">
                 <span class="pg-qmode-icon">${v.icon}</span>
                 <span class="pg-qmode-title">${t(v.title)}</span>
@@ -70,6 +81,7 @@ const MODES = [
         }),
     },
     { id: 'quiz', icon: '🎯', key: 'pnl.learn.quiz', render: renderQuizPicker },
+    { id: 'write', icon: '✍️', key: 'pnl.learn.write', render: c => renderWriting(c, quizDeps) },
     { id: 'match', icon: '🎮', key: 'pnl.learn.match', render: renderMatchSetup },
     {
         id: 'speak', icon: '🎤', key: 'pnl.learn.speak',
@@ -118,6 +130,7 @@ export class LearnTab {
         });
         const inner = Object.assign(document.createElement('div'), { className: 'pg-learn-mode-inner' });
         abortActiveRecognition();
+        leaveWriting();
         this.mode.replaceChildren(back, inner);
         this.setActive(id);
         mode.render(inner);
@@ -126,6 +139,7 @@ export class LearnTab {
         if (this.mode.hidden)
             return;
         abortActiveRecognition();
+        leaveWriting();
         this.mode.replaceChildren();
         this.setActive(null);
     }

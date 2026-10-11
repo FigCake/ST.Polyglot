@@ -17,7 +17,7 @@ import { notify, escapeHtml } from './ui.manager.js';
 import { downloadText } from './export/download.js';
 import { t } from './i18n.js';
 import { chatValue, currentChatId } from './storage.js';
-import { inScope, tagChat, mergeWordbooks, removeChats, removeWords, moveChats, chatOverview, findDuplicates, mergeGroup, editEntry, } from './wordbook-model.js';
+import { inScope, inLang, langKey, langsOf, tagChat, tagLang, mergeWordbooks, removeChats, removeWords, moveChats, chatOverview, findDuplicates, mergeGroup, editEntry, } from './wordbook-model.js';
 // ── Wordbook read / write ─────────────────────────────────────────────────────
 /** Every chat's words, as a live array: mutate, then saveWordbook(). Use scopedWordbook() for display. */
 export function loadWordbook() {
@@ -29,12 +29,34 @@ export function saveWordbook(wordbook) {
 export const currentScope = () => getSettings().wordbook_scope ?? 'chat';
 /** Whether words can be shown across chats (not when each chat stores its own words). */
 export const isShared = () => storeMode() !== 'chat';
-/** Entries in the chosen scope: the open chat's words, or all of them. */
+/** The current study language as entries store it. */
+export const studyLangKey = () => langKey(getLang());
+/** The study language lists are limited to, or null when the setting is off. */
+export const langFilter = () => (getSettings().wordbook_lang_only === false ? null : studyLangKey());
+/**
+ * Entries in the chosen scope: the open chat's words, or all of them — and,
+ * with "only this language's words" on, those saved under the study language.
+ */
 export function scopedWordbook(scope = currentScope()) {
-    if (!isShared())
-        return loadWordbook();
+    const lang = langFilter();
     const chatId = currentChatId();
-    return loadWordbook().filter(e => inScope(e, scope, chatId));
+    return loadWordbook().filter(e => inLang(e, lang) && (!isShared() || inScope(e, scope, chatId)));
+}
+/** Words saved before languages were recorded (shown in every language). */
+export const wordsWithoutLang = () => loadWordbook().filter(e => !langsOf(e).length).length;
+/** Whether any word belongs only to other study languages (so the language filter hides something). */
+export const otherLangWords = () => {
+    const lang = studyLangKey();
+    return loadWordbook().some(e => langsOf(e).length > 0 && !langsOf(e).includes(lang));
+};
+/** Files every word without a language under the current study language. Returns how many. */
+export function adoptWordsWithoutLang() {
+    const lang = studyLangKey();
+    const wordbook = loadWordbook();
+    const n = wordbook.filter(e => !langsOf(e).length && tagLang(e, lang)).length;
+    if (n)
+        saveWordbook(wordbook);
+    return n;
 }
 function forget(deleted) {
     deleted.forEach(deleteConjCache);
@@ -125,8 +147,8 @@ export async function clearAllConjCache() {
 }
 // ── Word sets CRUD ────────────────────────────────────────────────────────────
 export function getSets() { return setsData(); }
-export function saveSets(sets) { replaceUserData({ sets }); }
-export function newSetId() { return 'set_' + Date.now() + '_' + Math.random().toString(36).slice(2); }
+function saveSets(sets) { replaceUserData({ sets }); }
+function newSetId() { return 'set_' + Date.now() + '_' + Math.random().toString(36).slice(2); }
 export function createSet(name) {
     const sets = getSets();
     const id = newSetId();
@@ -166,7 +188,8 @@ export function addToWordbook(wordData, { quiet = false } = {}) {
     const existing = wordbook.find(w => w.word === canonical);
     if (existing) {
         const tagged = tagChat(existing, chatId);
-        if (tagged)
+        // Met again while studying another language: it belongs to that one too
+        if (tagLang(existing, studyLangKey()) || tagged)
             saveWordbook(wordbook);
         if (!quiet)
             notify(t(tagged ? 'wb.addedToChat' : 'wb.alreadyIn', { word: canonical }), 'info');
@@ -193,6 +216,7 @@ export function addToWordbook(wordData, { quiet = false } = {}) {
             && { collocations: wordData.collocations.filter((c) => typeof c === 'string') }),
         setIds: [],
         chats: chatId ? [chatId] : [],
+        langs: [studyLangKey()],
         dateAdded: new Date().toISOString(),
         conj_cached: !!conjData,
         srs_interval: SRS_CFG.initialInterval,

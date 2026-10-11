@@ -12,7 +12,7 @@ import { getContext } from '../../../../extensions.js';
 import { SECRET_KEYS, secret_state } from '../../../../secrets.js';
 // ── Provider config tables ────────────────────────────────────────────────────
 /** Polyglot provider key → ST chat_completion_source value. */
-export const PROVIDER_SOURCE = {
+const PROVIDER_SOURCE = {
     openai: 'openai',
     claude: 'claude',
     google: 'makersuite',

@@ -30,7 +30,7 @@ import { userData, replaceUserData, storeMode } from './data-store.js';
 import { cleanData, mergeUserData, list, num } from './user-data.js';
 import { isRecord } from './ai/client.js';
 export const BACKUP_FORMAT = 'polyglot-backup';
-export const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 1;
 /** Settings keys that hold data (backed up separately), the API key, or where AI requests go. */
 const NOT_SETTINGS = new Set([
     '_wordbook', '_sets', 'saved_wrong_answers',

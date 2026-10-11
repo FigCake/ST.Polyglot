@@ -8,7 +8,7 @@ const BLUR_SAVE_DELAY = 150;
 export function isNoteEditorOpen(editor) {
     return !editor.hidden;
 }
-export function closeNoteEditor({ editor, preview }) {
+function closeNoteEditor({ editor, preview }) {
     editor.hidden = true;
     editor.replaceChildren();
     if (preview)

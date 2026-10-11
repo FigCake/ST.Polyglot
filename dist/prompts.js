@@ -1,7 +1,7 @@
 // All AI prompt builders. Pure string functions: no side effects, no DOM, no API calls.
 // ── Language helpers ──────────────────────────────────────────────────────────
 /** Language-specific rules for finding a word's base form (annotatorPrompt, quickLookupPrompt). */
-export function baseFormRule(lang) {
+function baseFormRule(lang) {
     const l = lang.toLowerCase();
     if (['spanish', 'espanol', 'español', 'portuguese', 'português'].some(x => l.includes(x)))
         return 'dictionary form — verbs as infinitive (e.g. "hablar"/"falar"), nouns with definite article (e.g. "el libro"/"o livro", "la casa"/"a casa"), adjectives in masculine singular (e.g. "alto")';
@@ -45,11 +45,14 @@ Return ONLY valid JSON (no markdown, no extra text):
 Text:
 <text>${text}</text>`;
 }
-export function annotatorPrompt(text, lang, level, nativeLang) {
+export function annotatorPrompt(text, lang, level, nativeLang, names = []) {
     const rule = baseFormRule(lang);
     const reading = readingField(lang, 'the BASE FORM');
+    const skip = names.length ? `- Do not list these names or words; they are not vocabulary: ${names.join(', ')}\n` : '';
     return `You are a meticulous language tutor. Analyze the following ${lang} text for a CEFR ${level} learner.
 IMPORTANT: Analyze the ENTIRE text. Identify AT LEAST 30 items if the text is long enough.
+Study only the story: narration and dialogue. Skip status windows, stat blocks, trackers, UI panels,
+time/location headers and other metadata, however they are formatted.
 
 Task 1: Words/verbs/adjectives/phrases harder than or equal to ${level}.
 - "word": exact word/phrase as it appears in text
@@ -58,7 +61,7 @@ Task 1: Words/verbs/adjectives/phrases harder than or equal to ${level}.
 - "meaning": dictionary meaning of the BASE FORM in ${nativeLang}
 - "context_meaning": meaning of THIS SPECIFIC WORD as used in this sentence in ${nativeLang}
 - "level": A1-C2
-${reading[0]}
+${skip}${reading[0]}
 Task 2: Key grammar patterns.
 - "pattern": exact substring
 - "meaning": meaning in ${nativeLang}
@@ -105,6 +108,7 @@ ${types}
 
 Rules:
 - Each question MUST reference actual words or sentences from the text.
+- Use only the story (narration and dialogue), never status windows, stats or other metadata.
 - Distractors must be plausible but clearly wrong.
 - question: ask in ${nativeLang}.
 - explanation: explain WHY the answer is correct and why the others are wrong (${nativeLang}, 2-3 sentences).
@@ -536,4 +540,73 @@ Return ONLY:
 { "passages": [ { "i": 0, "words": "暗闇=くらやみ 中=なか 放たれる=はなたれる" } ] }
 
 ${blocks}`;
+}
+// ── Exam-style writing and typed grammar ──────────────────────────────────────
+const WRITING_KIND = {
+    letter: `a letter or email answering a concrete situation (an invitation, a complaint, a request, news to a friend…). Say who writes to whom and why; the register (formal or informal) follows from the situation.`,
+    opinion: `a text giving and supporting an opinion on a topic (an article, a forum post, a review or an essay). At A1–A2 make it a simple text about the learner's own life, likes and plans instead.`,
+    scene: `an in-story text based on the conversation below: a message, letter or diary entry the learner's character writes about what happened. Keep names and situations from the story.`,
+};
+/** A writing task like the ones language exams set at the learner's CEFR level. */
+export function writingTaskPrompt(kind, lang, level, nativeLang, length, scene = '') {
+    return `You are an examiner writing a ${lang} writing task for a CEFR ${level} learner whose native language is ${nativeLang}.
+Model it on the writing tasks standardised ${lang} exams set at ${level}, without copying any real exam.
+
+The task: ${WRITING_KIND[kind]}
+Length: ${length}.
+
+Rules:
+- "title": a short title in ${lang}.
+- "instructions": the task in ${lang}, 2–4 sentences, at a level a ${level} learner reads easily.
+- "points": 3–4 things the text must include, in ${lang}.
+- "register": "formal", "informal" or "neutral".
+- "instructions_native": the instructions and points translated into ${nativeLang}, one short paragraph.
+${scene && `\nThe conversation (use it only as the story):\n<conversation>\n${scene}\n</conversation>\n`}
+Return ONLY:
+{ "title": "", "instructions": "", "points": ["", ""], "register": "", "instructions_native": "" }`;
+}
+/** Rates a learner's text the way exam raters do: four criteria, 0–3 each. */
+export function writingFeedbackPrompt(task, text, lang, level, nativeLang, length) {
+    return `You are an experienced rater of ${lang} writing exams. Rate this text by a CEFR ${level} learner whose native language is ${nativeLang}, as raters of standardised exams do.
+
+Task: ${task.instructions}
+Must include: ${task.points.join(' / ') || '—'}
+Register: ${task.register}. Length asked: ${length}.
+
+Score each criterion from 0 to 3 against what ${level} requires (3 = fully meets ${level}, 2 = mostly, 1 = partly, 0 = not at all):
+- "task": the points are covered, the register and text type fit, the length is about right.
+- "coherence": ideas are clear, ordered and linked with connectors fitting ${level}.
+- "accuracy": grammar, vocabulary, spelling and punctuation are correct for ${level}.
+- "range": variety and precision of vocabulary and structures expected at ${level}.
+
+Rules:
+- "level": the CEFR level the text actually shows (A1–C2).
+- "summary": 2–3 sentences in ${nativeLang}: what works, what most needs work.
+- "corrected": the whole text corrected, changing only what is wrong or clearly unnatural; keep the learner's ideas and style.
+- "errors": each correction — "original" (the exact words from the text), "correction", "type" (grammar | vocabulary | spelling | punctuation | register | style), "explanation" (one sentence in ${nativeLang}).
+- "model": a model answer to the same task in ${lang} at ${level}, within the length asked.
+
+Text:
+<text>${text}</text>
+
+Return ONLY:
+{ "scores": { "task": 0, "coherence": 0, "accuracy": 0, "range": 0 }, "level": "", "summary": "",
+  "corrected": "", "errors": [{ "original": "", "correction": "", "type": "", "explanation": "" }], "model": "" }`;
+}
+/** One-gap grammar questions with typed answers, like the grammar sections of language exams. */
+export function typedGrammarPrompt(lang, level, nativeLang, count = 10, context = '') {
+    return `You are an expert ${lang} tutor writing the grammar section of a ${lang} exam for a CEFR ${level} learner whose native language is ${nativeLang}.
+Create exactly ${count} fill-in-the-gap questions the learner answers by TYPING the missing form — like the grammar tasks standardised ${lang} exams use at ${level}.
+
+Cover the grammar these exams test at ${level}, spread over different points: verb forms (tense, mood, aspect, conjugation), agreement, prepositions or particles, articles or cases, pronouns, connectors, word formation — whichever matter in ${lang} at ${level}.
+
+Rules:
+- "sentence": a natural ${lang} sentence with exactly one gap written ___ (three underscores). The gap is one word or a short form (at most 3 words).
+- "hint": in parentheses, what goes in the gap so only one form fits: the base word (e.g. "(venir)", "(食べる)", "(beautiful)") or the kind of word (e.g. "(preposition)").
+- "answers": every correct fill, exactly as it would be written. For Japanese, include both the kanji and the kana spelling when both are common.
+- "point": the grammar point in ${nativeLang}, 2–5 words.
+- "explanation": why, in ${nativeLang}, one or two sentences.
+${context && `\nWhere natural, use words and situations from this conversation:\n<conversation>\n${context}\n</conversation>\n`}
+Return ONLY:
+{ "questions": [{ "sentence": "", "hint": "", "answers": [""], "point": "", "explanation": "" }] }`;
 }

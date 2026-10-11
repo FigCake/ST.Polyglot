@@ -1,5 +1,6 @@
-// The Wordbook tab: this-chat / all-chats switch, search, level pills, set
-// picker, selection toolbar, the word list and the set manager.
+// The Wordbook tab: search, level pills, set picker, selection toolbar, the
+// word list and the set manager. Which words it lists (this chat, the study
+// language) is set in the panel settings.
 //
 //   ui/wordbook/filters.ts      filter state → visible entries (pure)
 //   ui/wordbook/list.ts         the rows and their actions
@@ -16,8 +17,8 @@ import { levelLabel } from '../utils.js';
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { askConfirm, askInput } from '../ui.manager.js';
-import { getSets, createSet, deleteSet, removeFromWordbook, currentScope, isShared, addToWordbook as addEntry } from '../wordbook.js';
-import { getSettings, updateSettings } from '../runtime.js';
+import { getSets, createSet, deleteSet, removeFromWordbook, currentScope, isShared, langFilter, otherLangWords, addToWordbook as addEntry, } from '../wordbook.js';
+import { getSettings, getLang } from '../runtime.js';
 import { currentChatId } from '../storage.js';
 import { toggleReanalysis } from './reanalysis-bar.js';
 import { emptyFilter } from './wordbook/filters.js';
@@ -31,21 +32,8 @@ const filter = emptyFilter();
 const LEVEL_PILLS = [...LEVEL_FILTERS, 'sentence'];
 let pane = null;
 // ── Markup ────────────────────────────────────────────────────────────────────
-/** "This chat | All chats" — only meaningful while a chat is open. */
-function scopeSwitch() {
-    if (!currentChatId() || !isShared())
-        return false;
-    const scope = currentScope();
-    return html `
-    <div class="pg-wb-scope" role="group" aria-label="${t('wb.scopeLabel')}">${['chat', 'all'].map(s => html `
-        <button class="pg-wb-scope-btn ${scope === s && 'active'}" data-action="scope" data-scope="${s}" aria-pressed="${scope === s}">
-            ${t(s === 'chat' ? 'wb.scopeChat' : 'wb.scopeAll')}
-        </button>`)}
-    </div>`;
-}
 const toolbar = (sets) => html `
     <div class="pg-reanalysis-bar pg-wb-reanalysis-bar" hidden></div>
-    ${scopeSwitch()}
 
     <div class="pg-wb-search-row">
         <input type="search" class="pg-wb-search-inp" placeholder="${t('wb.searchPh')}" value="${filter.query}" aria-label="${t('wb.searchPh')}">
@@ -126,8 +114,14 @@ function renderListOnly(root) {
     };
     const counts = renderList(list, ctx);
     const count = root.querySelector('.pg-wb-count');
-    if (count)
-        count.textContent = countLabel(counts, filter);
+    // Say what the settings limit the list to: the study language (when other
+    // languages have words) and the open chat
+    const limits = [
+        langFilter() && otherLangWords() ? getLang() : '',
+        currentChatId() && isShared() && currentScope() === 'chat' ? t('wb.scopeChat') : '',
+    ].filter(Boolean);
+    if (count instanceof HTMLElement)
+        count.title = count.textContent = [countLabel(counts, filter), ...limits].join(' · ');
     updateSelection(root);
 }
 const ACTIONS = {
@@ -136,10 +130,6 @@ const ACTIONS = {
         const el = root.querySelector('.pg-wb-dupes');
         if (el)
             showDuplicates(el, () => renderListOnly(root));
-    },
-    'scope': (root, el) => {
-        updateSettings({ wordbook_scope: el.dataset.scope === 'all' ? 'all' : 'chat' });
-        renderWordbook(root);
     },
     'level': (root, el) => {
         filter.level = el.dataset.level ?? 'all';

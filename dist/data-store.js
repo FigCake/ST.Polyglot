@@ -26,7 +26,7 @@ import { t } from './i18n.js';
 import { readUserFile, writeUserFile } from './user-files.js';
 import { mediaIn, releaseMedia } from './media-files.js';
 import { emptyData, hasData, mergeUserData, parseData, rebaseUserData, serializeData, } from './user-data.js';
-export const DATA_FILE = 'polyglot-data.json';
+const DATA_FILE = 'polyglot-data.json';
 /** One-time copy of the settings data, written before the first migration. */
 const MIGRATION_COPY = 'polyglot-data-before-migration.json';
 const SAVE_DELAY_MS = 800;

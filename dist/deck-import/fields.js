@@ -35,9 +35,9 @@ export function mediaRefs(html) {
 }
 // ── Anki furigana: 漢字[かんじ] ───────────────────────────────────────────────
 const FURIGANA = / ?([^\s[\]]+?)\[([^\]]+)\]/g;
-export const hasFurigana = (text) => /[^\s[\]]\[[^\]]+\]/.test(text);
+const hasFurigana = (text) => /[^\s[\]]\[[^\]]+\]/.test(text);
 /** Ruby HTML as Anki furigana: <ruby>漢字<rt>かんじ</rt></ruby> → 漢字[かんじ] (then read by splitFurigana). */
-export const rubyToFurigana = (html) => html.replace(/<ruby\b[^>]*>([\s\S]*?)<\/ruby>/gi, (_, inner) => inner
+const rubyToFurigana = (html) => html.replace(/<ruby\b[^>]*>([\s\S]*?)<\/ruby>/gi, (_, inner) => inner
     .replace(/<rp\b[^>]*>[\s\S]*?<\/rp>/gi, '')
     .replace(/([^<]*)<rt\b[^>]*>([\s\S]*?)<\/rt>/gi, (_m, base, rt) => `${base.trim()}[${rt.trim()}]`));
 /** "食[た]べる" → { text: "食べる", reading: "たべる" } (plain text: reading = ''). */

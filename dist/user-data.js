@@ -10,7 +10,7 @@ import { SRS as SRS_CFG } from './constants.js';
 import { mergeWordbooks, mergeEntries, rebaseEntry } from './wordbook-model.js';
 import { isRecord } from './ai/client.js';
 export const DATA_FORMAT = 'polyglot-data';
-export const DATA_VERSION = 1;
+const DATA_VERSION = 1;
 export const emptyData = () => ({ wordbook: [], sets: [], wrongAnswers: [] });
 export const hasData = (d) => d.wordbook.length > 0 || d.sets.length > 0 || d.wrongAnswers.length > 0;
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@ function cleanEntry(v) {
         level: typeof v.level === 'string' ? v.level : '',
         setIds: strings(v.setIds),
         chats: strings(v.chats),
+        ...(v.langs !== undefined && { langs: strings(v.langs) }),
         srs_interval: num(v.srs_interval, SRS_CFG.initialInterval),
         srs_ease: num(v.srs_ease, SRS_CFG.defaultEase),
         srs_due: num(v.srs_due, 0),

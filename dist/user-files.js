@@ -35,7 +35,7 @@ function assertName(name) {
         throw new Error(`Invalid user file name: ${name}`);
 }
 /** Bytes (or UTF-8 text) → base64, in chunks (spreading a large array into fromCharCode overflows the stack). */
-export function toBase64(data) {
+function toBase64(data) {
     const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
     let binary = '';
     for (let i = 0; i < bytes.length; i += 0x8000) {

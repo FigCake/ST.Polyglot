@@ -1,0 +1,146 @@
+// Typed grammar quiz (⌨️ in the quiz modes): one-gap sentences the learner
+// completes by typing the form, like the grammar sections of language exams,
+// at the learner's CEFR level. Answers are graded on the device.
+//
+//   generate (AI, once) ─▶ type + Enter per card ─▶ correct / near miss / wrong
+//   ─▶ score, retry the wrong ones, save them to the wrong-answer list
+//
+// Design rules:
+//   • No direct ST state reads — everything comes through QuizDeps.
+//   • Questions pass through acceptTypedQuestions(); grading is gradeTyped().
+import { html, setHtml } from '../html.js';
+import { t } from '../i18n.js';
+import { typedGrammarPrompt } from '../prompts.js';
+import { cleanRawMessage } from '../study-scope.js';
+import { unionBy } from '../ai/client.js';
+import { acceptTypedQuestions, gradeTyped, BLANK } from './writing-model.js';
+import { startSession } from './quiz.js';
+const COUNT = 10;
+/** Recent chat used as a theme for the sentences (status windows left out). */
+const CONTEXT_MESSAGES = 4;
+const CONTEXT_MAX_CHARS = 2000;
+function chatContext(deps) {
+    const s = deps.getSettings();
+    const text = (deps.getContext().chat ?? [])
+        .map(m => cleanRawMessage(m.mes ?? '', s))
+        .filter(Boolean)
+        .slice(-CONTEXT_MESSAGES)
+        .join('\n');
+    return text.slice(-CONTEXT_MAX_CHARS);
+}
+const skeleton = () => html `${[0, 1, 2].map(() => html `
+    <div class="pg-skeleton-quiz pg-skeleton">
+        <div class="pg-skeleton-line pg-skeleton"></div>
+        <div class="pg-skeleton-q pg-skeleton"></div>
+    </div>`)}`;
+function card(q, i) {
+    const [before, after] = q.sentence.split(BLANK);
+    return html `
+        <div class="pg-quiz-card pg-typed-card" data-idx="${i}">
+            ${q.point && html `<div class="pg-quiz-type-badge">${q.point}</div>`}
+            <div class="pg-quiz-q">
+                Q${i + 1}. ${before}<input class="pg-soft-input pg-typed-input" type="text" autocomplete="off"
+                    spellcheck="false" autocapitalize="off" aria-label="${q.hint || t('qz.typedBlank')}">${after}
+                ${q.hint && html `<span class="pg-typed-hint">${q.hint}</span>`}
+            </div>
+            <div class="pg-quiz-exp" hidden>
+                <span class="pg-quiz-correct-label">${t('qz.typedAnswer', { answer: q.answers.join(' / ') })}</span>
+                <span class="pg-typed-close" hidden>${t('qz.typedClose')}</span><br>
+                ${q.explanation}
+            </div>
+        </div>`;
+}
+function saveWrong(q, deps) {
+    const saved = deps.wrongAnswers();
+    const question = `${q.sentence} ${q.hint}`.trim();
+    if (saved.some(w => w.question === question))
+        return;
+    deps.saveWrongAnswers([...saved, {
+            type: 'grammar', question, options: [], answer: q.answers[0], explanation: q.explanation, savedAt: Date.now(),
+        }]);
+}
+function render(container, deps, questions, signal, isRetry = false) {
+    setHtml(container, html `
+        ${isRetry && html `<div class="pg-quiz-retry-header">${t('qz.retryHeader')}</div>`}
+        ${questions.map((q, i) => card(q, i))}
+        <div class="pg-quiz-score" hidden></div>`);
+    const wrong = [];
+    let answered = 0;
+    const check = (input) => {
+        const cardEl = input.closest('.pg-typed-card');
+        if (!cardEl || cardEl.classList.contains('pg-answered') || !input.value.trim())
+            return;
+        const i = Number(cardEl.dataset.idx);
+        const grade = gradeTyped(input.value, questions[i].answers);
+        cardEl.classList.add('pg-answered');
+        input.readOnly = true;
+        input.classList.add(grade === 'correct' ? 'pg-typed-ok' : 'pg-typed-bad');
+        cardEl.querySelector('.pg-quiz-exp')?.removeAttribute('hidden');
+        if (grade === 'close')
+            cardEl.querySelector('.pg-typed-close')?.removeAttribute('hidden');
+        if (grade !== 'correct')
+            wrong.push(i);
+        // On to the next unanswered card
+        const next = [...container.querySelectorAll('.pg-typed-input')].find(x => !x.readOnly);
+        next?.focus({ preventScroll: false });
+        if (++answered === questions.length)
+            showScore(container, deps, questions, wrong.sort((a, b) => a - b), signal);
+    };
+    container.addEventListener('keydown', e => {
+        const input = e.target;
+        if (e.key !== 'Enter' || e.isComposing || !input.matches?.('.pg-typed-input'))
+            return;
+        e.preventDefault();
+        check(input);
+    }, { signal });
+    container.querySelector('.pg-typed-input')?.focus({ preventScroll: true });
+}
+function showScore(container, deps, questions, wrong, signal) {
+    const scoreEl = container.querySelector('.pg-quiz-score');
+    if (!scoreEl)
+        return;
+    scoreEl.hidden = false;
+    setHtml(scoreEl, html `
+        <div class="pg-score-text">${questions.length - wrong.length} / ${questions.length} correct</div>
+        ${wrong.length
+        ? html `<button class="pg-btn pg-btn-secondary pg-btn-full pg-quiz-retry">${t('qz.retry', { n: wrong.length })}</button>`
+        : html `<div class="pg-score-perfect">${t('qz.allCorrect')}</div>`}`);
+    scoreEl.querySelector('.pg-quiz-retry')?.addEventListener('click', () => {
+        render(container, deps, wrong.map(i => questions[i]), startSession(container), true);
+    });
+    for (const i of wrong) {
+        const exp = container.querySelector(`.pg-typed-card[data-idx="${i}"] .pg-quiz-exp`);
+        if (!exp)
+            continue;
+        const btn = Object.assign(document.createElement('button'), {
+            className: 'pg-btn pg-btn-secondary pg-quiz-save-btn', textContent: t('qz.saveWrong'),
+        });
+        btn.addEventListener('click', () => {
+            saveWrong(questions[i], deps);
+            btn.textContent = t('qz.wrongSaved');
+            btn.disabled = true;
+        }, { signal });
+        exp.after(btn);
+    }
+}
+/** Ten typed grammar questions at the learner's level, themed on the recent chat when there is one. */
+export async function runTypedGrammar(container, deps) {
+    const signal = startSession(container);
+    setHtml(container, skeleton());
+    try {
+        const { data } = await deps.ai.json({
+            prompt: typedGrammarPrompt(deps.getLang(), deps.getSettings().cefr_level, deps.getNativeLang(), COUNT, chatContext(deps)),
+            signal,
+            accept: acceptTypedQuestions,
+            merge: unionBy(q => q.sentence),
+        });
+        if (signal.aborted)
+            return;
+        render(container, deps, data, signal);
+    }
+    catch (e) {
+        if (signal.aborted)
+            return;
+        setHtml(container, html `<div class="pg-error-msg">${t('qz.genFail', { msg: e instanceof Error ? e.message : String(e) })}</div>`);
+    }
+}

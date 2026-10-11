@@ -127,8 +127,6 @@ export function kanjiGaps(text, spans, from = 0, to = text.length) {
     }
     return gaps;
 }
-/** The uncovered kanji runs as strings. */
-export const uncoveredKanji = (text, spans, from = 0, to = text.length) => kanjiGaps(text, spans, from, to).map(g => text.slice(g.start, g.end));
 /**
  * A compact word list "暗闇=くらやみ 放=はな …" (space-separated surface=reading),
  * or the array form [["暗闇","くらやみ"], …]. Malformed entries are skipped.

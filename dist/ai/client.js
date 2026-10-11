@@ -29,7 +29,7 @@ export class AiResponseError extends Error {
         this.name = 'AiResponseError';
     }
 }
-export const JSON_SYSTEM_PROMPT = 'You are a precise language analysis assistant. Always respond with valid JSON only. ' +
+const JSON_SYSTEM_PROMPT = 'You are a precise language analysis assistant. Always respond with valid JSON only. ' +
     'No preamble, no markdown fences, no extra text.';
 const RETRY_NOTE = {
     truncated: '\n\nIMPORTANT: your previous reply was cut off before the JSON was complete. ' +

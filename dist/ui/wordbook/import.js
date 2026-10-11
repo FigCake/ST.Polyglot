@@ -15,8 +15,8 @@ import { notify } from '../../ui.manager.js';
 import { t } from '../../i18n.js';
 import { getNativeLang } from '../../runtime.js';
 import { currentChatId } from '../../storage.js';
-import { tagChat } from '../../wordbook-model.js';
-import { loadWordbook, saveWordbook, createSet, deleteSet, splitCsvLines } from '../../wordbook.js';
+import { tagChat, tagLang } from '../../wordbook-model.js';
+import { loadWordbook, saveWordbook, createSet, deleteSet, splitCsvLines, studyLangKey } from '../../wordbook.js';
 import { restoreFromFile } from '../backup-ui.js';
 import { importAnkiFile } from './deck-dialog.js';
 import { fieldText } from '../../deck-import/fields.js';
@@ -101,7 +101,7 @@ export function parseWordbookFile(text) {
  * Adds the file's rows to a new set named after the file. Words already in the
  * wordbook are only added to that set. Returns the set, or null if nothing changed.
  */
-export function importWordbookFile(text, filename) {
+function importWordbookFile(text, filename) {
     const rows = parseWordbookFile(text);
     const setName = filename.replace(/\.(csv|txt)$/i, '');
     if (!rows.length) {
@@ -120,7 +120,8 @@ export function importWordbookFile(text, filename) {
             const inSet = existing.setIds.includes(setId);
             if (!inSet)
                 existing.setIds.push(setId);
-            if (tagChat(existing, chatId) || !inSet)
+            const langTagged = tagLang(existing, studyLangKey());
+            if (tagChat(existing, chatId) || !inSet || langTagged)
                 updated++;
             continue;
         }
@@ -129,6 +130,7 @@ export function importWordbookFile(text, filename) {
             meaning_lang: getNativeLang() || undefined,
             setIds: [setId],
             chats: chatId ? [chatId] : [],
+            langs: [studyLangKey()],
             dateAdded: new Date().toISOString(),
             srs_interval: SRS_CFG.initialInterval,
             srs_ease: SRS_CFG.defaultEase,

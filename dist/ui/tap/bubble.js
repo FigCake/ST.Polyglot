@@ -88,7 +88,7 @@ export function closeBubble(bubble) {
     bubble.remove();
 }
 /** The open bubble in a message, if any. */
-export function bubbleIn(textEl) {
+function bubbleIn(textEl) {
     return textEl.querySelector('.pg-tap-bubble');
 }
 /**

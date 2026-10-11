@@ -18,7 +18,7 @@ import { migrateChatWordbook } from './wordbook.js';
 import { refreshWordbook } from './ui/wordbook-ui.js';
 import { initDataStore, onDataReplaced, storeMode } from './data-store.js';
 import { notify } from './ui.manager.js';
-import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, } from './annotator.js';
+import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, redrawAnnotations, } from './annotator.js';
 import { t } from './i18n.js';
 import { setupPlainCopy } from './plain-text.js';
 import { restoreFurigana, restoreFuriganaWithRetry, autoFurigana, forgetFurigana, resetFuriganaState, applyFuriganaDisplay, onFuriganaSettingChange, setupReadingEditor, } from './furigana/messages.js';
@@ -165,6 +165,9 @@ function onToggle(name, handler) {
             document.getElementById('pg-wand-btn')?.remove();
     });
     document.addEventListener('pg:language-change', onFuriganaSettingChange);
+    // Lists may be limited to the study language
+    document.addEventListener('pg:language-change', refreshWordbook);
+    document.addEventListener('pg:study-scope-change', redrawAnnotations);
     onToggle('pg:annotator-toggle', on => {
         if (on)
             injectAnnotateButtons();

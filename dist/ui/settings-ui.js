@@ -1,5 +1,5 @@
 // The Polyglot drawer in SillyTavern's Extensions settings: features, languages,
-// CEFR level, AI provider / model, max tokens.
+// CEFR level, what to leave out of study, AI provider / model, max tokens.
 //
 //   • Plain inputs carry data-setting="<key>" and are saved by one delegated
 //     handler (data-trim trims the value first); side effects of a change live
@@ -16,6 +16,7 @@ import { getSettings, saveSettings, getContext, getLang } from '../runtime.js';
 import { isJapanese } from '../utils.js';
 import { clearAllConjCache } from '../wordbook.js';
 import { ST_SEL } from '../st-dom.js';
+import { studiedText, skippedNames } from '../study-scope.js';
 const TOKENS = { min: 500, max: 100_000, step: 500, fallback: 4000 };
 const CUSTOM_MODEL = '__custom__';
 const LANGUAGES = [
@@ -37,6 +38,43 @@ const field = (label, control) => html `
     <div class="flex-container flexGap5 pg-set-field"><label>${label}</label>${control}</div>`;
 const textInput = (setting, value, placeholder, extra) => html `
     <input type="text" class="text_pole" data-setting="${setting}" data-trim value="${value}" placeholder="${placeholder}" autocomplete="off" spellcheck="false" ${extra}>`;
+const checkbox = (setting, on, label, hint) => html `
+    <label class="checkbox_label" title="${hint}"><input type="checkbox" data-setting="${setting}" ${on && html `checked`}><span>${label}</span></label>`;
+// ── Leave out of study ────────────────────────────────────────────────────────
+function skipRows(s) {
+    return html `
+        <div class="pg-set-field"><b>${t('set.skipHead')}</b></div>
+        <div class="flex-container flexGap5 pg-set-field">
+            ${checkbox('skip_names', s.skip_names, t('set.skipNames'), t('set.skipNamesHint'))}
+            ${checkbox('skip_blocks', s.skip_blocks, t('set.skipBlocks'), t('set.skipBlocksHint'))}
+            ${checkbox('skip_brackets', s.skip_brackets, t('set.skipBrackets'), t('set.skipBracketsHint'))}
+        </div>
+        ${field(t('set.skipTags'), textInput('skip_tags', s.skip_tags, 'status, info', html `title="${t('set.skipTagsHint')}"`))}
+        ${field(t('set.skipWords'), textInput('skip_words', s.skip_words, t('set.skipWordsPh')))}
+        <div class="pg-set-field">
+            <div class="menu_button pg-skip-preview-btn">${t('set.skipPreview')}</div>
+        </div>
+        <div class="pg-skip-preview" hidden></div>`;
+}
+/** Shows what 📖 would send for the last AI message, and which names are left out. */
+function previewSkip(root) {
+    const out = root.querySelector('.pg-skip-preview');
+    if (!out)
+        return;
+    out.hidden = false;
+    const textEl = [...document.querySelectorAll(`${ST_SEL.aiMes} ${ST_SEL.mesText}`)].pop();
+    const names = skippedNames();
+    const namesRow = names.length ? html `<div class="pg-skip-preview-names">${t('set.skipPreviewNames', { list: names.join(', ') })}</div>` : html ``;
+    if (!textEl) {
+        setHtml(out, html `<div>${t('set.skipPreviewNone')}</div>${namesRow}`);
+        return;
+    }
+    const studied = studiedText(textEl, !!getSettings().dialogue_only);
+    setHtml(out, html `
+        <div>${t('set.skipPreviewCount', { n: studied.skipped.length })}</div>
+        <div class="pg-skip-preview-text">${studied.text}</div>
+        ${namesRow}`);
+}
 // ── Provider block ────────────────────────────────────────────────────────────
 function stRows(s) {
     const override = !!(s.route_chat_source || s.route_model);
@@ -140,6 +178,9 @@ function panel(s) {
                 ${field(t('set.cefrLevel'), html `<select class="text_pole" data-setting="cefr_level">${options(CEFR_LEVELS.map(l => [l, l]), s.cefr_level)}</select>`)}
 
                 <hr class="pg-set-divider">
+                ${skipRows(s)}
+
+                <hr class="pg-set-divider">
                 ${field(t('set.aiProvider'), html `
                     <select class="text_pole pg-provider-select">${options(PROVIDERS.map(([v, l]) => [v, l || t('set.stDefault')]), s.provider)}</select>`)}
                 <div class="pg-provider-detail"></div>
@@ -166,6 +207,12 @@ function languageChanged(root) {
     show(root, '.pg-furi-toggle', isJapanese(getLang()));
     document.dispatchEvent(new CustomEvent('pg:language-change'));
 }
+/** Highlights follow the names and parts to skip; typing redraws once it pauses. */
+let scopeTimer;
+function studyScopeChanged() {
+    clearTimeout(scopeTimer);
+    scopeTimer = setTimeout(() => document.dispatchEvent(new CustomEvent('pg:study-scope-change')), 400);
+}
 /** What else must happen when a setting changes. */
 const SETTING_EFFECTS = {
     enabled_checker: (_, on) => document.dispatchEvent(new CustomEvent('pg:checker-toggle', { detail: { on } })),
@@ -180,6 +227,11 @@ const SETTING_EFFECTS = {
     language_custom: root => languageChanged(root),
     furigana_enabled: () => document.dispatchEvent(new CustomEvent('pg:language-change')),
     native_lang: (root, value) => show(root, '.pg-native-custom', value === 'custom'),
+    skip_names: studyScopeChanged,
+    skip_words: studyScopeChanged,
+    skip_tags: studyScopeChanged,
+    skip_blocks: studyScopeChanged,
+    skip_brackets: studyScopeChanged,
     route_chat_source: root => renderLiveConnection(root),
     route_model: root => renderLiveConnection(root),
 };
@@ -263,6 +315,7 @@ function bind(root) {
         else if (el.type === 'text' || el.type === 'password')
             handle(e);
     });
+    root.querySelector('.pg-skip-preview-btn')?.addEventListener('click', () => previewSkip(root));
     root.addEventListener('change', e => {
         const el = e.target;
         if (el.matches('.pg-tokens[type="number"]'))

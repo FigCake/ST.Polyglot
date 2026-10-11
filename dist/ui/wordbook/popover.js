@@ -3,7 +3,7 @@ import { html, setHtml } from '../../html.js';
 const EDGE = 8;
 let current = null;
 let outsideClickBound = false;
-export function hidePopover() {
+function hidePopover() {
     current?.el.remove();
     current = null;
 }

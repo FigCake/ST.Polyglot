@@ -7,11 +7,13 @@
 // highlights use — stay the same.
 import { plainText, plainTextNodes } from '../plain-text.js';
 import { dialogueLines } from '../dialogue.js';
+import { skippedRanges, maskRanges } from '../study-scope.js';
 import { DECOR_CLASS } from './message-decor.js';
 export const LINE_CLASS = 'pg-dlg';
 /** Marks the dialogue lines. */
 export function drawDialogue(textEl) {
-    const lines = dialogueLines(plainText(textEl));
+    // Quotes inside skipped parts (a status window…) are not dialogue
+    const lines = dialogueLines(maskRanges(plainText(textEl), skippedRanges(textEl)));
     if (!lines.length)
         return;
     let offset = 0;

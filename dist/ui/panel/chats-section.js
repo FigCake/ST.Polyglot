@@ -12,7 +12,6 @@ function render(el) {
     setHtml(el, html `
         <div class="pg-chats-head">
             <span class="pg-pset-label">${t('pnl.set.chats')}</span>
-            <span class="pg-pset-hint">${t('pnl.set.chatsHint')}</span>
         </div>
         ${groups.length ? html `
         <ul class="pg-chats-list">${groups.map(g => html `

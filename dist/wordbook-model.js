@@ -1,9 +1,11 @@
-// Pure wordbook operations: chat tags, scope, merging, per-chat overview.
+// Pure wordbook operations: chat and language tags, scope, merging, per-chat overview.
 //
 // One shared wordbook holds every entry. `entry.chats` lists the chats the
 // word was collected in; an entry with no chats is "unsorted" (saved while no
 // chat was open, or from an old global wordbook). The UI shows either the
-// open chat's words or all of them (WordbookScope).
+// open chat's words or all of them (WordbookScope). `entry.langs` lists the
+// study languages it was saved under in the same way; an entry without one
+// (saved before languages were recorded) shows in every language.
 //
 // No DOM, no storage — unit-tested.
 /** Key of the "no chat" group in overviews and chat selections. */
@@ -13,6 +15,11 @@ export const chatsOf = (e) => e.chats ?? [];
 export function inScope(e, scope, chatId) {
     return scope === 'all' || !chatId || chatsOf(e).includes(chatId);
 }
+export const langsOf = (e) => e.langs ?? [];
+/** How a study language is stored on entries ("Italian" and " italian" are one language). */
+export const langKey = (lang) => lang.trim().toLowerCase();
+/** Whether the entry belongs to study language `lang` (no filter: null; no recorded language: every one). */
+export const inLang = (e, lang) => !lang || !langsOf(e).length || langsOf(e).includes(lang);
 /** Group key of each chat the entry belongs to (UNSORTED when it has none). */
 const groupsOf = (e) => (chatsOf(e).length ? chatsOf(e) : [UNSORTED]);
 // ── Tags ──────────────────────────────────────────────────────────────────────
@@ -24,6 +31,13 @@ export function tagChat(e, chatId) {
     if (!chatId || chatsOf(e).includes(chatId))
         return false;
     e.chats = [...chatsOf(e), chatId];
+    return true;
+}
+/** Adds a study-language tag; returns true when it was missing. */
+export function tagLang(e, lang) {
+    if (!lang || langsOf(e).includes(lang))
+        return false;
+    e.langs = [...langsOf(e), lang];
     return true;
 }
 // ── Merging ───────────────────────────────────────────────────────────────────
@@ -51,6 +65,7 @@ export function mergeEntries(a, b) {
         ...merged,
         setIds: union(a.setIds, b.setIds),
         chats: union(a.chats, b.chats),
+        langs: union(a.langs, b.langs),
         collocations: a.collocations?.length ? a.collocations : b.collocations,
         notes: joinNotes(a.notes, b.notes),
         dateAdded: earliest(a.dateAdded, b.dateAdded),
@@ -63,7 +78,7 @@ export function mergeEntries(a, b) {
     };
 }
 const SRS_FIELDS = ['srs_interval', 'srs_ease', 'srs_due', 'srs_streak', 'srs_reviewed_at'];
-const LIST_FIELDS = new Set(['setIds', 'chats']);
+const LIST_FIELDS = new Set(['setIds', 'chats', 'langs']);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /** A list after both sides' additions and removals since `base`. */
 function rebaseList(base = [], local = [], server = []) {

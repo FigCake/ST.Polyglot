@@ -10,11 +10,11 @@ import { getSettings, updateSettings, getLang } from '../../runtime.js';
 import { html, setHtml } from '../../html.js';
 import { askConfirm, notify } from '../../ui.manager.js';
 import { t } from '../../i18n.js';
-import { loadWordbook, saveWordbook, scopedWordbook, isShared, clearAllConjCache, exportToCSV, exportToFlashcardTxt } from '../../wordbook.js';
+import { loadWordbook, saveWordbook, scopedWordbook, isShared, currentScope, wordsWithoutLang, adoptWordsWithoutLang, clearAllConjCache, exportToCSV, exportToFlashcardTxt, } from '../../wordbook.js';
 import { exportToPDF } from '../../export/pdf.js';
 import { getAllConjEntries } from '../../conj-cache.js';
 import { clearCurrentChatAnnotations } from '../../annotator.js';
-import { triggerImport, reanalyseAll } from '../wordbook-ui.js';
+import { triggerImport, reanalyseAll, refreshWordbook } from '../wordbook-ui.js';
 import { saveBackup } from '../backup-ui.js';
 import { applyPanelTheme, findPanelEl, setFloating } from './chrome.js';
 import { mountChatsSection } from './chats-section.js';
@@ -91,6 +91,16 @@ function render(s) {
                 ✨ ${t('wb.reanalyse')}
             </button>
             <div class="pg-reanalysis-bar" hidden></div>
+            ${isShared() && html `
+            <label class="pg-pset-row">
+                <span class="pg-pset-label">${t('pnl.set.chatOnly')}</span>
+                <input type="checkbox" class="pg-pset-check pg-scope-check" ${currentScope() === 'chat' && html `checked`}>
+            </label>`}
+            ${toggleRow('wordbook_lang_only', t('pnl.set.langOnly', { lang: getLang() }), s.wordbook_lang_only !== false)}
+            ${wordsWithoutLang() > 0 && html `
+            <button class="pg-btn pg-btn-secondary pg-btn-block" data-action="adopt-lang">
+                ${t('pnl.set.adoptLang', { n: wordsWithoutLang(), lang: getLang() })}
+            </button>`}
             ${isShared() && html `<div class="pg-pset-chats"></div>`}
             <div class="pg-pset-hint pg-pset-store">${t('data.where')}: ${t(STORE_LABELS[storeMode()])}</div>`)}
 
@@ -181,6 +191,14 @@ const ACTIONS = {
     'reset-srs': () => confirmed(t('pnl.set.resetSrsConfirm'), t('pnl.set.resetSrs'), resetSrs),
     'clear-conj': () => confirmed(t('pnl.set.clearConjConfirm'), t('pnl.set.clearConj'), clearAllConjCache),
     'clear-chat': () => confirmed(t('pnl.set.clearChatConfirm'), t('pnl.set.clearChat'), clearCurrentChatAnnotations),
+    'adopt-lang': async (_root, btn) => {
+        const n = wordsWithoutLang();
+        if (!await askConfirm(t('pnl.set.adoptLangConfirm', { n, lang: getLang() }), { yes: t('pnl.set.adoptLangYes'), no: t('wb.editCancel') }))
+            return;
+        notify(t('pnl.set.adoptLangDone', { n: adoptWordsWithoutLang(), lang: getLang() }), 'info', 3000);
+        btn.remove();
+        refreshWordbook();
+    },
 };
 /** Side effects that must follow a settings change for it to be visible immediately. */
 const SETTING_EFFECTS = {
@@ -190,6 +208,7 @@ const SETTING_EFFECTS = {
     panel_bg_image: applyPanelTheme,
     panel_floating: on => { const panel = findPanelEl(); if (panel)
         setFloating(panel, !!on); },
+    wordbook_lang_only: () => refreshWordbook(),
 };
 function readInput(el) {
     if (el instanceof HTMLInputElement && el.type === 'checkbox')
@@ -225,5 +244,10 @@ export function buildSettingsTab() {
         onSettingChange(e); });
     root.addEventListener('change', e => { if (e.target.type !== 'text')
         onSettingChange(e); });
+    // On (the default): the wordbook, study modes and exports use the open chat's words; off: all chats'
+    root.querySelector('.pg-scope-check')?.addEventListener('change', e => {
+        updateSettings({ wordbook_scope: e.target.checked ? 'chat' : 'all' });
+        refreshWordbook();
+    });
     return root;
 }

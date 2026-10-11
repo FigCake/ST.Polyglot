@@ -23,13 +23,15 @@ import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { sanitizeQuestions } from './quiz-sanitize.js';
 import { acceptList, unionBy } from '../ai/client.js';
+import { cleanRawMessage } from '../study-scope.js';
 const TARGETED_SAMPLE = 5;
 /** Combines two cut-off question lists, dropping repeats. */
 const sameQuestion = unionBy(q => q.question.trim().toLowerCase());
 // ── Sessions ──────────────────────────────────────────────────────────────────
 const sessions = new WeakMap();
 /** Cancels the container's previous quiz (request + listeners) and starts a new one. */
-function startSession(container) {
+/** Starts a quiz in `container`, ending the one running there (any quiz variant). */
+export function startSession(container) {
     sessions.get(container)?.abort();
     const session = new AbortController();
     sessions.set(container, session);
@@ -162,7 +164,10 @@ async function generate(container, deps, opts, signal = startSession(container))
  */
 export async function runMiniQuiz(container, deps, historyCount = UI.quizHistoryMessages, questionCount = 5) {
     const signal = startSession(container);
-    const messages = (deps.getContext().chat ?? []).filter(m => m.mes?.trim());
+    // Status windows and other skipped parts are not part of the conversation
+    const messages = (deps.getContext().chat ?? [])
+        .map(m => ({ name: m.name, mes: cleanRawMessage(m.mes ?? '', deps.getSettings()) }))
+        .filter(m => m.mes);
     if (messages.length < 2) {
         setHtml(container, message('empty', t('qz.noMessages')));
         return;

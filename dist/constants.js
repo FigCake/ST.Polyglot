@@ -81,14 +81,14 @@ export const SRS = {
 };
 // ── Native-language tags ───────────────────────────────────────────────────────
 // BCP-47 short tags for the supported UI / explanation languages.
-export const NATIVE_LANG_TAG = {
+const NATIVE_LANG_TAG = {
     Korean: 'ko',
     English: 'en',
     Italian: 'it',
     Spanish: 'es',
 };
 /** Human-readable language name used inside AI prompts. */
-export const NATIVE_LANG_LABEL = {
+const NATIVE_LANG_LABEL = {
     ko: 'Korean',
     en: 'English',
     it: 'Italian',

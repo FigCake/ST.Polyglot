@@ -22,7 +22,7 @@ const ROLE_CLASS = {
 /** Chip widths are estimated from text length (the SVG is drawn before layout). */
 const ARC = { gap: 8, charWidth: 8.5, chipPadding: 16, minChip: 36, top: 4, lane: 14 };
 /** Positions one arc per token→head dependency; shorter arcs get lower lanes so they don't cross. */
-export function layoutArcs(tokens) {
+function layoutArcs(tokens) {
     const widths = tokens.map(tok => Math.max(String(tok.text ?? '').length * ARC.charWidth + ARC.chipPadding, ARC.minChip));
     const centers = [];
     let x = 0;

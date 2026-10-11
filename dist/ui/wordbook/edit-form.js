@@ -19,7 +19,7 @@ export function openEditForm(item, word, done) {
     const field = (name, label, value, wide = false) => html `
         <label class="pg-wb-edit-field ${wide && 'pg-wb-edit-wide'}">
             <span>${label}</span>
-            <input type="text" class="text_pole" name="${name}" value="${value ?? ''}" autocomplete="off" spellcheck="false">
+            <input type="text" class="pg-soft-input" name="${name}" value="${value ?? ''}" autocomplete="off" spellcheck="false">
         </label>`;
     item.classList.add('pg-wb-editing');
     setHtml(item, html `
@@ -31,21 +31,21 @@ export function openEditForm(item, word, done) {
             ${japanese ? field('reading', t('wb.fReading'), e.reading ?? e.ipa) : field('ipa', t('wb.fIpa'), e.ipa)}
             <label class="pg-wb-edit-field">
                 <span>${t('wb.fLevel')}</span>
-                <select class="text_pole" name="level">
+                <select class="pg-set-select" name="level">
                     <option value="" ${!e.level && html `selected`}>—</option>
                     ${LEVELS.map(l => html `<option value="${l}" ${e.level === l && html `selected`}>${levelLabel(l)}</option>`)}
                 </select>
             </label>
             <label class="pg-wb-edit-field">
                 <span>${t('wb.fPos')}</span>
-                <select class="text_pole" name="pos">
+                <select class="pg-set-select" name="pos">
                     <option value="" ${!e.pos && html `selected`}>—</option>
                     ${POS_TAGS.map(p => html `<option value="${p}" ${e.pos === p && html `selected`}>${p}</option>`)}
                 </select>
             </label>
             <div class="pg-wb-edit-actions">
-                <button type="button" class="pg-btn pg-btn-secondary" data-edit="cancel">${t('wb.editCancel')}</button>
-                <button type="submit" class="pg-btn pg-btn-primary">${t('wb.editSave')}</button>
+                <button type="button" class="pg-wb-row-btn" data-edit="cancel">${t('wb.editCancel')}</button>
+                <button type="submit" class="pg-btn pg-btn-primary pg-btn-compact">${t('wb.editSave')}</button>
             </div>
         </form>`);
     const form = item.querySelector('form');

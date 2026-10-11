@@ -20,7 +20,7 @@ const CENTRAL = 0x02014b50;
 const LOCAL = 0x04034b50;
 const MAX32 = 0xffffffff;
 /** Largest entry readEntry inflates by default (a collection or one media file). */
-export const MAX_ENTRY_BYTES = 512 * 1024 * 1024;
+const MAX_ENTRY_BYTES = 512 * 1024 * 1024;
 async function bytesOf(file, start, end) {
     return new DataView(await file.slice(start, end).arrayBuffer());
 }

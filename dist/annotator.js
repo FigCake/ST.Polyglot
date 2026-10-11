@@ -13,7 +13,8 @@
 //   • openLearningPanel is injected (setOpenPanelFn) — the panel layer imports
 //     this module's neighbours, so importing it here would create a cycle.
 //   • Highlighting only wraps text nodes; it never rewrites the message HTML.
-//   • Message text is read through plain-text.ts (no furigana readings).
+//   • Message text is read through plain-text.ts (no furigana readings), and
+//     what study-scope.ts skips (status windows, names) is neither sent nor highlighted.
 import { KEY, DELAY } from './constants.js';
 import { ST_SEL, mesSelector, mesIdOf, mesTextOf } from './st-dom.js';
 import { levelClass, findWord, entryList, withEntryFor } from './utils.js';
@@ -25,8 +26,8 @@ import { addToWordbook } from './wordbook.js';
 import { chatValue, currentChatId } from './storage.js';
 import { getSettings, getLang, getNativeLang, ai } from './runtime.js';
 import { acceptObject, unionBy } from './ai/client.js';
-import { readableText, plainText } from './plain-text.js';
-import { dialogueLines, dialogueText } from './dialogue.js';
+import { plainText } from './plain-text.js';
+import { studiedText, skippedNodes, skippedNames, wordSkipper } from './study-scope.js';
 import { drawDialogue, stripDialogue, LINE_CLASS } from './ui/dialogue-layer.js';
 import { showFuriganaFor, hideFuriganaFor, clearChatFurigana } from './furigana/messages.js';
 import { textHash } from './furigana/model.js';
@@ -78,12 +79,13 @@ function highlightClass(token) {
     // Words without a usable level get the hardest tier
     return tier === 'grammar' || tier === 'sentence' ? 'pg-hl-c' : `pg-hl-${tier[0].toLowerCase()}`;
 }
-/** Tokens to look for, longest first so phrases win over the words inside them. */
+/** Tokens to look for, longest first so phrases win over the words inside them. Names are not words to study. */
 function tokensOf(data) {
+    const skip = wordSkipper();
     return [
-        ...(data.hard_words ?? []).map(w => ({ type: 'word', text: w.word, data: w })),
+        ...(data.hard_words ?? []).filter(w => !skip(w.word, w.base_form)).map(w => ({ type: 'word', text: w.word, data: w })),
         ...(data.grammar_patterns ?? []).map(g => ({ type: 'grammar', text: g.pattern, data: g })),
-        ...(data.idioms ?? []).map(i => ({ type: 'idiom', text: i.phrase, data: i })),
+        ...(data.idioms ?? []).filter(i => !skip(i.phrase, i.base_form)).map(i => ({ type: 'idiom', text: i.phrase, data: i })),
     ]
         .filter(tok => typeof tok.text === 'string' && tok.text.length > 0)
         .sort((a, b) => b.text.length - a.text.length);
@@ -140,12 +142,14 @@ function textNodesIn(root) {
 }
 function highlight(textEl, data) {
     const tokens = tokensOf(data);
+    const skipped = skippedNodes(textEl);
     // Dialogue-only analyses highlight inside the dialogue lines only
-    const nodes = textNodesIn(textEl).filter(n => !data.dialogue || n.parentElement?.closest(`.${LINE_CLASS}`));
+    const nodes = textNodesIn(textEl)
+        .filter(n => !skipped.has(n) && (!data.dialogue || n.parentElement?.closest(`.${LINE_CLASS}`)));
     nodes.forEach(node => highlightTextNode(node, tokens));
 }
 /** Replaces highlight spans with plain text. */
-export function stripHighlightsFromEl(textEl) {
+function stripHighlightsFromEl(textEl) {
     textEl.querySelectorAll('.pg-clickable-word').forEach(span => span.replaceWith(span.textContent ?? ''));
     textEl.normalize();
 }
@@ -162,7 +166,7 @@ function show(msgEl, mesId, data) {
     annotateButton(msgEl)?.classList.add('pg-btn-active');
 }
 /** The user removes the message's analysis (📖 again): taken down and deleted, for this text only. */
-export function removeAnnotation(msgEl, mesId) {
+function removeAnnotation(msgEl, mesId) {
     const data = annotations.get(mesId);
     hideFuriganaFor(mesId);
     takeDown(mesId);
@@ -314,8 +318,9 @@ export function injectAnnotateButtons() {
 function saveIdioms(idioms = []) {
     if (getSettings().auto_save_idioms === false)
         return 0;
+    const skip = wordSkipper();
     return idioms
-        .filter(i => i.phrase?.trim() && i.meaning?.trim())
+        .filter(i => i.phrase?.trim() && i.meaning?.trim() && !skip(i.phrase, i.base_form))
         .map(i => addToWordbook({
         word: i.phrase, base_form: i.base_form?.trim() || i.phrase.trim(), meaning: i.meaning,
         meaning_lang: getNativeLang(), level: 'idiom', context_meaning: i.context_meaning,
@@ -330,6 +335,14 @@ function mergeAnnotations(preferred, other) {
         grammar_patterns: list(preferred.grammar_patterns, other.grammar_patterns, g => g.pattern),
         idioms: list(preferred.idioms, other.idioms, i => i.phrase),
     };
+}
+/** Draws the shown analyses again, e.g. after the names or parts to skip changed. */
+export function redrawAnnotations() {
+    for (const [mesId, data] of annotations) {
+        const msgEl = document.querySelector(mesSelector(mesId));
+        if (msgEl)
+            show(msgEl, mesId, data);
+    }
 }
 /** Whether the message is annotated now. */
 export const isAnnotated = (mesId) => annotations.has(mesId);
@@ -346,13 +359,15 @@ export async function runAnnotator(msgEl, mesId) {
         return;
     // "Dialogue only": the quoted lines are what gets studied
     const dialogue = !!getSettings().dialogue_only;
-    const plain = plainText(textEl);
-    const lines = dialogue ? dialogueLines(plain) : undefined;
+    const { text: studied, plain, lines } = studiedText(textEl, dialogue);
     if (lines && !lines.length) {
         notify(t('dlg.none'), 'info', 3000);
         return;
     }
-    const studied = lines ? dialogueText(plain, lines) : readableText(textEl);
+    if (!studied.trim()) {
+        notify(t('ann.allSkipped'), 'info', 3000);
+        return;
+    }
     const chatId = currentChatId();
     const hash = textHash(plain);
     const btn = annotateButton(msgEl);
@@ -364,7 +379,7 @@ export async function runAnnotator(msgEl, mesId) {
     const readings = showFuriganaFor(mesId, lines);
     try {
         const { data } = await ai.json({
-            prompt: annotatorPrompt(studied, getLang(), getSettings().cefr_level, getNativeLang()),
+            prompt: annotatorPrompt(studied, getLang(), getSettings().cefr_level, getNativeLang(), skippedNames()),
             signal: abort.signal,
             accept: (acceptObject),
             merge: mergeAnnotations,

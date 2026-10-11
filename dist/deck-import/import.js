@@ -13,7 +13,7 @@ import { currentChatId } from '../storage.js';
 import { storeMode } from '../data-store.js';
 import { writeUserFile } from '../user-files.js';
 import { existingMedia, inParallel, keepableMedia, noteUploaded } from '../media-files.js';
-import { loadWordbook, saveWordbook, getSets, createSet } from '../wordbook.js';
+import { loadWordbook, saveWordbook, getSets, createSet, studyLangKey } from '../wordbook.js';
 import { mergeWordbooks } from '../wordbook-model.js';
 // ── Media ─────────────────────────────────────────────────────────────────────
 const extOf = (name) => /\.([a-z0-9]+)$/i.exec(name)?.[1].toLowerCase() ?? '';
@@ -141,6 +141,7 @@ export function addRows(rows, fallbackDeck, media) {
             ...(r.image && media.has(r.image) && { image: media.get(r.image) }),
             setIds: [setId],
             chats: chatId ? [chatId] : [],
+            langs: [studyLangKey()],
             dateAdded: now,
             srs_interval: SRS_CFG.initialInterval,
             srs_ease: SRS_CFG.defaultEase,
