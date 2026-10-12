@@ -144,12 +144,15 @@ export const getNativeLang = () => getNativeLangFromSettings(getSettings());
 const client = createAiClient((system, user, signal) => complete(getSettings(), system, user, signal));
 /**
  * The shared AI client, bound to the current provider settings.
- * A result recovered from a cut-off reply is still returned, with a notice.
+ * A result recovered from a cut-off reply, or still missing fields after the
+ * retry, is still returned, with a notice.
  */
 export const ai = {
     async json(request) {
         const result = await client.json(request);
-        if (result.partial)
+        if (result.missing?.length)
+            notify(t('ai.missing'), 'warn', 5000);
+        else if (result.partial)
             notify(t('ai.partial'), 'warn', 4000);
         return result;
     },

@@ -26,6 +26,8 @@ function readingField(lang, of) {
         : ['', ''];
 }
 // ── Prompt builders ───────────────────────────────────────────────────────────
+/** The fields checkerPrompt asks for. */
+export const CHECKER_FIELDS = ['grammar', 'natural', 'explanation'];
 export function checkerPrompt(text, lang, level, nativeLang) {
     return `You are a ${lang} language tutor for CEFR ${level} learners.
 The user wants to express something in ${lang}.
@@ -208,6 +210,8 @@ Return ONLY valid JSON:
 For Section B questions set "passage" to the reading text. For Section A set "passage" to null.`;
 }
 /** Looks up one word; `context` is the surrounding sentence and may be empty. */
+/** The text fields quickLookupPrompt asks for ("reading" too for Japanese); "word_family" is a list. */
+export const lookupFields = (lang) => ['word', 'base_form', 'pos_info', 'meaning', 'context_meaning', 'level', ...(/japanese|日本語/i.test(lang) ? ['reading'] : [])];
 export function quickLookupPrompt(word, context, lang, level, nativeLang) {
     const rule = baseFormRule(lang);
     const reading = readingField(lang, 'the BASE FORM');
@@ -299,6 +303,8 @@ Return ONLY valid JSON — no preamble, no fences:
 }`;
 }
 /** A short example sentence for a flashcard, pitched at `level`, with a native-language translation. */
+/** The fields exampleSentencePrompt asks for. */
+export const EXAMPLE_FIELDS = ['sentence', 'translation', 'form'];
 export function exampleSentencePrompt(word, lang, level, nativeLang) {
     return `Create a short example sentence in ${lang} for a CEFR ${level} learner using the word "${word}".
 

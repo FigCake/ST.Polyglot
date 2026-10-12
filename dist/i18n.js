@@ -80,6 +80,7 @@ const EN = {
     'pnl.set.restoreNewer': 'This backup was made by a newer Polyglot version. Update the extension first.',
     // ── AI requests ───────────────────────────────────────────────────────────
     'ai.partial': 'Part of the AI reply was cut off — showing what could be recovered.',
+    'ai.missing': 'Some parts were missing from the AI reply, even after asking again: showing what came. Fill in or delete the rest yourself.',
     // ── Tabs ──────────────────────────────────────────────────────────────────
     'tab.wordbook': 'Wordbook',
     'tab.learn': 'Study',
@@ -627,6 +628,7 @@ const KO = {
     'pnl.set.restoreNewer': '더 새 버전의 Polyglot으로 만든 백업입니다. 확장 프로그램을 먼저 업데이트하세요.',
     // ── AI requests ───────────────────────────────────────────────────────────
     'ai.partial': 'AI 응답 일부가 잘려서, 복구된 부분만 표시합니다.',
+    'ai.missing': '다시 요청해도 AI 응답에 빠진 칸이 있어서, 받은 내용만 담았습니다. 나머지는 직접 채우거나 지워 주세요.',
     // ── Tabs ──────────────────────────────────────────────────────────────────
     'tab.wordbook': '단어장',
     'tab.learn': '학습',
@@ -1174,6 +1176,7 @@ const IT = {
     'pnl.set.restoreNewer': 'Questo backup proviene da una versione più recente di Polyglot. Aggiorna prima l\'estensione.',
     // ── AI requests ───────────────────────────────────────────────────────────
     'ai.partial': 'Parte della risposta dell\'AI è stata troncata: mostro ciò che è stato recuperato.',
+    'ai.missing': 'Anche dopo una nuova richiesta mancavano alcune parti nella risposta dell\'AI: mostro ciò che è arrivato. Completa o elimina il resto.',
     // ── Tabs ──────────────────────────────────────────────────────────────────
     'tab.wordbook': 'Vocabolario',
     'tab.learn': 'Studio',
@@ -1720,6 +1723,7 @@ const ES = {
     'pnl.set.restoreNewer': 'Esta copia es de una versión más reciente de Polyglot. Actualiza primero la extensión.',
     // ── AI requests ───────────────────────────────────────────────────────────
     'ai.partial': 'Parte de la respuesta de la IA se cortó: se muestra lo que se pudo recuperar.',
+    'ai.missing': 'Incluso tras volver a pedirla, a la respuesta de la IA le faltaban partes: se muestra lo que llegó. Completa o borra el resto.',
     // ── Tabs ──────────────────────────────────────────────────────────────────
     'tab.wordbook': 'Vocabulario',
     'tab.learn': 'Estudio',

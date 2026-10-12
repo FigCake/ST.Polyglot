@@ -25,7 +25,7 @@ import { t } from './i18n.js';
 import { addToWordbook } from './wordbook.js';
 import { chatValue, currentChatId } from './storage.js';
 import { getSettings, getLang, getNativeLang, ai, getContext } from './runtime.js';
-import { acceptObject, unionBy } from './ai/client.js';
+import { isRecord, unionBy, withEmptyFields } from './ai/client.js';
 import { plainText, shownTextHashes } from './plain-text.js';
 import { studiedText, skippedNodes, skippedNames, wordSkipper } from './study-scope.js';
 import { drawDialogue, stripDialogue, LINE_CLASS } from './ui/dialogue-layer.js';
@@ -336,6 +336,30 @@ function saveIdioms(idioms = []) {
         .filter(r => r === 'added').length;
 }
 /** Two cut-off analyses as one: every highlight either attempt found, without repeats. */
+/** The text fields annotatorPrompt asks for in each list's items; the first is the item's own text. */
+const ITEM_FIELDS = {
+    hard_words: ['word', 'base_form', 'pos_info', 'meaning', 'context_meaning', 'level'],
+    grammar_patterns: ['pattern', 'meaning', 'structure', 'words_used'],
+    idioms: ['phrase', 'base_form', 'meaning', 'context_meaning'],
+};
+/**
+ * The analysis as far as it can be shown: an item without its own text is
+ * dropped, other fields it lacks are left empty. Gaps are not asked for again
+ * (one would repeat the whole analysis); a reply with none of the lists is the
+ * wrong shape and is.
+ */
+export function acceptAnnotation(v) {
+    if (!isRecord(v) || !Object.keys(ITEM_FIELDS).some(k => Array.isArray(v[k])))
+        return null;
+    const items = (list, fields) => (Array.isArray(list) ? list : [])
+        .filter(x => isRecord(x) && typeof x[fields[0]] === 'string' && x[fields[0]].trim())
+        .map(x => withEmptyFields(x, fields));
+    return {
+        hard_words: items(v.hard_words, ITEM_FIELDS.hard_words),
+        grammar_patterns: items(v.grammar_patterns, ITEM_FIELDS.grammar_patterns),
+        idioms: items(v.idioms, ITEM_FIELDS.idioms),
+    };
+}
 function mergeAnnotations(preferred, other) {
     const list = (a, b, keyOf) => unionBy(keyOf)(a ?? [], b ?? []);
     return {
@@ -389,7 +413,7 @@ export async function runAnnotator(msgEl, mesId) {
         const { data } = await ai.json({
             prompt: annotatorPrompt(studied, getLang(), getSettings().cefr_level, getNativeLang(), skippedNames()),
             signal: abort.signal,
-            accept: (acceptObject),
+            accept: acceptAnnotation,
             merge: mergeAnnotations,
         });
         if (abort.signal.aborted || chatId !== currentChatId())

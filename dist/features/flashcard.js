@@ -13,7 +13,7 @@
 // Design rules:
 //   • ST state and runtime helpers come in through FlashDeps.
 //   • One delegated click handler per session; re-rendering a card never re-binds.
-import { exampleSentencePrompt } from '../prompts.js';
+import { exampleSentencePrompt, EXAMPLE_FIELDS } from '../prompts.js';
 import { shuffleArray } from '../utils.js';
 import { rubyWord, shownReading } from '../furigana/word.js';
 import { html, setHtml, raw } from '../html.js';
@@ -23,7 +23,7 @@ import { srsRate, previewDays, todaysCards, forecast, isNew, isFresh, isMissed, 
 import { logReview, newWordsToday } from '../study-log.js';
 import { cardKind, clozeOf, gradeWord } from '../card-kind.js';
 import { findWord } from '../utils.js';
-import { acceptObject } from '../ai/client.js';
+import { acceptObject, missingKeys } from '../ai/client.js';
 import { userFileUrl } from '../user-files.js';
 import { withoutSound } from '../word-sounds.js';
 import { speakButton } from '../speak-button.js';
@@ -90,6 +90,7 @@ async function loadExample(w, card, deps) {
             prompt: exampleSentencePrompt(w.base_form || w.word, deps.getLang(), deps.getSettings().cefr_level, deps.getNativeLang()),
             signal: request.signal,
             accept: (acceptObject),
+            missing: v => missingKeys(v, EXAMPLE_FIELDS),
         });
         const sentence = data.sentence?.trim();
         if (request.signal.aborted || !sentence)

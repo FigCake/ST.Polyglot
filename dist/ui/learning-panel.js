@@ -7,9 +7,9 @@
 import { openPanel, buildTabView } from '../ui.manager.js';
 import { abortActiveRecognition } from '../speech.js';
 import { t } from '../i18n.js';
-import { quickLookupPrompt } from '../prompts.js';
+import { quickLookupPrompt, lookupFields } from '../prompts.js';
 import { ai, getLang, getNativeLang, getSettings } from '../runtime.js';
-import { acceptObject } from '../ai/client.js';
+import { acceptObject, missingKeys, withEmptyFields } from '../ai/client.js';
 import { renderWordbook, unmountWordbook, addToWordbook, refreshWordbook } from './wordbook-ui.js';
 import { ignoreWords } from '../wordbook.js';
 import { LearnTab } from './panel/learn-tab.js';
@@ -91,13 +91,18 @@ export async function lookUpWord(word, context = '') {
     lookupRequest = request;
     openLearningPanel('learn', { type: 'loading', word });
     try {
+        const fields = lookupFields(getLang());
         const { data } = await ai.json({
             prompt: quickLookupPrompt(word, context, getLang(), getSettings().cefr_level, getNativeLang()),
             signal: request.signal,
             accept: (acceptObject),
+            missing: v => [...missingKeys(v, fields), ...(Array.isArray(v.word_family) ? [] : ['word_family'])],
         });
+        // Fields still missing stay empty (the word asked about stands in for its own)
+        const shown = withEmptyFields(data, fields);
+        shown.word_family = (Array.isArray(data.word_family) ? data.word_family : []).filter(f => typeof f?.form === 'string' && f.form.trim());
         if (!request.signal.aborted)
-            openLearningPanel('learn', { type: 'word', data: { ...data, level: data.level || 'B1' } });
+            openLearningPanel('learn', { type: 'word', data: { ...shown, word: shown.word || word } });
     }
     catch (e) {
         if (!request.signal.aborted)

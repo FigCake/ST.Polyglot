@@ -6,9 +6,9 @@
 // Design rules:
 //   • No direct ST state reads — settings, lang, the AI client and the archive are injected.
 //   • setWandBusy is injected so this module has no dependency on index.ts.
-import { checkerPrompt } from '../prompts.js';
+import { checkerPrompt, CHECKER_FIELDS } from '../prompts.js';
 import { notify } from '../ui.manager.js';
-import { acceptObject } from '../ai/client.js';
+import { acceptObject, missingKeys } from '../ai/client.js';
 import { t } from '../i18n.js';
 import { ST_SEL } from '../st-dom.js';
 /**
@@ -46,11 +46,15 @@ export async function runChecker(deps) {
             prompt: checkerPrompt(text, deps.getLang(), s.cefr_level, deps.getNativeLang()),
             signal: abort.signal,
             accept: (acceptObject),
+            missing: v => missingKeys(v, CHECKER_FIELDS),
         });
         if (abort.signal.aborted)
             return;
         const str = (v) => (typeof v === 'string' ? v.trim() : '');
         const grammar = str(result.grammar), natural = str(result.natural);
+        // Neither came, even when asked again: nothing to put in the box (the missing-fields notice says so)
+        if (!grammar && !natural)
+            return;
         const corrected = checkerText(text, grammar, natural);
         if (!corrected) {
             notify(t('chk.looksGood'), 'ok', 2000);
