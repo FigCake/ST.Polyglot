@@ -305,10 +305,11 @@ export function exampleSentencePrompt(word, lang, level, nativeLang) {
 Rules:
 - "sentence": one clear, natural ${lang} sentence (max 12 words) showing typical usage
 - "translation": natural ${nativeLang} translation of that sentence
+- "form": the word exactly as written in the sentence (inflected or conjugated if it is)
 - Difficulty should match CEFR ${level}
 
 Return ONLY valid JSON (no markdown, no extra text):
-{ "sentence": "...", "translation": "..." }`;
+{ "sentence": "...", "translation": "...", "form": "..." }`;
 }
 /** Full syntactic breakdown of a sentence: dependency tokens, grammar points and a summary. */
 export function deepAnalysisPrompt(sentence, lang, nativeLang) {

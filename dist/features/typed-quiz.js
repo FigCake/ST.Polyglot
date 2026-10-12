@@ -2,8 +2,13 @@
 // completes by typing the form, like the grammar sections of language exams,
 // at the learner's CEFR level. Answers are graded on the device.
 //
-//   generate (AI, once) ─▶ type + Enter per card ─▶ correct / near miss / wrong
-//   ─▶ score, retry the wrong ones, save them to the wrong-answer list
+//   generate (AI, once) ─▶ type + Enter (or the keyboard's Go / Done) per card,
+//   or "Grade all" ─▶ correct / near miss / wrong ─▶ score, retry the wrong
+//   ones, save them to the wrong-answer list
+//
+// Each gap is its own <form>, so the browser submits it on Enter or a phone
+// keyboard's Go / Done key (whose keydown may carry no "Enter", or come mid-
+// composition); a key handler alone missed those.
 //
 // Design rules:
 //   • No direct ST state reads — everything comes through QuizDeps.
@@ -39,8 +44,8 @@ function card(q, i) {
         <div class="pg-quiz-card pg-typed-card" data-idx="${i}">
             ${q.point && html `<div class="pg-quiz-type-badge">${q.point}</div>`}
             <div class="pg-quiz-q">
-                Q${i + 1}. ${before}<input class="pg-soft-input pg-typed-input" type="text" autocomplete="off"
-                    spellcheck="false" autocapitalize="off" aria-label="${q.hint || t('qz.typedBlank')}">${after}
+                Q${i + 1}. ${before}<form class="pg-typed-form"><input class="pg-soft-input pg-typed-input" type="text" autocomplete="off"
+                    spellcheck="false" autocapitalize="off" enterkeyhint="done" aria-label="${q.hint || t('qz.typedBlank')}"></form>${after}
                 ${q.hint && html `<span class="pg-typed-hint">${q.hint}</span>`}
             </div>
             <div class="pg-quiz-exp" hidden>
@@ -63,12 +68,14 @@ function render(container, deps, questions, signal, isRetry = false) {
     setHtml(container, html `
         ${isRetry && html `<div class="pg-quiz-retry-header">${t('qz.retryHeader')}</div>`}
         ${questions.map((q, i) => card(q, i))}
+        <button class="pg-btn pg-btn-primary pg-btn-full pg-typed-grade-all">${t('qz.typedGradeAll')}</button>
         <div class="pg-quiz-score" hidden></div>`);
     const wrong = [];
     let answered = 0;
-    const check = (input) => {
+    /** Grades one gap; an empty one only when `blankToo` ("Grade all" counts it wrong and shows the answer). */
+    const check = (input, blankToo = false) => {
         const cardEl = input.closest('.pg-typed-card');
-        if (!cardEl || cardEl.classList.contains('pg-answered') || !input.value.trim())
+        if (!cardEl || cardEl.classList.contains('pg-answered') || (!input.value.trim() && !blankToo))
             return;
         const i = Number(cardEl.dataset.idx);
         const grade = gradeTyped(input.value, questions[i].answers);
@@ -82,16 +89,25 @@ function render(container, deps, questions, signal, isRetry = false) {
             wrong.push(i);
         // On to the next unanswered card
         const next = [...container.querySelectorAll('.pg-typed-input')].find(x => !x.readOnly);
-        next?.focus({ preventScroll: false });
-        if (++answered === questions.length)
+        if (!blankToo)
+            next?.focus({ preventScroll: false });
+        if (++answered === questions.length) {
+            container.querySelector('.pg-typed-grade-all')?.remove();
             showScore(container, deps, questions, wrong.sort((a, b) => a - b), signal);
+        }
     };
-    container.addEventListener('keydown', e => {
-        const input = e.target;
-        if (e.key !== 'Enter' || e.isComposing || !input.matches?.('.pg-typed-input'))
+    container.addEventListener('submit', e => {
+        const form = e.target;
+        if (!form.matches?.('.pg-typed-form'))
             return;
         e.preventDefault();
-        check(input);
+        const input = form.querySelector('.pg-typed-input');
+        if (input)
+            check(input);
+    }, { signal });
+    container.querySelector('.pg-typed-grade-all')?.addEventListener('click', () => {
+        for (const input of container.querySelectorAll('.pg-typed-input'))
+            check(input, true);
     }, { signal });
     container.querySelector('.pg-typed-input')?.focus({ preventScroll: true });
 }

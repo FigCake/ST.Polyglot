@@ -4,7 +4,8 @@ import { dictUrl } from '../../constants.js';
 import { levelClass, levelLabel } from '../../utils.js';
 import { html, setHtml, raw } from '../../html.js';
 import { t } from '../../i18n.js';
-import { scopedWordbook } from '../../wordbook.js';
+import { scopedWordbook, loadWordbook } from '../../wordbook.js';
+import { askConfirm } from '../../ui.manager.js';
 import { getSettings, getLang } from '../../runtime.js';
 import { speak } from '../../speech.js';
 import { toggleNoteEditor } from './note-editor.js';
@@ -24,6 +25,26 @@ function saveButton(saved, label) {
         <button class="pg-btn pg-btn-primary pg-btn-full pg-detail-save" ${saved && html `disabled`}>
             ${saved ? t('det.saved') : label}
         </button>`;
+}
+/** A quiet button under the save button: never show this word again. */
+const ignoreButton = () => html `<button class="pg-detail-ignore" title="${t('wb.ignoreTip')}">${t('det.ignore')}</button>`;
+/**
+ * Wires the ignore button: ignores the word and its other forms, then says so
+ * in place. A saved word is deleted with its review progress, so that asks first.
+ */
+function bindIgnore(container, forms, actions) {
+    const words = [...new Set(forms.map(w => w?.trim()).filter((w) => !!w))];
+    const btn = container.querySelector('.pg-detail-ignore');
+    btn?.addEventListener('click', async () => {
+        // Saved in any chat: ignoring deletes it everywhere
+        const saved = loadWordbook().find(e => words.includes(e.word))?.word;
+        if (saved && !(await askConfirm(t('det.ignoreSaved', { word: saved }), { yes: t('wb.ignore') })))
+            return;
+        if (!btn.isConnected)
+            return;
+        actions.ignore(words);
+        setHtml(container, html `<div class="pg-empty-hint">${t('det.ignored')}</div>`);
+    });
 }
 /** Wires the save button: saves once, then shows "Saved". */
 function bindSave(container, entry, actions) {
@@ -89,7 +110,8 @@ function renderWord(container, w, actions) {
             </div>
         </div>`}
         ${entry && notesBlock(entry.notes)}
-        ${saveButton(!!entry, t('det.addWord'))}`);
+        ${saveButton(!!entry, t('det.addWord'))}
+        ${ignoreButton()}`);
     container.querySelector('.pg-speak-btn')?.addEventListener('click', () => speak(canonical, getLang(), entry?.audio));
     container.querySelector('.pg-det-family-chips')?.addEventListener('click', e => {
         const form = e.target.closest('[data-word]')?.dataset.word;
@@ -103,6 +125,7 @@ function renderWord(container, w, actions) {
     }, canonical));
     if (!entry)
         bindSave(container, w, actions);
+    bindIgnore(container, [w.word, w.base_form, entry?.word], actions);
 }
 function renderGrammar(container, g, actions) {
     const saved = isSaved(g.pattern);
@@ -127,7 +150,9 @@ function renderIdiom(container, idiom, actions) {
         ${base !== idiom.phrase && section(t('det.baseForm'), base)}
         ${section(t('det.meaning'), idiom.meaning, true)}
         ${section(t('det.context'), idiom.context_meaning)}
-        ${saveButton(saved, t('det.addToWb'))}`);
+        ${saveButton(saved, t('det.addToWb'))}
+        ${ignoreButton()}`);
+    bindIgnore(container, [idiom.phrase, base], actions);
     if (!saved)
         bindSave(container, {
             word: idiom.phrase, base_form: base, meaning: idiom.meaning, level: 'idiom', context_meaning: idiom.context_meaning,

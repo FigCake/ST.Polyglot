@@ -28,7 +28,7 @@ const strings = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string'
 export const num = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 /** Optional fields that must be text when present (anything else would break the views that read them). */
 const TEXT_FIELDS = ['meaning_lang', 'pos_info', 'pos', 'ipa', 'reading', 'notes', 'original_form', 'context_meaning',
-    'example', 'example_translation', 'audio', 'image', 'dateAdded'];
+    'example', 'example_translation', 'example_form', 'audio', 'image', 'dateAdded'];
 const SRS_NUMBERS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
     'srs_interval', 'srs_ease', 'srs_streak'];
 /** The entry without optional fields of the wrong type (a backup or chat metadata may hold anything). */
@@ -53,6 +53,8 @@ function typedFields(v) {
     }
     if ('conj_cached' in out && typeof out.conj_cached !== 'boolean')
         delete out.conj_cached;
+    if ('known' in out && out.known !== true)
+        delete out.known;
     return out;
 }
 /** Keeps entries with a word; repairs the fields every feature relies on. */

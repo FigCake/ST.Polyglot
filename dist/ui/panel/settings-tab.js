@@ -163,7 +163,7 @@ async function withBusy(btn, fn) {
 }
 const SRS_KEYS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
     'srs_interval', 'srs_ease', 'srs_streak'];
-/** Resets review progress of the words in the current scope: they are new again. */
+/** Resets review progress of the words in the current scope: they are new again (a "known" mark goes too). */
 function resetSrs() {
     const inView = new Set(scopedWordbook().map(w => w.word));
     const wordbook = loadWordbook();
@@ -172,6 +172,7 @@ function resetSrs() {
             continue;
         for (const k of SRS_KEYS)
             delete w[k];
+        delete w.known;
     }
     saveWordbook(wordbook);
 }

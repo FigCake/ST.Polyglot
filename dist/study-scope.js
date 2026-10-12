@@ -10,7 +10,7 @@
 // the whole text, so these settings never orphan a saved analysis. ST drops
 // unknown tags when rendering (<status> keeps its text), so tag blocks are
 // found in the raw message and located in the rendered text by content.
-import { getSettings, getContext } from './runtime.js';
+import { getSettings, getContext, saveSettings } from './runtime.js';
 import { plainText, plainTextNodes, readableText } from './plain-text.js';
 import { dialogueLines, dialogueText } from './dialogue.js';
 import { mesIdOf } from './st-dom.js';
@@ -240,6 +240,32 @@ export function skippedNames() {
     const s = getSettings();
     const list = [...(s.skip_names ? chatNames() : []), ...parseList(s.skip_words)];
     return [...new Set(list.map(n => n.trim()))].filter(n => n.length <= 40).slice(0, 20);
+}
+/**
+ * Adds words to the "Other words" setting: never highlighted, saved or listed
+ * by the analysis again. A word with a comma cannot be listed and is left out.
+ * Returns how many were added.
+ */
+export function skipWords(words) {
+    const s = getSettings();
+    const list = parseList(s.skip_words);
+    const keys = new Set(list.map(wordKey));
+    const added = [];
+    for (const word of words.map(w => w.trim())) {
+        const key = wordKey(word);
+        if (!key || /[,\n]/.test(word) || keys.has(key))
+            continue;
+        keys.add(key);
+        added.push(word);
+    }
+    if (!added.length)
+        return 0;
+    s.skip_words = [...list, ...added].join(', ');
+    saveSettings();
+    // The settings drawer may be open: keep its field in step, so typing there does not undo this
+    document.querySelectorAll('input[data-setting="skip_words"]').forEach(el => { el.value = s.skip_words; });
+    document.dispatchEvent(new CustomEvent('pg:study-scope-change'));
+    return added.length;
 }
 /** Tells whether a found word (or its base form) is a skipped name or word. */
 export function wordSkipper() {

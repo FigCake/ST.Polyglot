@@ -127,12 +127,20 @@ export function memoryOf(e) {
     return fromSm2(finite(e.srs_ease) ? e.srs_ease : 2.5, finite(e.srs_interval) ? e.srs_interval : 1);
 }
 export const isNew = (e) => memoryOf(e) === null;
+/** Grammar patterns and sentences are review material for quizzes, not cards. */
+export const isCard = (w) => w.level !== 'grammar' && w.level !== 'sentence';
 /** A word counts as known once it would be recalled for three weeks (stability in days). */
 export const KNOWN_STABILITY = 21;
 /** Times forgotten (at most once a day) that make a word frequently missed. */
 export const MISSED_LAPSES = 4;
+/** Known: marked so by the learner, or recalled for three weeks. */
+export const isKnown = (e) => e.known === true || (memoryOf(e)?.stability ?? 0) >= KNOWN_STABILITY;
+/** A new word waiting for its first review (one marked known is not). */
+export const isFresh = (e) => isNew(e) && e.known !== true;
+/** New (never reviewed), learning, or known. */
+export const wordStatus = (e) => (isKnown(e) ? 'known' : isNew(e) ? 'new' : 'learning');
 /** Forgotten MISSED_LAPSES times or more and not known yet: worth extra practice. */
-export const isMissed = (e) => (e.srs_lapses ?? 0) >= MISSED_LAPSES && (memoryOf(e)?.stability ?? 0) < KNOWN_STABILITY;
+export const isMissed = (e) => (e.srs_lapses ?? 0) >= MISSED_LAPSES && !isKnown(e);
 const daysSince = (at, now) => (finite(at) ? Math.max(0, studyDay(now) - studyDay(at)) : 0);
 /** A fixed 0–1 value per word and review, so the labels show the interval a rating then gives. */
 function fuzzFor(e) {
@@ -161,13 +169,15 @@ export function srsRate(e, rating, now = Date.now()) {
     delete e.srs_streak;
     return { requeue: rating === 0, wasNew };
 }
-const isDue = (e, now) => !isNew(e) && (e.srs_due ?? 0) <= now;
-/** Reviews due now (new words aside). */
+/** Words in the review schedule: reviewed before and not marked known. */
+const scheduled = (e) => !isNew(e) && e.known !== true;
+const isDue = (e, now) => scheduled(e) && (e.srs_due ?? 0) <= now;
+/** Reviews due now (new words and words marked known aside). */
 export const dueCount = (pool, now = Date.now()) => pool.filter(e => isDue(e, now)).length;
 /** Today's cards: due reviews, most overdue first, then up to `newLeft` new words in the order they were added. */
 export function todaysCards(pool, newLeft, now = Date.now()) {
     const due = pool.filter(e => isDue(e, now)).sort((a, b) => (a.srs_due ?? 0) - (b.srs_due ?? 0));
-    const fresh = pool.filter(isNew).sort((a, b) => (a.dateAdded ?? '').localeCompare(b.dateAdded ?? ''));
+    const fresh = pool.filter(isFresh).sort((a, b) => (a.dateAdded ?? '').localeCompare(b.dateAdded ?? ''));
     return [...due, ...fresh.slice(0, Math.max(0, newLeft))];
 }
 /** Reviews due on each of the `days` days after today. */
@@ -175,7 +185,7 @@ export function dueAhead(pool, days, now = Date.now()) {
     const today = studyDay(now);
     const out = new Array(days).fill(0);
     for (const e of pool) {
-        if (isNew(e))
+        if (!scheduled(e))
             continue;
         const ahead = studyDay(e.srs_due ?? 0) - today;
         if (ahead >= 1 && ahead <= days)

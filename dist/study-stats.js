@@ -1,6 +1,6 @@
 // What the study record (Learn tab, before a mode is picked) shows, from the
 // day totals (user-data StudyDay) and the words. Pure: no DOM, no I/O.
-import { studyDay, dayKey, memoryOf, dueCount, dueAhead, KNOWN_STABILITY } from './srs.js';
+import { studyDay, dayKey, dueCount, dueAhead, isKnown } from './srs.js';
 const DAY_MS = 86_400_000;
 const dayOf = (key) => Math.round(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, +key.slice(8, 10)) / DAY_MS);
 const studied = (d) => d.n + d.r > 0;
@@ -35,7 +35,7 @@ export function studyStats(days, pool, now = Date.now()) {
         ratings30,
         ahead: dueAhead(pool, 7, now),
         words: pool.length,
-        known: pool.filter(e => (memoryOf(e)?.stability ?? 0) >= KNOWN_STABILITY).length,
+        known: pool.filter(isKnown).length,
         due: dueCount(pool, now),
     };
 }

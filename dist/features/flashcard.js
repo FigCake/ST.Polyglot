@@ -4,6 +4,9 @@
 //   front  word · part of speech · 🔊 · 🎤 pronunciation check
 //   back   meaning · base form · meaning in context · example sentence · note
 //
+// In review mode a learnt word may instead be asked as its example with the
+// word blanked, or as its meaning with the word to type (card-kind.ts).
+//
 // Example sentences are generated once, on the first flip of a card without
 // one, and saved to the entry.
 //
@@ -15,9 +18,11 @@ import { shuffleArray } from '../utils.js';
 import { rubyWord, shownReading } from '../furigana/word.js';
 import { html, setHtml, raw } from '../html.js';
 import { t, currentLang } from '../i18n.js';
-import { loadWordbook, saveWordbook, scopedWordbook, getSets } from '../wordbook.js';
-import { srsRate, previewDays, todaysCards, forecast, isNew, isMissed } from '../srs.js';
+import { loadWordbook, saveWordbook, scopedWordbook, getSets, setKnown } from '../wordbook.js';
+import { srsRate, previewDays, todaysCards, forecast, isNew, isFresh, isMissed, isCard } from '../srs.js';
 import { logReview, newWordsToday } from '../study-log.js';
+import { cardKind, clozeOf, gradeWord } from '../card-kind.js';
+import { findWord } from '../utils.js';
 import { acceptObject } from '../ai/client.js';
 import { userFileUrl } from '../user-files.js';
 const RATINGS = [
@@ -26,8 +31,6 @@ const RATINGS = [
     { rating: 2, key: 'fl.good', cls: 'pg-srs-good' },
     { rating: 3, key: 'fl.easy', cls: 'pg-srs-easy' },
 ];
-/** Grammar patterns and sentences are review material for quizzes, not cards. */
-export const isCard = (w) => w.level !== 'grammar' && w.level !== 'sentence';
 /** How many more new words "more new words" adds to today's. */
 const MORE_NEW = 10;
 /** An interval as a button label: "3d", "1.5mo", "2y" (in the UI language). */
@@ -40,18 +43,36 @@ function intervalLabel(days) {
         return t('fl.ivlMonths', { n: short(days / 30) });
     return t('fl.ivlYears', { n: short(days / 365) });
 }
+/** The four rating buttons, each with the interval it gives, and "I know this word". */
+function ratingRow(days) {
+    return html `
+        <div class="pg-srs-rating">${RATINGS.map(r => html `
+            <button class="pg-srs-btn ${r.cls}" data-action="rate" data-rating="${r.rating}">
+                <span class="pg-srs-label">${t(r.key)}</span>
+                <span class="pg-srs-preview">${r.rating === 0 ? t('fl.ivlSoon') : intervalLabel(days[r.rating])}</span>
+            </button>`)}
+        </div>
+        <button class="pg-srs-known" data-action="set-known" title="${t('wb.markKnown')}">${t('fl.knowIt')}</button>`;
+}
 const multiline = (text) => html `${text.split('\n').map((line, i) => html `${i > 0 && raw('<br>')}${line}`)}`;
 // ── Example sentences ─────────────────────────────────────────────────────────
 let exampleRequest = null;
+/** The example with the word marked (or blanked, on a cloze card's front). */
+function sentenceView(c, blank = false) {
+    return blank
+        ? html `${c.parts.map((part, i) => html `${i > 0 && html `<span class="pg-cloze-blank" aria-label="${t('qz.typedBlank')}"></span>`}${part}`)}`
+        : html `${c.parts.map((part, i) => html `${i > 0 && html `<b class="pg-cloze-answer">${c.answer}</b>`}${part}`)}`;
+}
 function exampleView(w) {
     if (!w.example)
         return html `
         <div class="pg-flash-example-wrap">
             <div class="pg-flash-example pg-flash-example-loading"><i class="fa-solid fa-spinner fa-spin"></i></div>
         </div>`;
+    const cloze = clozeOf(w);
     return html `
         <div class="pg-flash-example-wrap">
-            <div class="pg-flash-example">${w.example}</div>
+            <div class="pg-flash-example">${cloze ? sentenceView(cloze) : w.example}</div>
             ${w.example_translation && html `<div class="pg-flash-example-trans">${w.example_translation}</div>`}
         </div>`;
 }
@@ -74,11 +95,21 @@ async function loadExample(w, card, deps) {
         const wordbook = loadWordbook();
         const entry = wordbook.find(e => e.word === w.word);
         const translation = data.translation?.trim() || undefined;
+        // Kept only when the sentence really has it
+        const form = typeof data.form === 'string' && findWord(sentence, data.form.trim()) !== -1 ? data.form.trim() : undefined;
         if (entry) {
             Object.assign(entry, { example: sentence, example_translation: translation ?? entry.example_translation });
+            if (form)
+                entry.example_form = form;
+            else
+                delete entry.example_form;
             saveWordbook(wordbook);
         }
-        Object.assign(w, { example: sentence, example_translation: translation });
+        Object.assign(w, { example: sentence, example_translation: translation ?? w.example_translation });
+        if (form)
+            w.example_form = form;
+        else
+            delete w.example_form;
         if (slot?.isConnected)
             slot.outerHTML = exampleView(w).value;
     }
@@ -103,6 +134,10 @@ class FlashcardSession {
     reviewed = 0;
     /** New words added to today's limit this session ("more new words"). */
     extraNew = 0;
+    /** The kind each card was first shown as, by word and review time (it must not change while shown). */
+    kinds = new Map();
+    /** The answer typed on a typing card, once checked. */
+    typed = null;
     setSelect;
     area;
     constructor(root, deps, review) {
@@ -124,10 +159,27 @@ class FlashcardSession {
         this.setSelect = root.querySelector('.pg-flash-set');
         this.area = root.querySelector('.pg-flash-area');
         root.addEventListener('click', e => this.onClick(e));
+        // The typed answer is a form: Enter and a phone keyboard's Go / Done both submit it
+        root.addEventListener('submit', e => {
+            if (!e.target.matches?.('.pg-flash-type'))
+                return;
+            e.preventDefault();
+            this.check();
+        });
         this.setSelect.addEventListener('change', () => this.restart());
         this.restart();
     }
     get card() { return this.deck[this.index]; }
+    /** How the shown card asks for its word: fixed when it is first shown. */
+    kindOf(w) {
+        if (!this.srs)
+            return 'meaning';
+        const key = `${w.word}\n${w.srs_reviewed_at ?? 0}`;
+        let kind = this.kinds.get(key);
+        if (!kind)
+            this.kinds.set(key, kind = cardKind(w));
+        return kind;
+    }
     pool() {
         const setId = this.setSelect.value;
         return scopedWordbook().filter(w => isCard(w) && (setId === 'all' || (w.setIds ?? []).includes(setId)));
@@ -143,6 +195,7 @@ class FlashcardSession {
         this.deck = this.srs ? todaysCards(pool, this.newLeft()) : pool;
         this.index = 0;
         this.flipped = false;
+        this.typed = null;
         this.reviewed = 0;
         this.updateControls(pool);
         this.render();
@@ -165,7 +218,7 @@ class FlashcardSession {
             return html `<div class="pg-empty-hint">${multiline(t('fl.noWords'))}</div>`;
         const pool = this.pool();
         const ahead = forecast(pool);
-        const more = pool.some(isNew);
+        const more = pool.some(isFresh);
         return html `
             <div class="pg-srs-complete">
                 <div class="pg-srs-complete-icon">🎉</div>
@@ -182,6 +235,9 @@ class FlashcardSession {
             ? `${t('fl.remaining', { n: this.deck.length })} · ${t('fl.doneSess', { n: this.reviewed })}`
             : `${this.index + 1} / ${this.deck.length}`;
         const days = srs && flipped ? previewDays(w) : [];
+        const kind = this.kindOf(w);
+        if (kind !== 'meaning')
+            return this.askView(w, kind, progress, days);
         return html `
             <div class="pg-flash-progress">${srs && isNew(w) && html `<span class="pg-srs-new">${t('fl.newBadge')}</span> `}${isMissed(w) && html `<span class="pg-srs-new pg-missed-tag">${t('wb.missedTag')}</span> `}${progress}</div>
             <div class="pg-flash-card ${flipped && 'pg-flash-flipped'}" data-action="flip">
@@ -204,13 +260,7 @@ class FlashcardSession {
             </div>
             <div class="pg-pronun-result"></div>
             <div class="pg-flash-hint">${!flipped && t(srs ? 'fl.clickReveal' : 'fl.tapReveal')}</div>
-            ${srs && flipped && html `
-            <div class="pg-srs-rating">${RATINGS.map(r => html `
-                <button class="pg-srs-btn ${r.cls}" data-action="rate" data-rating="${r.rating}">
-                    <span class="pg-srs-label">${t(r.key)}</span>
-                    <span class="pg-srs-preview">${r.rating === 0 ? t('fl.ivlSoon') : intervalLabel(days[r.rating])}</span>
-                </button>`)}
-            </div>`}
+            ${srs && flipped && ratingRow(days)}
             ${!srs && html `
             <div class="pg-flash-nav">
                 <button class="pg-btn pg-btn-secondary" data-action="prev" ${this.index === 0 && html `disabled`}>${t('fl.prev')}</button>
@@ -218,12 +268,67 @@ class FlashcardSession {
                 <button class="pg-btn pg-btn-secondary" data-action="next" ${this.index === this.deck.length - 1 && html `disabled`}>${t('fl.next')}</button>
             </div>`}`;
     }
+    /** A cloze or typing card: the question on the front, the word and its meaning on the back. */
+    askView(w, kind, progress, days) {
+        const { flipped, typed } = this;
+        const cloze = kind === 'cloze' ? clozeOf(w) : null;
+        const result = typed && html `
+            <div class="pg-flash-typed pg-flash-typed-${typed.grade}">
+                ${typed.grade === 'correct' ? '✓' : html `✗ <s>${typed.text}</s>`}
+                ${typed.grade === 'close' && html `<span class="pg-typed-close">${t('qz.typedClose')}</span>`}
+            </div>`;
+        return html `
+            <div class="pg-flash-progress">${isMissed(w) && html `<span class="pg-srs-new pg-missed-tag">${t('wb.missedTag')}</span> `}${progress}</div>
+            <div class="pg-flash-card pg-flash-ask ${flipped && 'pg-flash-flipped'}" data-action="flip">
+                <div class="pg-flash-front">
+                    ${cloze
+            ? html `<div class="pg-flash-cloze">${sentenceView(cloze, true)}</div>
+                               ${w.example_translation && html `<div class="pg-flash-example-trans">${w.example_translation}</div>`}`
+            : html `<div class="pg-flash-meaning">${w.meaning}</div>
+                               ${w.pos_info && html `<div class="pg-flash-pos">${w.pos_info}</div>`}`}
+                </div>
+                <div class="pg-flash-back">
+                    ${flipped && w.image && html `<img class="pg-word-img" src="${userFileUrl(w.image)}" alt="">`}
+                    <div class="pg-flash-word">${rubyWord(w.word, shownReading(w))}</div>
+                    ${result}
+                    <div class="pg-flash-meaning">${w.meaning}</div>
+                    ${w.base_form && w.base_form !== w.word && html `<div class="pg-flash-pos">${w.base_form}</div>`}
+                    ${flipped && exampleView(w)}
+                    ${w.notes && html `<div class="pg-flash-notes">${w.notes}</div>`}
+                    <div class="pg-flash-btn-row">
+                        <button class="pg-speak-btn pg-flash-speak" data-action="speak" title="${t('fl.listen')}">🔊</button>
+                        ${this.deps.hasSpeechRecog() && html `<button class="pg-flash-mic" data-action="mic" title="${t('fl.mic')}" data-active="false">🎤</button>`}
+                    </div>
+                </div>
+            </div>
+            ${kind === 'typing' && !flipped && html `
+            <form class="pg-flash-type">
+                <input class="pg-soft-input pg-flash-input" type="text" autocomplete="off" spellcheck="false"
+                    autocapitalize="off" enterkeyhint="done" placeholder="${t('fl.typeHere')}" aria-label="${t('fl.typeHere')}">
+                <button type="submit" class="pg-btn pg-btn-primary">${t('speak.check')}</button>
+            </form>`}
+            <div class="pg-pronun-result"></div>
+            <div class="pg-flash-hint">${!flipped && t(kind === 'cloze' ? 'fl.clozeHint' : 'fl.typeHint')}</div>
+            ${flipped && ratingRow(days)}`;
+    }
     render() {
         exampleRequest?.abort();
         const w = this.card;
         setHtml(this.area, w ? this.cardView(w) : this.emptyView());
         if (w && this.flipped && !w.example)
             loadExample(w, this.area, this.deps);
+        this.area.querySelector('.pg-flash-input')?.focus({ preventScroll: true });
+    }
+    /** Grades the typed answer and turns the card over. */
+    check() {
+        const w = this.card;
+        const input = this.area.querySelector('.pg-flash-input');
+        const text = input?.value.trim();
+        if (!w || !text)
+            return;
+        this.typed = { text, grade: gradeWord(w, text) };
+        this.flipped = true;
+        this.render();
     }
     // ── Actions ───────────────────────────────────────────────────────────────
     stopMic() {
@@ -236,6 +341,7 @@ class FlashcardSession {
             return;
         this.index = next;
         this.flipped = false;
+        this.typed = null;
         this.render();
     }
     rate(rating) {
@@ -256,6 +362,20 @@ class FlashcardSession {
             this.reviewed++;
         this.index = Math.min(this.index, Math.max(0, this.deck.length - 1));
         this.flipped = false;
+        this.typed = null;
+        this.updateControls();
+        this.render();
+    }
+    /** "I know this word": marked known, so it leaves the review (not counted as reviewed). */
+    setKnown() {
+        const w = this.card;
+        if (!w)
+            return;
+        setKnown([w.word], true);
+        this.deck = this.deck.filter(e => e.word !== w.word);
+        this.index = Math.min(this.index, Math.max(0, this.deck.length - 1));
+        this.flipped = false;
+        this.typed = null;
         this.updateControls();
         this.render();
     }
@@ -282,6 +402,9 @@ class FlashcardSession {
                 break;
             case 'rate':
                 this.rate(Number(el.dataset.rating));
+                break;
+            case 'set-known':
+                this.setKnown();
                 break;
             case 'toggle-srs':
                 this.srs = !this.srs;

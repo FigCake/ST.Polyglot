@@ -16,13 +16,13 @@ import { LEVEL_FILTERS } from '../constants.js';
 import { levelLabel } from '../utils.js';
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
-import { askConfirm, askInput } from '../ui.manager.js';
-import { getSets, createSet, deleteSet, removeFromWordbook, currentScope, isShared, langFilter, otherLangWords, addToWordbook as addEntry, scopedWordbook, } from '../wordbook.js';
+import { askConfirm, askInput, notify } from '../ui.manager.js';
+import { getSets, createSet, deleteSet, removeFromWordbook, currentScope, isShared, langFilter, otherLangWords, addToWordbook as addEntry, scopedWordbook, setKnown, ignoreWords, } from '../wordbook.js';
 import { getSettings, getLang } from '../runtime.js';
 import { currentChatId } from '../storage.js';
 import { toggleReanalysis } from './reanalysis-bar.js';
 import { emptyFilter } from './wordbook/filters.js';
-import { isMissed } from '../srs.js';
+import { isMissed, isCard, wordStatus } from '../srs.js';
 import { renderList, countLabel, selectedWords } from './wordbook/list.js';
 import { pickAndImport } from './wordbook/import.js';
 import { showDuplicates } from './wordbook/duplicates.js';
@@ -31,9 +31,18 @@ const SEARCH_DEBOUNCE_MS = 150;
 /** Persists while the panel stays open (search is reset when the tab is re-mounted). */
 const filter = emptyFilter();
 const LEVEL_PILLS = [...LEVEL_FILTERS, 'sentence'];
+const STATUSES = ['new', 'learning', 'known'];
+/** Words (not grammar or sentences) in each status. */
+function statusCounts() {
+    const counts = { new: 0, learning: 0, known: 0 };
+    for (const w of scopedWordbook())
+        if (isCard(w))
+            counts[wordStatus(w)]++;
+    return counts;
+}
 let pane = null;
 // ── Markup ────────────────────────────────────────────────────────────────────
-const toolbar = (sets, missed) => html `
+const toolbar = (sets, missed, status) => html `
     <div class="pg-reanalysis-bar pg-wb-reanalysis-bar" hidden></div>
 
     <div class="pg-wb-search-row">
@@ -52,6 +61,10 @@ const toolbar = (sets, missed) => html `
             </button>`}
         </div>
         <div class="pg-wb-set-row">
+            <select class="pg-set-select pg-status-select" aria-label="${t('wb.allStatus')}">
+                <option value="all">${t('wb.allStatus')}</option>
+                ${STATUSES.map(st => html `<option value="${st}" ${filter.status === st && html `selected`}>${t(`wb.status.${st}`)} ${status[st]}</option>`)}
+            </select>
             <select class="pg-set-select" aria-label="${t('wb.allSets')}">
                 <option value="all">${t('wb.allSets')}</option>
                 ${sets.map(s => html `<option value="${s.id}" ${filter.setId === s.id && html `selected`}>${s.name}</option>`)}
@@ -65,6 +78,8 @@ const toolbar = (sets, missed) => html `
         <span class="pg-wb-sel-count" hidden></span>
         <button class="pg-wb-row-btn pg-wb-row-btn-danger pg-wb-when-selected" data-action="delete-selected" hidden>${t('wb.delete')}</button>
         <button class="pg-wb-row-btn pg-wb-when-selected" data-action="reanalyse-selected" hidden>${t('wb.reanalyse')}</button>
+        <button class="pg-wb-row-btn pg-wb-when-selected" data-action="known-selected" title="${t('wb.markKnown')}" hidden>${t('wb.toKnown')}</button>
+        <button class="pg-wb-row-btn pg-wb-when-selected" data-action="ignore-selected" title="${t('wb.ignoreTip')}" hidden>${t('wb.ignore')}</button>
         <span class="pg-wb-count-spacer"></span>
         <button class="pg-wb-row-btn" data-action="dupes" title="${t('wb.dupFindTip')}">${t('wb.dupFind')}</button>
         <button class="pg-wb-row-btn" data-action="select-all">${t('wb.selectAll')}</button>
@@ -165,6 +180,28 @@ const ACTIONS = {
         removeFromWordbook(words);
         renderWordbook(root);
     },
+    'known-selected': root => {
+        const list = listOf(root);
+        const words = list ? selectedWords(list) : [];
+        if (!words.length)
+            return;
+        setKnown(words, true);
+        renderWordbook(root);
+    },
+    'ignore-selected': async (root) => {
+        const list = listOf(root);
+        // Words only: a grammar pattern or a sentence is not something the analysis highlights as a word
+        const cards = new Set(scopedWordbook().filter(isCard).map(w => w.word));
+        const words = (list ? selectedWords(list) : []).filter(w => cards.has(w));
+        if (!words.length) {
+            notify(t('wb.ignoreNone'), 'info');
+            return;
+        }
+        if (!(await askConfirm(t('wb.ignoreConfirm', { n: words.length }), { yes: t('wb.ignore') })))
+            return;
+        ignoreWords(words);
+        renderWordbook(root);
+    },
     'reanalyse-selected': root => {
         const list = listOf(root);
         const bar = root.querySelector('.pg-wb-reanalysis-bar');
@@ -203,6 +240,14 @@ function bind(root) {
     });
     root.addEventListener('change', e => {
         const select = e.target;
+        // The inline edit form's selects (level, part of speech) live in the list
+        if (select.closest('.pg-wb-list'))
+            return;
+        if (select.classList.contains('pg-status-select')) {
+            filter.status = select.value;
+            renderWordbook(root);
+            return;
+        }
         if (!select.classList.contains('pg-set-select'))
             return;
         filter.setId = select.value;
@@ -217,7 +262,7 @@ export function renderWordbook(root) {
         filter.query = '';
     const scroll = listOf(root)?.scrollTop ?? 0;
     pane = root;
-    setHtml(root, toolbar(getSets(), scopedWordbook().filter(isMissed).length));
+    setHtml(root, toolbar(getSets(), scopedWordbook().filter(isMissed).length, statusCounts()));
     if (!bound.has(root)) {
         bind(root);
         bound.add(root);

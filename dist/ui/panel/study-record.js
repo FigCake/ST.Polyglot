@@ -12,8 +12,7 @@ import { t } from '../../i18n.js';
 import { getSettings } from '../../runtime.js';
 import { daysData } from '../../data-store.js';
 import { scopedWordbook } from '../../wordbook.js';
-import { isNew } from '../../srs.js';
-import { isCard } from '../../features/flashcard.js';
+import { isFresh, isCard } from '../../srs.js';
 import { studyStats } from '../../study-stats.js';
 const DAY_MS = 86_400_000;
 const dateOf = (day) => new Date(day * DAY_MS);
@@ -89,7 +88,7 @@ function aheadRow(ahead, firstDay) {
 export function renderStudyRecord(container, onReview) {
     const pool = scopedWordbook().filter(isCard);
     const s = studyStats(daysData(), pool);
-    const fresh = Math.min(pool.filter(isNew).length, Math.max(0, (getSettings().srs_new_per_day ?? 20) - s.today.n));
+    const fresh = Math.min(pool.filter(isFresh).length, Math.max(0, (getSettings().srs_new_per_day ?? 20) - s.today.n));
     setHtml(container, html `
         <div class="pg-record">
             ${streakLine(s)}

@@ -76,7 +76,7 @@ export function similarityScore(a, b) {
 // ── Finding a word in running text ────────────────────────────────────────────
 const WORD_CHAR = /[\p{L}\p{N}]/u;
 /** Scripts written without spaces: words sit side by side, so a letter next door is no boundary. */
-const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}ー]/u;
+export const UNSPACED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}ー]/u;
 const HANGUL = /\p{Script=Hangul}/u;
 /** Whether `neighbor` glues onto the word whose edge character is `edge` (so it is not a match). */
 function glued(neighbor, edge, after) {

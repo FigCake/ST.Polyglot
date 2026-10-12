@@ -17,6 +17,7 @@ import { notify, escapeHtml } from './ui.manager.js';
 import { downloadText } from './export/download.js';
 import { t } from './i18n.js';
 import { chatValue, currentChatId } from './storage.js';
+import { skipWords } from './study-scope.js';
 import { inScope, inLang, langKey, langsOf, tagChat, tagLang, mergeWordbooks, removeChats, removeWords, moveChats, chatOverview, findDuplicates, mergeGroup, editEntry, } from './wordbook-model.js';
 // ── Wordbook read / write ─────────────────────────────────────────────────────
 /** Every chat's words, as a live array: mutate, then saveWordbook(). Use scopedWordbook() for display. */
@@ -73,6 +74,36 @@ export function removeFromWordbook(words) {
         : removeWords(loadWordbook(), set);
     saveWordbook(wordbook);
     forget(deleted);
+}
+/** Marks words known (left out of reviews, schedule kept) or back to reviewing. */
+export function setKnown(words, known) {
+    const set = new Set(words);
+    const wb = loadWordbook();
+    for (const e of wb) {
+        if (!set.has(e.word))
+            continue;
+        if (known)
+            e.known = true;
+        else
+            delete e.known;
+    }
+    saveWordbook(wb);
+}
+/**
+ * Ignores words: removed from the wordbook (every chat's) and added, with
+ * their base forms, to the "Other words" setting, so they are not highlighted
+ * or saved again. `words` may include words not in the wordbook.
+ */
+export function ignoreWords(words) {
+    const set = new Set(words);
+    const all = loadWordbook();
+    const forms = all.filter(e => set.has(e.word)).map(e => e.base_form);
+    const { wordbook, deleted } = removeWords(all, set);
+    if (deleted.length) {
+        saveWordbook(wordbook);
+        forget(deleted);
+    }
+    skipWords([...words, ...forms]);
 }
 // ── Per-chat management ───────────────────────────────────────────────────────
 export const wordbookByChat = () => chatOverview(loadWordbook());

@@ -10,7 +10,8 @@ import { t } from '../i18n.js';
 import { quickLookupPrompt } from '../prompts.js';
 import { ai, getLang, getNativeLang, getSettings } from '../runtime.js';
 import { acceptObject } from '../ai/client.js';
-import { renderWordbook, unmountWordbook, addToWordbook } from './wordbook-ui.js';
+import { renderWordbook, unmountWordbook, addToWordbook, refreshWordbook } from './wordbook-ui.js';
+import { ignoreWords } from '../wordbook.js';
 import { LearnTab } from './panel/learn-tab.js';
 import { buildSettingsTab } from './panel/settings-tab.js';
 import { PANEL_ID, PANEL_BOX_ID, restorePanelChrome } from './panel/chrome.js';
@@ -56,7 +57,7 @@ export function openLearningPanel(initialTab = 'learn', wordData = null) {
             name: t('tab.learn'), id: 'learn',
             render: () => {
                 learnTab?.dispose();
-                learnTab = new LearnTab(pendingWord, { lookup: w => lookUpWord(w), save: addToWordbook });
+                learnTab = new LearnTab(pendingWord, { lookup: w => lookUpWord(w), save: addToWordbook, ignore: words => { ignoreWords(words); refreshWordbook(); } });
                 pendingWord = null;
                 return learnTab.el;
             },

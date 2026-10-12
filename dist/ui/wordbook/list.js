@@ -7,12 +7,12 @@ import { POS_LABELS } from '../../constants.js';
 import { levelClass, levelLabel } from '../../utils.js';
 import { html, setHtml } from '../../html.js';
 import { t, currentLang } from '../../i18n.js';
-import { loadWordbook, scopedWordbook, removeFromWordbook, toggleWordInSet } from '../../wordbook.js';
+import { loadWordbook, scopedWordbook, removeFromWordbook, toggleWordInSet, setKnown } from '../../wordbook.js';
 import { ai, getLang, getNativeLang } from '../../runtime.js';
 import { speak } from '../../speech.js';
 import { userFileUrl } from '../../user-files.js';
 import { showConjugationPopupFromCache } from '../../features/conjugation.js';
-import { isMissed } from '../../srs.js';
+import { isMissed, isKnown, isCard } from '../../srs.js';
 import { applyFilter, isFiltered, splitMatch } from './filters.js';
 import { rubyWord, shownReading } from '../../furigana/word.js';
 import { toggleNoteEditor, openNoteEditor, isNoteEditorOpen } from './note-editor.js';
@@ -45,6 +45,9 @@ function row(w, ctx) {
                 </div>
                 <div class="pg-wb-head-right">
                     <button class="pg-icon-btn pg-speak-btn" data-action="speak" title="${t('wb.listen')}" aria-label="${t('wb.listen')}">🔊</button>
+                    ${isCard(w) && html `
+                    <button class="pg-icon-btn pg-wb-known-btn ${w.known && 'pg-wb-known-on'}" data-action="known" aria-pressed="${w.known ? 'true' : 'false'}"
+                        title="${t(w.known ? 'wb.unmarkKnown' : 'wb.markKnown')}" aria-label="${t(w.known ? 'wb.unmarkKnown' : 'wb.markKnown')}"><i class="fa-solid fa-check"></i></button>`}
                     <button class="pg-icon-btn pg-wb-edit-btn" data-action="edit" title="${t('wb.edit')}" aria-label="${t('wb.edit')}"><i class="fa-solid fa-pen"></i></button>
                     <button class="pg-icon-btn pg-wb-del" data-action="delete" title="${t('wb.deleteWord')}" aria-label="${t('wb.deleteWord')}"><i class="fa-solid fa-xmark"></i></button>
                 </div>
@@ -54,6 +57,7 @@ function row(w, ctx) {
                 ${w.ipa && html `<span class="pg-ipa-chip">${w.ipa}</span>`}
                 <span class="pg-level-badge level-${levelClass(w.level || 'grammar')}">${levelLabel(w.level)}</span>
                 ${isMissed(w) && html `<span class="pg-missed-tag" title="${t('wb.missedTip')}">${t('wb.missedTag')}</span>`}
+                ${isCard(w) && isKnown(w) && html `<span class="pg-known-tag" title="${t(w.known ? 'wb.knownSetTip' : 'wb.knownTip')}">${t('wb.knownTag')}</span>`}
                 ${w.conj_cached && html `<button class="pg-icon-btn pg-wb-conj-btn" data-action="conjugate" title="${t('wb.conjTable')}">📊</button>`}
                 <button class="pg-icon-btn pg-wb-note-btn${w.notes ? ' pg-wb-note-btn-has' : ''}" data-action="note" title="${t('wb.noteTitle')}">📝</button>
                 ${date && html `<span class="pg-wb-date">${date}</span>`}
@@ -119,6 +123,10 @@ function onClick(listEl, e) {
             break;
         case 'delete':
             removeFromWordbook([word]);
+            ctx.refresh();
+            break;
+        case 'known':
+            setKnown([word], !loadWordbook().find(w => w.word === word)?.known);
             ctx.refresh();
             break;
         case 'filter-pos': {

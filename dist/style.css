@@ -3069,6 +3069,47 @@ mark.pg-wb-hl {
 }
 .pg-flash-example-err { opacity: 0.2; }
 
+/* ── Review cards that ask for the word: a blanked example, or typing it ── */
+.pg-flash-cloze {
+    font-size: 1.1em;
+    color: var(--pg-t1);
+    line-height: 1.6;
+    margin-bottom: 6px;
+}
+.pg-cloze-blank {
+    display: inline-block;
+    width: 4em;
+    height: 1em;
+    margin: 0 2px;
+    vertical-align: -0.12em;
+    border-bottom: 2px solid currentColor;
+    opacity: 0.45;
+}
+.pg-cloze-answer { font-weight: 700; }
+.pg-flash-ask .pg-flash-back .pg-flash-word { margin-bottom: 4px; }
+.pg-flash-typed {
+    font-size: max(12px, 0.82em);
+    margin-bottom: 8px;
+    color: var(--pg-t2);
+}
+.pg-flash-typed-correct { color: var(--pg-ok); }
+.pg-flash-typed-wrong,
+.pg-flash-typed-close   { color: var(--pg-err); }
+.pg-flash-typed .pg-typed-close { display: block; margin: 2px 0 0; font-size: 0.92em; }
+.pg-flash-type {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.pg-flash-type .pg-flash-input {
+    flex: 1;
+    min-width: 0;
+    height: 30px;
+    box-sizing: border-box;
+    text-align: center;
+}
+.pg-flash-type .pg-btn { font-size: 0.85em !important; padding: 5px 12px !important; }
+
 
 
 /* ── 🔁 SRS toggle button & badge ── */
@@ -4107,6 +4148,8 @@ input.pg-soft-input.pg-typed-input {
     vertical-align: baseline;
     font-size: 1em;
 }
+.pg-typed-form { display: inline; margin: 0; }
+.pg-typed-grade-all { margin: 4px 0 8px; }
 input.pg-typed-input.pg-typed-ok  { background: rgba(60, 180, 100, 0.25); }
 input.pg-typed-input.pg-typed-bad { background: rgba(220, 60, 60, 0.22); }
 .pg-typed-hint  { margin-left: 4px; font-size: 0.9em; color: var(--pg-t3); }
@@ -4166,9 +4209,23 @@ input.pg-typed-input.pg-typed-bad { background: rgba(220, 60, 60, 0.22); }
 }
 .pg-record-val { font-size: 1.15em; font-weight: 500; color: var(--pg-t1); }
 .pg-record-lab { font-size: max(10px, 0.68em); color: var(--pg-t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.pg-record-go { cursor: pointer; }
+/* "To review" is a button that looks like the other numbers: no border, fill, shadow or
+   focus ring from ST themes, custom CSS or the phone's native button look */
+.pg-record .pg-record-go {
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: none !important;
+    border-radius: 0;
+    margin: 0;
+    -webkit-tap-highlight-color: transparent;
+}
 .pg-record-go .pg-record-lab { color: var(--pg-t2); }
-.pg-record-go:hover .pg-record-val { color: var(--pg-hue); }
+.pg-record-go:hover .pg-record-val,
+.pg-record-go:focus-visible .pg-record-val { color: var(--pg-hue); }
 
 .pg-record-ahead { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 8px; }
 .pg-record-ahead-lab { font-size: max(10px, 0.68em); color: var(--pg-t3); padding-bottom: 14px; white-space: nowrap; }
@@ -4189,3 +4246,32 @@ input.pg-typed-input.pg-typed-bad { background: rgba(220, 60, 60, 0.22); }
     white-space: nowrap;
 }
 .pg-filter-missed.active { background: rgba(224, 128, 96, 0.28); }
+
+/* ── Word status: known tag, the row's ✓ toggle, status picker, ignore, "I know this word" ── */
+.pg-known-tag {
+    font-size: max(10px, 0.68em);
+    color: var(--pg-t2);
+    padding: 1px 7px;
+    border-radius: 8px;
+    background: rgba(110, 190, 140, 0.18);
+    white-space: nowrap;
+}
+.pg-wb-known-btn { font-size: 11px; opacity: 0.35; }
+.pg-wb-known-btn:hover { opacity: 0.8; }
+.pg-wb-known-btn.pg-wb-known-on { opacity: 1; color: var(--pg-ok) !important; }
+.pg-wb-set-row .pg-status-select { flex: 0 1 38%; }
+.pg-detail-ignore,
+.pg-srs-known {
+    display: block;
+    margin: 8px auto 0;
+    padding: 2px 6px;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--pg-t1);
+    opacity: 0.4;
+    font-size: max(12px, 0.75em);
+    cursor: pointer;
+}
+.pg-detail-ignore:hover,
+.pg-srs-known:hover { opacity: 0.85; text-decoration: underline; }
