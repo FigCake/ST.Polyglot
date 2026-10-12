@@ -84,7 +84,7 @@ function stRows(s) {
     return html `
         <div class="pg-st-info-box">
             <span class="pg-st-info-icon">🔗</span>
-            <span class="pg-st-info-text">${t('set.stDesc')}<br><span class="pg-st-live"></span></span>
+            <span class="pg-st-info-text pg-st-live"></span>
         </div>
         <label class="pg-set-override-toggle">
             <input type="checkbox" class="pg-st-override" ${override && html `checked`}> ${t('set.stAdvanced')}
@@ -112,10 +112,6 @@ function profileRows(s) {
             <div class="pg-set-field"><div class="menu_button pg-profile-recheck">${t('set.profileRecheck')}</div></div>`;
     }
     return html `
-        <div class="pg-st-info-box">
-            <span class="pg-st-info-icon">🔌</span>
-            <span class="pg-st-info-text">${t('set.profileDesc')}</span>
-        </div>
         ${field(t('set.profile'), html `<select class="text_pole pg-profile-select" data-setting="profile_id">${profileOptions(s.profile_id)}</select>`)}`;
 }
 /** Reads the profiles again when their list is opened, keeping the select (and its focus). */
