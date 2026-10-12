@@ -39,7 +39,7 @@ const BACKUP_VERSION = 1;
  */
 const NOT_SETTINGS = new Set([
     '_wordbook', '_sets', 'saved_wrong_answers', 'saved_checks', 'saved_days',
-    'ext_api_key', 'ext_base_url', 'provider', 'model', '_model_history', 'route_chat_source', 'route_model',
+    'ext_api_key', 'ext_base_url', 'provider', 'model', '_model_history', 'route_chat_source', 'route_model', 'profile_id',
     'voice_provider', 'voice_oa_url', 'voice_proxy',
 ]);
 const isApiKey = (k) => k.endsWith('_key');

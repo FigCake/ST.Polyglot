@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     native_lang: 'en', // explanation / UI language: 'ko'|'en'|'it'|'es'|'custom'
     native_lang_custom: '',
     cefr_level: 'B1',
-    // provider: 'st' | 'openai' | 'claude' | 'google' | 'openrouter' | 'deepseek' | 'vertexai' | 'custom'
+    // provider: 'st' | 'profile' | 'openai' | 'claude' | 'google' | 'openrouter' | 'deepseek' | 'vertexai' | 'custom'
     provider: 'st',
     model: '', // selected model name (unused when provider is 'st')
     // last-used model per provider — restored when switching back to a provider
@@ -39,6 +39,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     // ST default connection only (provider='st')
     route_chat_source: '',
     route_model: '',
+    // SillyTavern connection profile only (provider='profile')
+    profile_id: '',
     // Custom provider only (provider='custom')
     ext_api_key: '',
     ext_base_url: '',

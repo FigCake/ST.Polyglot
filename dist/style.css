@@ -1615,6 +1615,8 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 #pg-settings-panel .pg-set-field > label:first-child:not(.checkbox_label) { min-width: 70px; }
 #pg-settings-panel .pg-set-field > select,
 #pg-settings-panel .pg-set-field > input { flex: 1; }
+/* ST's buttons are min-content wide: Korean text would break after every letter */
+#pg-settings-panel .pg-set-field > .menu_button { width: fit-content; }
 #pg-settings-panel .pg-set-divider {
     border: 0;
     border-top: 1px solid var(--SmartThemeBorderColor, #555);

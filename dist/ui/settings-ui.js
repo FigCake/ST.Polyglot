@@ -7,8 +7,11 @@
 //   • The provider and model selects, the connection override and max tokens
 //     have their own handlers in bind().
 //   • The provider block is re-rendered when the provider changes.
+//   • ST connection profiles are read again when their list is opened, so a
+//     profile made in ST after the drawer was drawn shows up.
 import { CEFR_LEVELS } from '../constants.js';
 import { PROVIDER_MODELS, ROUTE_MODEL_KEY } from '../api.js';
+import { connectionProfiles, profileLabel } from '../ai/st-profiles.js';
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { notify } from '../ui.manager.js';
@@ -28,7 +31,7 @@ const NATIVE_LANGUAGES = [
     ['en', '🇺🇸 English'], ['es', '🇪🇸 Spanish'], ['it', '🇮🇹 Italian'], ['ko', '🇰🇷 Korean'], ['custom', '✏️ Custom'],
 ];
 const PROVIDERS = [
-    ['st', ''], // label from i18n
+    ['st', ''], ['profile', ''], // labels from i18n
     ['openai', 'OpenAI'], ['claude', 'Claude (Anthropic)'], ['google', 'Google Gemini (AI Studio)'],
     ['vertexai', 'Google Vertex AI'], ['openrouter', 'OpenRouter'], ['deepseek', 'DeepSeek'], ['custom', '⚙️ Custom'],
 ];
@@ -91,6 +94,34 @@ function stRows(s) {
             ${field('Model', textInput('route_model', s.route_model, t('set.stModelPh')))}
         </div>`;
 }
+/** The profile list; a placeholder first while none (or a deleted one) is chosen. */
+function profileOptions(chosen) {
+    const profiles = connectionProfiles();
+    const known = profiles.some(p => p.id === chosen);
+    return html `
+        ${!known && html `<option value="" selected disabled>${t('set.profilePick')}</option>`}
+        ${options(profiles.map(p => [p.id, profileLabel(p)]), chosen)}`;
+}
+function profileRows(s) {
+    if (!connectionProfiles().length) {
+        return html `
+            <div class="pg-st-info-box">
+                <span class="pg-st-info-icon">🔌</span>
+                <span class="pg-st-info-text">${t('set.profileNone')}</span>
+            </div>
+            <div class="pg-set-field"><div class="menu_button pg-profile-recheck">${t('set.profileRecheck')}</div></div>`;
+    }
+    return html `
+        <div class="pg-st-info-box">
+            <span class="pg-st-info-icon">🔌</span>
+            <span class="pg-st-info-text">${t('set.profileDesc')}</span>
+        </div>
+        ${field(t('set.profile'), html `<select class="text_pole pg-profile-select" data-setting="profile_id">${profileOptions(s.profile_id)}</select>`)}`;
+}
+/** Reads the profiles again when their list is opened, keeping the select (and its focus). */
+function refreshProfiles(select) {
+    setHtml(select, profileOptions(getSettings().profile_id));
+}
 function knownProviderRows(s) {
     const models = PROVIDER_MODELS[s.provider] ?? [];
     const manual = !!s.model && !models.includes(s.model);
@@ -113,6 +144,8 @@ function customProviderRows(s) {
 function providerRows(s) {
     if (s.provider === 'st')
         return stRows(s);
+    if (s.provider === 'profile')
+        return profileRows(s);
     if (s.provider === 'custom')
         return customProviderRows(s);
     if (s.provider in PROVIDER_MODELS)
@@ -182,7 +215,7 @@ function panel(s) {
 
                 <hr class="pg-set-divider">
                 ${field(t('set.aiProvider'), html `
-                    <select class="text_pole pg-provider-select">${options(PROVIDERS.map(([v, l]) => [v, l || t('set.stDefault')]), s.provider)}</select>`)}
+                    <select class="text_pole pg-provider-select">${options(PROVIDERS.map(([v, l]) => [v, l || t(v === 'profile' ? 'set.profileOption' : 'set.stDefault')]), s.provider)}</select>`)}
                 <div class="pg-provider-detail"></div>
 
                 <hr class="pg-set-divider">
@@ -316,6 +349,15 @@ function bind(root) {
             handle(e);
     });
     root.querySelector('.pg-skip-preview-btn')?.addEventListener('click', () => previewSkip(root));
+    root.addEventListener('click', e => {
+        if (e.target.closest('.pg-profile-recheck'))
+            renderProvider(root);
+    });
+    root.addEventListener('focusin', e => {
+        const el = e.target;
+        if (el.matches('.pg-profile-select'))
+            refreshProfiles(el);
+    });
     root.addEventListener('change', e => {
         const el = e.target;
         if (el.matches('.pg-tokens[type="number"]'))

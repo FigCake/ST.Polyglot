@@ -192,11 +192,34 @@ function onToggle(name, handler) {
 })();
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({
     name: 'pg-check',
-    callback: async () => {
+    callback: async (_args, value) => {
+        if (!getSettings().enabled_checker) {
+            notify(t('chk.slashOff'), 'warn', 4000);
+            return 'The input assistant is turned off.';
+        }
+        const textarea = document.querySelector(ST_SEL.sendTextarea);
+        // Typed in the input box, the command has replaced what was there: the text comes with it
+        const text = value?.trim();
+        if (text && textarea) {
+            textarea.value = text;
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (!textarea?.value.trim()) {
+            notify(t('chk.slashEmpty'), 'info', 4000);
+            return 'Nothing to check.';
+        }
         await runChecker(checkerDeps());
         return 'Done.';
     },
-    helpString: 'Polyglot: check and translate the current input box content (same as the 🌍 button).',
+    helpString: 'Polyglot: check and translate a text (same as the 🌍 button), put back in the input box. Example: /pg-check Ciao, come stai? Without text it checks what is in the input box (for Quick Replies and scripts).',
+    unnamedArgumentList: [
+        SlashCommandNamedArgument.fromProps({
+            name: 'text',
+            description: 'Text to check (defaults to the input box)',
+            typeList: [ARGUMENT_TYPE.STRING],
+            isRequired: false,
+        }),
+    ],
 }));
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({
     name: 'pg-annotate',

@@ -3,7 +3,8 @@
 // No DOM, and getSettings() is never called: complete() takes `s: Settings`,
 // and runtime.ts binds the live settings and wraps it in the JSON client
 // (ai/client.ts). From ST it only reads request headers, which keys are set,
-// and the current chat-completion connection.
+// the current chat-completion connection and its connection profiles.
+import { findProfile, profileSource, sendThroughProfile } from './ai/st-profiles.js';
 // @ts-expect-error — no type declarations for ST internals
 import { getRequestHeaders } from '../../../../../script.js';
 // @ts-expect-error — no type declarations for ST internals
@@ -99,6 +100,12 @@ function answerParts(parts) {
         .map(p => p.text)
         .join('');
 }
+/** Text of a text-completion answer (a connection profile for a local backend). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function textCompletion(data) {
+    const text = data?.choices?.[0]?.text ?? data?.results?.[0]?.text ?? data?.response ?? data?.content;
+    return typeof text === 'string' ? text : undefined;
+}
 /** Reads the answer text and the "hit the token limit" flag from any supported response shape. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function readReply(data) {
@@ -109,10 +116,14 @@ export function readReply(data) {
     const text = ((typeof content === 'string' ? content : answerParts(content)) || undefined) ?? // OpenAI-compatible
         answerParts(data?.content) ?? // Anthropic
         answerParts(data?.candidates?.[0]?.content?.parts) ?? // Gemini
+        textCompletion(data) ??
         '';
     const truncated = choice?.finish_reason === 'length' ||
         data?.stop_reason === 'max_tokens' ||
-        data?.candidates?.[0]?.finishReason === 'MAX_TOKENS';
+        data?.candidates?.[0]?.finishReason === 'MAX_TOKENS' ||
+        data?.results?.[0]?.finish_reason === 'length' || // KoboldCpp
+        data?.done_reason === 'length' || // Ollama
+        data?.stopped_limit === true; // llama.cpp
     return { text: stripReasoning(text), truncated };
 }
 /** Long enough for slow reasoning models; a hung backend must not leave a spinner forever. */
@@ -211,6 +222,7 @@ export function complete(s, system, user, signal = null) {
     switch (s.provider || 'st') {
         case 'st': return completeViaST(system, user, s, signal);
         case 'custom': return completeViaCustom(system, user, s, signal);
+        case 'profile': return completeViaProfile(system, user, s, signal);
         // ST reads its own saved Vertex auth (Express key or service account)
         case 'vertexai': return completeViaST(system, user, { ...s, route_chat_source: 'vertexai', route_model: s.model }, signal);
         default: return completeViaProvider(system, user, s, signal);
@@ -267,6 +279,38 @@ async function completeViaProvider(system, user, s, signal) {
             ...sourceFields(source, s.model, s.max_tokens),
         },
     });
+}
+/**
+ * A SillyTavern connection profile: its API, model, key and proxy, without
+ * its preset. ST checks the key and reads the answer's errors.
+ */
+async function completeViaProfile(system, user, s, signal) {
+    if (!s.profile_id)
+        throw new Error('No connection profile chosen. Choose one in Polyglot\'s settings.');
+    const profile = findProfile(s.profile_id);
+    if (!profile)
+        throw new Error('The connection profile chosen in Polyglot\'s settings no longer exists. Choose another one.');
+    const source = profileSource(profile);
+    const request = timeoutSignal(signal);
+    try {
+        const data = await sendThroughProfile(profile.id, buildMessages(system, user), s.max_tokens, request.signal, {
+            temperature: TEMPERATURE,
+            ...(source && sourceFields(source, profile.model ?? '', s.max_tokens)),
+        });
+        return readReply(data);
+    }
+    catch (e) {
+        if (request.timedOut())
+            throw new Error(`Connection profile: no response within ${REQUEST_TIMEOUT_MS / 1000} s.`);
+        if (e instanceof Error && e.name === 'AbortError')
+            throw e;
+        if (e instanceof TypeError && /fetch|network/i.test(e.message))
+            throw new Error(ST_NETWORK_HINT);
+        throw new Error(`Connection profile "${profile.name || profile.id}": ${e?.message || 'the request failed'}`);
+    }
+    finally {
+        request.release();
+    }
 }
 /** Any OpenAI-compatible endpoint with a user-supplied base URL and key. */
 async function completeViaCustom(system, user, s, signal) {

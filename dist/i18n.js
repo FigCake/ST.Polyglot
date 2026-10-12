@@ -162,6 +162,7 @@ const EN = {
     'set.langCustomPh': 'Language name (e.g. Portuguese)',
     'set.nativeLangPh': 'Your language (e.g. French, Portuguese)',
     'set.stDefault': '🔗 ST default (use main model)',
+    'set.profileOption': '🔌 ST connection profile',
     // ── Settings actions / notifications ──────────────────────────────────────
     'set.langChanged': 'Learning language changed — conjugation cache cleared.',
     // ── Wordbook UI ───────────────────────────────────────────────────────────
@@ -369,6 +370,8 @@ const EN = {
     'chk.changed': 'The input changed while checking. Suggested: {text}',
     'chk.error': 'An error occurred while checking.',
     'chk.btnTitle': 'Polyglot: check / translate input',
+    'chk.slashOff': 'The input assistant is turned off (Extensions → Polyglot).',
+    'chk.slashEmpty': 'Nothing to check. Write the text after the command: /pg-check Ciao, come stai?',
     // ── Annotator ─────────────────────────────────────────────────────────────
     'ann.analysing': 'Polyglot analysing…',
     'ann.allSkipped': 'Nothing left to analyse: the whole message is left out (Polyglot settings → Leave out of study).',
@@ -500,6 +503,11 @@ const EN = {
     // ── Settings — ST provider rows ───────────────────────────────────────────
     'set.stDesc': 'Uses the API and model currently connected in SillyTavern.',
     'set.stAdvanced': 'Advanced: override source / model',
+    'set.profile': 'Profile',
+    'set.profilePick': 'Choose a profile…',
+    'set.profileDesc': 'Uses a profile saved in SillyTavern\'s Connection Manager: its API, model and key. Its preset (roleplay prompts, samplers) is left out.',
+    'set.profileNone': 'No connection profiles yet. Save one in SillyTavern\'s Connection Manager (API Connections → profiles), then check again.',
+    'set.profileRecheck': 'Check again',
     'set.stModelPh': 'Leave blank to use the source\'s default model',
     'set.modelManual': '✏️ Enter manually…',
     'set.modelPh': 'Model name (e.g. gemini-3.2-pro-preview)',
@@ -701,6 +709,7 @@ const KO = {
     'set.langCustomPh': '언어 이름 (예: Portuguese)',
     'set.nativeLangPh': '사용 언어 (예: French, Portuguese)',
     'set.stDefault': '🔗 ST 기본 (메인 모델 사용)',
+    'set.profileOption': '🔌 ST 연결 프로필',
     // ── Settings actions / notifications ──────────────────────────────────────
     'set.langChanged': '학습 언어 변경 — 동사변화표 캐시가 초기화됐습니다.',
     // ── Wordbook UI ───────────────────────────────────────────────────────────
@@ -908,6 +917,8 @@ const KO = {
     'chk.changed': '확인하는 동안 입력이 바뀌었습니다. 제안: {text}',
     'chk.error': '교정 중 오류가 발생했습니다.',
     'chk.btnTitle': 'Polyglot: 입력 교정 / 번역',
+    'chk.slashOff': '입력 교정이 꺼져 있습니다 (확장 프로그램 → Polyglot).',
+    'chk.slashEmpty': '교정할 글이 없습니다. 명령 뒤에 글을 적어 주세요: /pg-check Ciao, come stai?',
     // ── Annotator ─────────────────────────────────────────────────────────────
     'ann.analysing': 'Polyglot 분석 중…',
     'ann.allSkipped': '분석할 글이 없습니다. 메시지 전체가 분석에서 빠졌습니다 (Polyglot 설정 → 분석에서 뺄 것).',
@@ -1039,6 +1050,11 @@ const KO = {
     // ── Settings — ST provider rows ───────────────────────────────────────────
     'set.stDesc': '현재 SillyTavern에 연결된 API와 모델을 사용합니다.',
     'set.stAdvanced': '고급: 소스 / 모델 덮어쓰기',
+    'set.profile': '프로필',
+    'set.profilePick': '프로필 고르기…',
+    'set.profileDesc': 'SillyTavern 연결 관리자에 저장한 프로필의 API·모델·키를 사용합니다. 프리셋(롤플레이 프롬프트, 샘플러)은 빼고 보냅니다.',
+    'set.profileNone': '아직 연결 프로필이 없습니다. SillyTavern의 연결 관리자(API 연결 → 프로필)에서 저장한 뒤 다시 확인해 주세요.',
+    'set.profileRecheck': '다시 확인',
     'set.stModelPh': '비워두면 소스 기본 모델 사용',
     'set.modelManual': '✏️ 직접 입력…',
     'set.modelPh': '모델 이름 (예: gemini-3.2-pro-preview)',
@@ -1240,6 +1256,7 @@ const IT = {
     'set.langCustomPh': 'Nome lingua (es. Portoghese)',
     'set.nativeLangPh': 'La tua lingua (es. Francese, Portoghese)',
     'set.stDefault': '🔗 ST predefinito (usa modello principale)',
+    'set.profileOption': '🔌 Profilo di connessione ST',
     // ── Settings actions / notifications ──────────────────────────────────────
     'set.langChanged': 'Lingua cambiata — cache coniugazioni cancellata.',
     // ── Wordbook UI ───────────────────────────────────────────────────────────
@@ -1446,6 +1463,8 @@ const IT = {
     'chk.changed': 'Il testo è cambiato durante il controllo. Suggerimento: {text}',
     'chk.error': 'Si è verificato un errore durante il controllo.',
     'chk.btnTitle': 'Polyglot: controlla / traduci input',
+    'chk.slashOff': 'L\'assistente di scrittura è disattivato (Estensioni → Polyglot).',
+    'chk.slashEmpty': 'Niente da controllare. Scrivi il testo dopo il comando: /pg-check Ciao, come stai?',
     // ── Annotator ─────────────────────────────────────────────────────────────
     'ann.analysing': 'Polyglot in analisi…',
     'ann.allSkipped': 'Niente da analizzare: tutto il messaggio è escluso (impostazioni Polyglot → Escludi dallo studio).',
@@ -1577,6 +1596,11 @@ const IT = {
     // ── Settings — ST provider rows ───────────────────────────────────────────
     'set.stDesc': 'Usa l\'API e il modello attualmente collegati in SillyTavern.',
     'set.stAdvanced': 'Avanzato: sovrascrivi sorgente / modello',
+    'set.profile': 'Profilo',
+    'set.profilePick': 'Scegli un profilo…',
+    'set.profileDesc': 'Usa un profilo salvato nel Connection Manager di SillyTavern: API, modello e chiave. Il preset (prompt di roleplay, campionatori) viene escluso.',
+    'set.profileNone': 'Nessun profilo di connessione. Salvane uno nel Connection Manager di SillyTavern (Connessioni API → profili), poi controlla di nuovo.',
+    'set.profileRecheck': 'Controlla di nuovo',
     'set.stModelPh': 'Lascia vuoto per usare il modello predefinito della sorgente',
     'set.modelManual': '✏️ Inserisci manualmente…',
     'set.modelPh': 'Nome modello (es. gemini-3.2-pro-preview)',
@@ -1778,6 +1802,7 @@ const ES = {
     'set.langCustomPh': 'Nombre del idioma (p. ej. Portugués)',
     'set.nativeLangPh': 'Tu idioma (p. ej. Francés, Portugués)',
     'set.stDefault': '🔗 ST predeterminado (usar modelo principal)',
+    'set.profileOption': '🔌 Perfil de conexión de ST',
     // ── Settings actions / notifications ──────────────────────────────────────
     'set.langChanged': 'Idioma cambiado — caché de conjugaciones limpiada.',
     // ── Wordbook UI ───────────────────────────────────────────────────────────
@@ -1984,6 +2009,8 @@ const ES = {
     'chk.changed': 'El texto cambió durante la revisión. Sugerencia: {text}',
     'chk.error': 'Se produjo un error al verificar.',
     'chk.btnTitle': 'Polyglot: verificar / traducir entrada',
+    'chk.slashOff': 'El asistente de escritura está desactivado (Extensiones → Polyglot).',
+    'chk.slashEmpty': 'Nada que verificar. Escribe el texto después del comando: /pg-check Ciao, come stai?',
     // ── Annotator ─────────────────────────────────────────────────────────────
     'ann.analysing': 'Polyglot analizando…',
     'ann.allSkipped': 'Nada que analizar: todo el mensaje está excluido (ajustes de Polyglot → Excluir del estudio).',
@@ -2115,6 +2142,11 @@ const ES = {
     // ── Settings — ST provider rows ───────────────────────────────────────────
     'set.stDesc': 'Usa la API y el modelo actualmente conectados en SillyTavern.',
     'set.stAdvanced': 'Avanzado: anular fuente / modelo',
+    'set.profile': 'Perfil',
+    'set.profilePick': 'Elige un perfil…',
+    'set.profileDesc': 'Usa un perfil guardado en el Connection Manager de SillyTavern: su API, modelo y clave. Su preset (prompts de rol, samplers) se deja fuera.',
+    'set.profileNone': 'Aún no hay perfiles de conexión. Guarda uno en el Connection Manager de SillyTavern (Conexiones API → perfiles) y vuelve a comprobar.',
+    'set.profileRecheck': 'Comprobar de nuevo',
     'set.stModelPh': 'Dejar vacío para usar el modelo predeterminado de la fuente',
     'set.modelManual': '✏️ Introducir manualmente…',
     'set.modelPh': 'Nombre del modelo (p. ej. gemini-3.2-pro-preview)',

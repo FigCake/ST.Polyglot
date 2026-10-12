@@ -18,7 +18,7 @@
 - **Study Modes** — Flashcards, quiz, cloze, typed grammar gaps, reading exam, a weak-points exam built from saved wrong answers, conjugation drill, match, speaking
 - **Writing practice** — Exam-style tasks at your CEFR level (letter or email, opinion text, a scene from your chat), rated on task, organisation, accuracy and range, with corrections and a model answer
 - **PDF Export** — Print-ready A5 flashcard deck, with the conjugation tables you have opened at the end
-- **Slash commands** — `/pg-check`, `/pg-annotate`, `/pg-lookup <word>`, `/pg-panel`
+- **Slash commands** — `/pg-check <text>` (or the input box's text, from Quick Replies and scripts), `/pg-annotate`, `/pg-lookup <word>`, `/pg-panel`
 - **Themes** — Dark, light, breeze and milk; docked or floating panel
 
 ---
@@ -29,14 +29,14 @@
 2. In SillyTavern → Extensions → **Polyglot**, set your target language, CEFR level, and AI provider
 3. Open the Polyglot panel (🌍 on a message, or the 🧩 menu next to the input) for study, the wordbook, and display settings
 
-Supports SillyTavern's default connection or external APIs — OpenAI, Claude, Gemini, Vertex AI, DeepSeek, OpenRouter, and any OpenAI-compatible endpoint.
+Supports SillyTavern's default connection, a SillyTavern connection profile (Connection Manager; its preset is left out), or external APIs — OpenAI, Claude, Gemini, Vertex AI, DeepSeek, OpenRouter, and any OpenAI-compatible endpoint.
 
 ---
 
 ### Your data
 
 - **Storage** — Your words live in `polyglot-data.json` in your SillyTavern user files (not in settings), so they follow you to every device that opens the same SillyTavern. Changes saved from two devices are combined, not overwritten. If your SillyTavern cannot store user files, words are kept in each chat instead, and the all-chats view and sounds/images are unavailable.
-- **Backup** — Settings → Back up saves words, review progress, sets, saved wrong answers, settings and cached conjugation tables as one JSON file, or a `.zip` when words have sounds or images. API keys, the AI connection (provider, model, Custom base URL) and where voice requests go (voice service, OpenAI-compatible URL, proxy) are never included.
+- **Backup** — Settings → Back up saves words, review progress, sets, saved wrong answers, settings and cached conjugation tables as one JSON file, or a `.zip` when words have sounds or images. API keys, the AI connection (provider, model, connection profile, Custom base URL) and where voice requests go (voice service, OpenAI-compatible URL, proxy) are never included.
 - **Restore** — *Merge* adds a backup to your data; *Replace* swaps everything for it, after first downloading a backup of what you have now.
 
 ---
