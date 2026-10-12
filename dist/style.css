@@ -1758,8 +1758,8 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 /* Settings tab — icon button row (one column per action) */
 .pg-pset-icon-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(44px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
+    gap: 6px;
 }
 .pg-pset-icon-btn {
     display: flex;

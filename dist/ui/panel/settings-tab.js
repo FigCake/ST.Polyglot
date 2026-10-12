@@ -10,8 +10,9 @@ import { getSettings, updateSettings, getLang } from '../../runtime.js';
 import { html, setHtml } from '../../html.js';
 import { askConfirm, notify } from '../../ui.manager.js';
 import { t } from '../../i18n.js';
-import { loadWordbook, saveWordbook, scopedWordbook, isShared, currentScope, wordsWithoutLang, adoptWordsWithoutLang, clearAllConjCache, exportToCSV, exportToFlashcardTxt, } from '../../wordbook.js';
+import { loadWordbook, saveWordbook, scopedWordbook, isShared, currentScope, wordsWithoutLang, adoptWordsWithoutLang, clearAllConjCache, exportToCSV, exportToFlashcardTxt, getSets, } from '../../wordbook.js';
 import { exportToPDF } from '../../export/pdf.js';
+import { exportToApkg } from '../../export/apkg.js';
 import { getAllConjEntries } from '../../conj-cache.js';
 import { clearCurrentChatAnnotations } from '../../annotator.js';
 import { triggerImport, reanalyseAll, refreshWordbook } from '../wordbook-ui.js';
@@ -27,6 +28,7 @@ const EXPORT_BUTTONS = [
     { action: 'import', icon: 'fa-file-import', title: 'pnl.set.import' },
     { action: 'csv', icon: 'fa-file-csv', title: 'pnl.set.export' },
     { action: 'txt', icon: 'fa-file-lines', title: 'pnl.set.exportTxt' },
+    { action: 'apkg', icon: 'fa-layer-group', title: 'pnl.set.exportApkg' },
     { action: 'pdf', icon: 'fa-file-pdf', title: 'pnl.set.exportPdf' },
     { action: 'backup', icon: 'fa-box-archive', title: 'pnl.set.backup' },
 ];
@@ -184,6 +186,18 @@ async function exportPdf(btn) {
     }
     await withBusy(btn, async () => exportToPDF(wordbook, await getAllConjEntries(getLang())));
 }
+async function exportApkg(btn) {
+    const wordbook = scopedWordbook();
+    if (!wordbook.length) {
+        notify(t('wb.noExport'), 'warn');
+        return;
+    }
+    await withBusy(btn, async () => {
+        const r = await exportToApkg(wordbook, getSets(), getLang());
+        notify([t('pnl.set.apkgDone', { n: r.words, m: r.media }), r.missing ? t('pnl.set.apkgMissing', { n: r.missing }) : '']
+            .filter(Boolean).join(' '), r.missing ? 'warn' : 'info', 4000);
+    });
+}
 function reanalyse(root, btn) {
     const bar = root.querySelector('.pg-reanalysis-bar');
     if (!bar)
@@ -196,6 +210,7 @@ const ACTIONS = {
     'txt': () => exportToFlashcardTxt(scopedWordbook()),
     'backup': (_, btn) => withBusy(btn, async () => { await saveBackup(); }),
     'pdf': (_, btn) => exportPdf(btn),
+    'apkg': (_, btn) => exportApkg(btn),
     'reanalyse': reanalyse,
     'licenses': () => showLicenses(),
     'reset-srs': () => confirmed(t('pnl.set.resetSrsConfirm'), t('pnl.set.resetSrs'), resetSrs),

@@ -12,7 +12,7 @@
 - **Tap to Translate** — Double-click a sentence (mouse), or select text and tap **Translate sentence** (touch), for an inline translation with verb forms; ask for a deeper sentence analysis from there
 - **Quick Lookup** — Select any word to get its dictionary form, POS, IPA, and meaning
 - **Wordbook + spaced review** — Save words and review them on an FSRS schedule: today's due words first, then new words up to a daily limit, with a forecast for the coming days. A word you have learnt comes back in turn as its meaning, its saved example with the word blanked out, or its meaning with the word to type. Each word is new, learning or known (recalled for three weeks, or marked known to leave the reviews), with a status filter; ignoring a word removes it and stops it being highlighted or saved again. Words you keep forgetting are marked as often missed, with a wordbook filter and a matching game of just those words. The Learn tab opens on your study record: day streak, today's work, reviews left, 30-day accuracy, this month's calendar with your runs of study days, and the reviews due this week. One shared wordbook, viewable per chat or across all chats, and per study language. Merge duplicates, fill missing meanings with AI re-analysis, organise words into sets
-- **Import / Export** — Anki decks (`.apkg` / `.colpkg`, with sounds and images), CSV, and a TXT file for flashcard apps
+- **Import / Export** — Anki decks (`.apkg` / `.colpkg`, with sounds and images) in and out: the export is an `.apkg` with each word's meaning, example, note, sound and picture, tagged by level, set and status. Also CSV, and a TXT file for flashcard apps
 - **Furigana (Japanese)** — Readings over kanji with message analysis (📖) and on word cards, flashcards and the PDF deck; click a reading to correct it
 - **Study Modes** — Flashcards, quiz, cloze, typed grammar gaps, reading exam, a weak-points exam built from saved wrong answers, conjugation drill, match, speaking
 - **Writing practice** — Exam-style tasks at your CEFR level (letter or email, opinion text, a scene from your chat), rated on task, organisation, accuracy and range, with corrections and a model answer
@@ -56,4 +56,5 @@ under **Settings → Open-source licenses**.
 
 Anki and SillyTavern are names of their own projects. Polyglot is not affiliated
 with or endorsed by either. The Anki import reads the `.apkg` / `.colpkg` file
-format with Polyglot's own code; no Anki code is included.
+format with Polyglot's own code, and the Anki export writes it (and the SQLite file
+inside) the same way; no Anki code is included.
