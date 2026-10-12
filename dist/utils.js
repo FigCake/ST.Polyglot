@@ -160,3 +160,5 @@ export function relocateEntries(saved, shown, length) {
     }
     return changed ? out : null;
 }
+/** How a study language is stored on entries ("Italian" and " italian" are one language). */
+export const langKey = (lang) => lang.trim().toLowerCase();

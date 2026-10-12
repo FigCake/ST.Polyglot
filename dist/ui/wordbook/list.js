@@ -9,7 +9,8 @@ import { html, setHtml } from '../../html.js';
 import { t, currentLang } from '../../i18n.js';
 import { loadWordbook, scopedWordbook, removeFromWordbook, toggleWordInSet, setKnown } from '../../wordbook.js';
 import { ai, getLang, getNativeLang } from '../../runtime.js';
-import { speak } from '../../speech.js';
+import { speak } from '../../voice.js';
+import { speakButton } from '../../speak-button.js';
 import { userFileUrl } from '../../user-files.js';
 import { showConjugationPopupFromCache } from '../../features/conjugation.js';
 import { isMissed, isKnown, isCard } from '../../srs.js';
@@ -44,7 +45,7 @@ function row(w, ctx) {
                     <button class="pg-pos-chip${filter.pos === w.pos ? ' pg-pos-chip-active' : ''}" data-action="filter-pos" data-pos="${w.pos}" title="${t('wb.filterByPos')}">${posLabel}</button>`}
                 </div>
                 <div class="pg-wb-head-right">
-                    <button class="pg-icon-btn pg-speak-btn" data-action="speak" title="${t('wb.listen')}" aria-label="${t('wb.listen')}">🔊</button>
+                    ${speakButton({ saved: !!w.audio, label: t('wb.listen'), cls: 'pg-icon-btn', action: 'speak' })}
                     ${isCard(w) && html `
                     <button class="pg-icon-btn pg-wb-known-btn ${w.known && 'pg-wb-known-on'}" data-action="known" aria-pressed="${w.known ? 'true' : 'false'}"
                         title="${t(w.known ? 'wb.unmarkKnown' : 'wb.markKnown')}" aria-label="${t(w.known ? 'wb.unmarkKnown' : 'wb.markKnown')}"><i class="fa-solid fa-check"></i></button>`}
@@ -116,7 +117,7 @@ function onClick(listEl, e) {
     e.stopPropagation();
     switch (action.dataset.action) {
         case 'speak':
-            speak(word, getLang(), loadWordbook().find(w => w.word === word)?.audio);
+            speak(word, getLang(), { audio: loadWordbook().find(w => w.word === word)?.audio, keep: { word, field: 'audio' } });
             break;
         case 'edit':
             openEditForm(item, word, ctx.refresh);

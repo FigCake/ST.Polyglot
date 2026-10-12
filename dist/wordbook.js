@@ -18,14 +18,16 @@ import { downloadText } from './export/download.js';
 import { t } from './i18n.js';
 import { chatValue, currentChatId } from './storage.js';
 import { skipWords } from './study-scope.js';
+import { withSound, withoutSound } from './word-sounds.js';
 import { inScope, inLang, langKey, langsOf, tagChat, tagLang, mergeWordbooks, removeChats, removeWords, moveChats, chatOverview, findDuplicates, mergeGroup, editEntry, } from './wordbook-model.js';
 // ── Wordbook read / write ─────────────────────────────────────────────────────
 /** Every chat's words, as a live array: mutate, then saveWordbook(). Use scopedWordbook() for display. */
 export function loadWordbook() {
     return wordbookData();
 }
-export function saveWordbook(wordbook) {
-    replaceUserData({ wordbook });
+/** `burst`: one of many changes in a row (a sound run), saved with the others a few seconds later. */
+export function saveWordbook(wordbook, burst = false) {
+    replaceUserData({ wordbook }, burst);
 }
 export const currentScope = () => getSettings().wordbook_scope ?? 'chat';
 /** Whether words can be shown across chats (not when each chat stores its own words). */
@@ -74,6 +76,16 @@ export function removeFromWordbook(words) {
         : removeWords(loadWordbook(), set);
     saveWordbook(wordbook);
     forget(deleted);
+}
+/** Sets a word's sound (`made`: by a voice service), or removes it with null. False when the word is gone. */
+export function setWordSound(word, field, name, made = false) {
+    const wb = loadWordbook();
+    const i = wb.findIndex(e => e.word === word);
+    if (i < 0)
+        return false;
+    wb[i] = name ? withSound(wb[i], field, name, made) : withoutSound(wb[i], field);
+    saveWordbook(wb);
+    return true;
 }
 /** Marks words known (left out of reviews, schedule kept) or back to reviewing. */
 export function setKnown(words, known) {

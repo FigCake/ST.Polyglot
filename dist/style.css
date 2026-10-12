@@ -983,7 +983,7 @@
 .pg-btn-block  { width: 100%; }
 .pg-btn-danger { color: var(--pg-err) !important; }
 
-.pg-pset .pg-reanalysis-bar { margin: 0; }
+.pg-pset .pg-run-bar { margin: 0; }
 
 .pg-quiz-container { margin-top: 10px; }
 
@@ -2804,6 +2804,20 @@ mark.pg-wb-hl {
     vertical-align: middle;
 }
 .pg-speak-btn:hover { opacity: 1; }
+.pg-speak-btn:focus-visible { outline: 1.5px solid currentColor !important; outline-offset: 2px; opacity: 1; }
+
+/* A sound kept as a file: a small dot on the button's corner */
+.pg-speak-saved { position: relative; }
+.pg-speak-saved::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    right: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--pg-ok);
+}
 
 /* Pronunciation button inside the detail tab header */
 .pg-word-detail-header .pg-speak-btn,
@@ -3494,16 +3508,16 @@ mark.pg-wb-hl {
     font-style: italic;
 }
 
-.pg-reanalysis-bar {
+/* Drawn from the theme's text colour, so it shows on light themes as well as dark */
+.pg-run-bar {
     margin: 0 0 10px;
     border-radius: var(--pg-radius);
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.20);
+    background: color-mix(in srgb, var(--pg-t1) 7%, transparent);
     padding: 8px 12px 8px;
     animation: pg-bubble-in 0.18s ease;
 }
 
-.pg-reanalysis-progress {
+.pg-run-progress {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -3511,7 +3525,7 @@ mark.pg-wb-hl {
     margin-bottom: 8px;
 }
 
-.pg-reanalysis-text {
+.pg-run-text {
     font-size: 0.8em;
     color: var(--pg-t1);
     opacity: 0.75;
@@ -3522,34 +3536,34 @@ mark.pg-wb-hl {
     white-space: nowrap;
 }
 
-.pg-reanalysis-stop {
+.pg-run-stop {
     flex-shrink: 0;
     padding: 2px 9px;
     font-size: max(12px, 0.75em);
     font-weight: 600;
     border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.18);
-    background: rgba(255,255,255,0.10);
+    border: none;
+    background: color-mix(in srgb, var(--pg-t1) 12%, transparent);
     color: var(--pg-t1);
     cursor: pointer;
     transition: background 0.12s;
     font-family: var(--pg-font);
 }
-.pg-reanalysis-stop:hover {
-    background: rgba(255,255,255,0.20);
+.pg-run-stop:hover {
+    background: color-mix(in srgb, var(--pg-t1) 22%, transparent);
 }
 
-.pg-reanalysis-track {
+.pg-run-track {
     height: 4px;
     border-radius: 2px;
-    background: rgba(255,255,255,0.12);
+    background: color-mix(in srgb, var(--pg-t1) 12%, transparent);
     overflow: hidden;
 }
 
-.pg-reanalysis-fill {
+.pg-run-fill {
     height: 100%;
     border-radius: 2px;
-    background: rgba(255,255,255,0.70);
+    background: color-mix(in srgb, var(--pg-t1) 70%, transparent);
     transition: width 0.3s ease;
     min-width: 4px;
 }
@@ -3576,8 +3590,9 @@ mark.pg-wb-hl {
 
 .pg-wb-count-row {
     display: flex;
+    flex-wrap: wrap;   /* with words selected, the selection buttons take a second line on a narrow panel */
     align-items: center;
-    gap: 8px;
+    gap: 2px 8px;
     padding: 0 14px 8px;
     font-size: max(12px, 0.75em);
     color: var(--pg-t1);
@@ -4057,6 +4072,13 @@ mark.pg-wb-hl {
 .pg-wb-edit-wide { grid-column: 1 / -1; }
 .pg-wb-edit-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
 
+/* The edit form's sounds: name, what it is, then Play / Make / Remove */
+.pg-wb-sounds { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 4px; font-size: 0.82em; }
+.pg-wb-sounds-title { color: var(--pg-t3); }
+.pg-wb-sound-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-height: 26px; }
+.pg-wb-sound-name { min-width: 3.5em; color: var(--pg-t2); }
+.pg-wb-sound-state { flex: 1 1 auto; min-width: 3.5em; color: var(--pg-t3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* Fields in the look of .pg-set-select: a faint fill, no border. Grey rather
    than white, so the fill still shows on the light themes' white cards. */
 .pg-soft-input {
@@ -4275,3 +4297,15 @@ input.pg-typed-input.pg-typed-bad { background: rgba(220, 60, 60, 0.22); }
 }
 .pg-detail-ignore:hover,
 .pg-srs-known:hover { opacity: 0.85; text-decoration: underline; }
+
+/* ── Voice settings and the example's 🔊 ── */
+.pg-voice-pick { display: flex; gap: 6px; align-items: center; }
+.pg-voice-pick .text_pole { flex: 1; min-width: 0; margin: 0; }
+.pg-voice-pick .pg-btn { flex: none; }
+.pg-flash-example-speak {
+    font-size: 0.85em;
+    margin-left: 4px;
+    vertical-align: baseline;
+    opacity: 0.6;
+}
+.pg-flash-example-speak:hover { opacity: 1; }

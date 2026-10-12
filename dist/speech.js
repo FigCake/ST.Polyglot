@@ -1,4 +1,7 @@
-// Text-to-speech and pronunciation scoring (Web Speech API).
+// Playback and pronunciation scoring (Web Speech API).
+//
+// The building blocks voice.ts reads aloud with: playing a sound file, the
+// browser's voice, and stopping both. Which voice reads a word is voice.ts's.
 //
 // Design rules:
 //   • Pure scoring helpers (speechLangCode, normalizeForPronunciation,
@@ -9,7 +12,6 @@ import { similarityScore } from './utils.js';
 import { notify } from './ui.manager.js';
 import { html, setHtml } from './html.js';
 import { t } from './i18n.js';
-import { userFileUrl } from './user-files.js';
 // ── Language codes ────────────────────────────────────────────────────────────
 const LANG_CODES = [
     [['spanish', 'español'], 'es-ES'],
@@ -21,11 +23,18 @@ const LANG_CODES = [
     [['korean', '한국어'], 'ko-KR'],
     [['portuguese'], 'pt-PT'],
 ];
-/** Maps a free-text language name ("Japanese", "Español") to a BCP-47 code. */
-export function speechLangCode(lang) {
+/**
+ * The BCP-47 code of a language Polyglot knows ("Japanese", "Español" → ja-JP,
+ * es-ES); null for one it does not (a custom study language such as Russian).
+ */
+export function knownLangCode(lang) {
     const l = lang.toLowerCase();
-    return LANG_CODES.find(([needles]) => needles.some(n => l.includes(n)))?.[1] ?? 'en-US';
+    if (l.includes('english'))
+        return 'en-US';
+    return LANG_CODES.find(([needles]) => needles.some(n => l.includes(n)))?.[1] ?? null;
 }
+/** Maps a free-text language name to a BCP-47 code, English for one it does not know. */
+export const speechLangCode = (lang) => knownLangCode(lang) ?? 'en-US';
 // ── Text-to-speech ────────────────────────────────────────────────────────────
 /** Learner-friendly speaking rate. */
 const SPEECH_RATE = 0.85;
@@ -80,32 +89,42 @@ export function splitForSpeech(text, lang, max = maxUtteranceChars(lang)) {
 // The queued utterances are kept referenced until the last one ends, so
 // Chromium's GC cannot collect them mid-playback and cut speech short.
 let playing = [];
-/** The recording being played (a word's own audio file). */
+/** The recording being played (a sound file, or a voice service's answer). */
 let recording = null;
-/**
- * Speaks text aloud at a learner-friendly rate, interrupting any ongoing
- * speech. With `audio` (a recorded file in the user's files, e.g. from Anki)
- * the recording is played instead; if it cannot be played, the text is spoken.
- */
-export function speak(text, lang, audio) {
-    recording?.pause();
-    recording = null;
-    if (audio) {
-        if ('speechSynthesis' in window)
-            window.speechSynthesis.cancel();
-        const player = recording = new Audio(userFileUrl(audio));
-        player.play().catch(() => { if (recording === player) {
-            recording = null;
-            speak(text, lang);
-        } });
-        return;
+const revoke = (src) => { if (src.startsWith('blob:'))
+    URL.revokeObjectURL(src); };
+/** Stops what is being read aloud: a recording or the browser's voice. */
+export function stopSpeech() {
+    if (recording) {
+        recording.pause();
+        revoke(recording.src);
     }
+    recording = null;
+    if ('speechSynthesis' in window)
+        window.speechSynthesis.cancel();
+}
+/**
+ * Plays a sound (a file URL, or a blob: URL it then owns). If it cannot be
+ * played, `onFail` gets the error, unless something else started meanwhile.
+ */
+export function playSound(src, onFail) {
+    const player = recording = new Audio(src);
+    player.onended = () => revoke(src);
+    player.play().catch(error => {
+        revoke(src);
+        if (recording === player) {
+            recording = null;
+            onFail(error);
+        }
+    });
+}
+/** The browser's own voice, at a learner-friendly rate (`code`: BCP-47). */
+export function speakWithBrowser(text, code) {
     if (!('speechSynthesis' in window)) {
         notify(t('tts.noSupport'), 'err', 2500);
         return;
     }
     window.speechSynthesis.cancel();
-    const code = speechLangCode(lang);
     const queue = splitForSpeech(text, code).map(chunk => Object.assign(new SpeechSynthesisUtterance(chunk), { lang: code, rate: SPEECH_RATE }));
     playing = queue;
     if (!queue.length)

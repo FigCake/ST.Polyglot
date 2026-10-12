@@ -7,7 +7,8 @@
 // Modes and quiz variants are declared as data (MODES / QUIZ_VARIANTS), so
 // adding one is a single table entry.
 import { getSettings, getLang, getNativeLang, ai, getContext } from '../../runtime.js';
-import { speak, hasSpeechRecognition, runPronunciationCheck, setActiveRecognition, getActiveRecognition, abortActiveRecognition, } from '../../speech.js';
+import { speak } from '../../voice.js';
+import { hasSpeechRecognition, runPronunciationCheck, setActiveRecognition, getActiveRecognition, abortActiveRecognition, } from '../../speech.js';
 import { html, setHtml } from '../../html.js';
 import { askConfirm } from '../../ui.manager.js';
 import { t } from '../../i18n.js';

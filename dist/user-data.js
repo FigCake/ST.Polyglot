@@ -28,7 +28,7 @@ const strings = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string'
 export const num = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 /** Optional fields that must be text when present (anything else would break the views that read them). */
 const TEXT_FIELDS = ['meaning_lang', 'pos_info', 'pos', 'ipa', 'reading', 'notes', 'original_form', 'context_meaning',
-    'example', 'example_translation', 'example_form', 'audio', 'image', 'dateAdded'];
+    'example', 'example_translation', 'example_form', 'example_audio', 'audio', 'image', 'dateAdded'];
 const SRS_NUMBERS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
     'srs_interval', 'srs_ease', 'srs_streak'];
 /** The entry without optional fields of the wrong type (a backup or chat metadata may hold anything). */
@@ -37,11 +37,13 @@ function typedFields(v) {
     for (const k of TEXT_FIELDS)
         if (k in out && typeof out[k] !== 'string')
             delete out[k];
-    if ('collocations' in out) {
-        if (Array.isArray(out.collocations))
-            out.collocations = out.collocations.filter(c => typeof c === 'string');
+    for (const k of ['collocations', 'made_sounds']) {
+        if (!(k in out))
+            continue;
+        if (Array.isArray(out[k]))
+            out[k] = out[k].filter(c => typeof c === 'string');
         else
-            delete out.collocations;
+            delete out[k];
     }
     for (const k of SRS_NUMBERS)
         if (k in out && !Number.isFinite(out[k]))
@@ -139,7 +141,7 @@ export function mergeUserData(current, incoming) {
  * only if the learner edited it here (keptAfterDeletion).
  */
 export function rebaseUserData(base, local, server) {
-    const serverMedia = new Set(server.wordbook.flatMap(e => [e.audio, e.image]));
+    const serverMedia = new Set(server.wordbook.flatMap(e => [e.audio, e.example_audio, e.image]));
     return {
         wordbook: rebase(base.wordbook, local.wordbook, server.wordbook, e => e.word, (l, r, b) => (b ? rebaseEntry(b, l, r) : mergeEntries(l, r)), (l, b) => keptAfterDeletion(b, l, serverMedia)),
         sets: rebase(base.sets, local.sets, server.sets, s => s.id, l => l),

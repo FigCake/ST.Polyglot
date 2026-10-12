@@ -63,7 +63,10 @@ export function guessMapping(fields) {
     const map = { word: -1, meaning: -1, reading: -1, example: -1, notes: -1 };
     const used = new Set();
     for (const [target, re] of NAME_HINTS) {
-        const i = fields.findIndex((f, k) => !used.has(k) && re.test(f.trim()));
+        // A field named exactly for the target wins over one that only contains a hint
+        // (Polyglot's own "Example" before its "Context")
+        const exact = fields.findIndex((f, k) => !used.has(k) && f.trim().toLowerCase() === target);
+        const i = exact >= 0 ? exact : fields.findIndex((f, k) => !used.has(k) && re.test(f.trim()));
         if (i >= 0) {
             map[target] = i;
             used.add(i);
@@ -104,7 +107,9 @@ export function notesToRows(notes, mappings) {
         const reading = readingField.reading || readingField.text || word.reading;
         const example = splitFurigana(fieldText(html('example'))).text;
         const notesText = fieldText(html('notes'));
-        const sound = refs.flatMap(r => r.sounds)[0];
+        const exampleAt = map.example ?? -1;
+        const sound = refs.flatMap((r, i) => (i === exampleAt ? [] : r.sounds))[0];
+        const exampleSound = exampleAt >= 0 ? refs[exampleAt]?.sounds[0] : undefined;
         const image = refs.flatMap(r => r.images)[0];
         if (reading)
             row.reading = reading;
@@ -114,6 +119,8 @@ export function notesToRows(notes, mappings) {
             row.notes = notesText;
         if (sound)
             row.sound = sound;
+        if (exampleSound && example)
+            row.exampleSound = exampleSound;
         if (image)
             row.image = image;
         rows.push(row);

@@ -1,7 +1,8 @@
 // Edit every field of a wordbook row in place: word, base form, meanings,
 // level, part of speech, reading (Japanese) or pronunciation.
 //
-// Renaming onto a word that already exists merges the two entries.
+// Renaming onto a word that already exists merges the two entries. The
+// word's sounds have their own buttons below the fields (sound-rows.ts).
 import { CEFR_LEVELS, POS_TAGS } from '../../constants.js';
 import { isJapanese, levelLabel } from '../../utils.js';
 import { html, setHtml } from '../../html.js';
@@ -9,6 +10,7 @@ import { t } from '../../i18n.js';
 import { notify } from '../../ui.manager.js';
 import { getLang } from '../../runtime.js';
 import { loadWordbook, editWord } from '../../wordbook.js';
+import { soundRows, bindSoundRows } from './sound-rows.js';
 const LEVELS = [...CEFR_LEVELS, 'idiom', 'grammar', 'sentence'];
 /** Replaces the row's content with the form. `done` re-renders the list (saved or cancelled). */
 export function openEditForm(item, word, done) {
@@ -43,6 +45,7 @@ export function openEditForm(item, word, done) {
                     ${POS_TAGS.map(p => html `<option value="${p}" ${e.pos === p && html `selected`}>${p}</option>`)}
                 </select>
             </label>
+            ${soundRows(e)}
             <div class="pg-wb-edit-actions">
                 <button type="button" class="pg-wb-row-btn" data-edit="cancel">${t('wb.editCancel')}</button>
                 <button type="submit" class="pg-btn pg-btn-primary pg-btn-compact">${t('wb.editSave')}</button>
@@ -53,6 +56,7 @@ export function openEditForm(item, word, done) {
         return;
     form.querySelector('input[name="meaning"]')?.focus();
     form.querySelector('[data-edit="cancel"]')?.addEventListener('click', done);
+    bindSoundRows(form, word);
     form.addEventListener('keydown', ev => { if (ev.key === 'Escape') {
         ev.stopPropagation();
         done();

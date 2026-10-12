@@ -19,6 +19,7 @@ import { triggerImport, reanalyseAll, refreshWordbook } from '../wordbook-ui.js'
 import { saveBackup } from '../backup-ui.js';
 import { applyPanelTheme, findPanelEl, setFloating } from './chrome.js';
 import { mountChatsSection } from './chats-section.js';
+import { voiceSection, bindVoiceSettings } from './voice-settings.js';
 import { showLicenses } from '../licenses.js';
 import { storeMode } from '../../data-store.js';
 import { furiganaEnabled, applyFuriganaDisplay, warnIfFontClamped } from '../../furigana/messages.js';
@@ -97,7 +98,7 @@ function render(s) {
             <button class="pg-btn pg-btn-secondary pg-btn-block" data-action="reanalyse" title="${t('wb.reanalyseTip')}">
                 ✨ ${t('wb.reanalyse')}
             </button>
-            <div class="pg-reanalysis-bar" hidden></div>
+            <div class="pg-run-bar pg-reanalysis-bar" hidden></div>
             ${isShared() && html `
             <label class="pg-pset-row">
                 <span class="pg-pset-label">${t('pnl.set.chatOnly')}</span>
@@ -118,6 +119,8 @@ function render(s) {
             ${dangerButton('clear-conj', t('pnl.set.clearConj'))}
             ${dangerButton('clear-chat', t('pnl.set.clearChat'))}
             ${textField('dict_url_custom', t('pnl.set.dictUrl'), s.dict_url_custom ?? '', t('pnl.set.dictUrlPh'), t('pnl.set.dictUrlDesc'))}`)}
+
+        ${section(t('tts.section'), voiceSection(s))}
 
         ${furiganaEnabled() && section(t('furi.section'), html `
             ${selectRow('furigana_display', t('furi.display'), s.furigana_display ?? 'show', FURIGANA_DISPLAY)}
@@ -269,11 +272,13 @@ export function buildSettingsTab() {
         updateSettings({ [key]: value });
         SETTING_EFFECTS[key]?.(value);
     };
-    // Text fields save as you type; checkboxes and selects fire `change`
-    root.addEventListener('input', e => { if (e.target.type === 'text')
+    // Text and key fields save as you type (closing the panel mid-word loses nothing); checkboxes and selects fire `change`
+    const typed = (e) => ['text', 'password'].includes(e.target.type);
+    root.addEventListener('input', e => { if (typed(e))
         onSettingChange(e); });
-    root.addEventListener('change', e => { if (e.target.type !== 'text')
+    root.addEventListener('change', e => { if (!typed(e))
         onSettingChange(e); });
+    bindVoiceSettings(root);
     // On (the default): the wordbook, study modes and exports use the open chat's words; off: all chats'
     root.querySelector('.pg-scope-check')?.addEventListener('change', e => {
         updateSettings({ wordbook_scope: e.target.checked ? 'chat' : 'all' });

@@ -100,7 +100,7 @@ function fieldsOf(e, media) {
         e.context_meaning && e.context_meaning !== e.meaning ? esc(e.context_meaning) : '',
         e.base_form && e.base_form !== e.word ? esc(e.base_form) : '',
         esc(e.pos_info),
-        example(e),
+        example(e) + (e.example_audio && media.has(e.example_audio) ? ` [sound:${e.example_audio}]` : ''),
         esc(e.example_translation),
         esc(e.notes),
         e.audio && media.has(e.audio) ? `[sound:${e.audio}]` : '',

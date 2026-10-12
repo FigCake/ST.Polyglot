@@ -112,7 +112,7 @@ class SpeakingSession {
             return;
         }
         setHtml(this.area, cardView(this.modeFor()));
-        this.deps.speak(w.word, this.deps.getLang(), w.audio); // play on open
+        this.deps.speak(w.word, this.deps.getLang(), { audio: w.audio, keep: { word: w.word, field: 'audio' } }); // play on open
     }
     /** Shows the answer and the Next button. */
     reveal() {
@@ -161,7 +161,7 @@ class SpeakingSession {
                 break;
             case 'play':
                 if (this.entry)
-                    this.deps.speak(this.entry.word, this.deps.getLang(), this.entry.audio);
+                    this.deps.speak(this.entry.word, this.deps.getLang(), { audio: this.entry.audio, keep: { word: this.entry.word, field: 'audio' } });
                 break;
             case 'check':
                 this.check(el);

@@ -1,8 +1,9 @@
-// Wordbook list filters (level pill, frequently missed, word status, set, part of speech, search) — pure.
+// Wordbook list filters (level pill, frequently missed, no sound, word status, set, part of speech, search) — pure.
 import { isMissed, isCard, wordStatus } from '../../srs.js';
-export const emptyFilter = () => ({ level: 'all', setId: 'all', pos: '', query: '', missed: false, status: 'all' });
+import { lacksSound } from '../../word-sounds.js';
+export const emptyFilter = () => ({ level: 'all', setId: 'all', pos: '', query: '', missed: false, noSound: false, status: 'all' });
 export function isFiltered(f) {
-    return f.level !== 'all' || f.setId !== 'all' || !!f.pos || !!f.query.trim() || f.missed || f.status !== 'all';
+    return f.level !== 'all' || f.setId !== 'all' || !!f.pos || !!f.query.trim() || f.missed || f.noSound || f.status !== 'all';
 }
 function matchesLevel(w, level) {
     if (level === 'all')
@@ -22,6 +23,7 @@ export function applyFilter(wordbook, f) {
         .filter(w => matchesLevel(w, f.level) &&
         (!f.pos || w.pos === f.pos) &&
         (!f.missed || isMissed(w)) &&
+        (!f.noSound || lacksSound(w)) &&
         (f.status === 'all' || (isCard(w) && wordStatus(w) === f.status)) &&
         (f.setId === 'all' || (w.setIds ?? []).includes(f.setId)) &&
         (!q || matchesQuery(w, q)))

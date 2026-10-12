@@ -25,6 +25,8 @@ import { cardKind, clozeOf, gradeWord } from '../card-kind.js';
 import { findWord } from '../utils.js';
 import { acceptObject } from '../ai/client.js';
 import { userFileUrl } from '../user-files.js';
+import { withoutSound } from '../word-sounds.js';
+import { speakButton } from '../speak-button.js';
 const RATINGS = [
     { rating: 0, key: 'fl.again', cls: 'pg-srs-again' },
     { rating: 1, key: 'fl.hard', cls: 'pg-srs-hard' },
@@ -72,7 +74,8 @@ function exampleView(w) {
     const cloze = clozeOf(w);
     return html `
         <div class="pg-flash-example-wrap">
-            <div class="pg-flash-example">${cloze ? sentenceView(cloze) : w.example}</div>
+            <div class="pg-flash-example">${cloze ? sentenceView(cloze) : w.example}
+                ${speakButton({ saved: !!w.example_audio, label: t('fl.listenExample'), cls: 'pg-flash-example-speak', action: 'speak-example' })}</div>
             ${w.example_translation && html `<div class="pg-flash-example-trans">${w.example_translation}</div>`}
         </div>`;
 }
@@ -93,16 +96,18 @@ async function loadExample(w, card, deps) {
             return;
         // Re-read so concurrent SRS updates are not overwritten
         const wordbook = loadWordbook();
-        const entry = wordbook.find(e => e.word === w.word);
+        const i = wordbook.findIndex(e => e.word === w.word);
         const translation = data.translation?.trim() || undefined;
         // Kept only when the sentence really has it
         const form = typeof data.form === 'string' && findWord(sentence, data.form.trim()) !== -1 ? data.form.trim() : undefined;
-        if (entry) {
-            Object.assign(entry, { example: sentence, example_translation: translation ?? entry.example_translation });
+        if (i >= 0) {
+            const entry = { ...wordbook[i], example: sentence, example_translation: translation ?? wordbook[i].example_translation };
             if (form)
                 entry.example_form = form;
             else
                 delete entry.example_form;
+            // A new example: the old one's sound no longer fits (its file goes at the next save)
+            wordbook[i] = withoutSound(entry, 'example_audio');
             saveWordbook(wordbook);
         }
         Object.assign(w, { example: sentence, example_translation: translation ?? w.example_translation });
@@ -110,6 +115,7 @@ async function loadExample(w, card, deps) {
             w.example_form = form;
         else
             delete w.example_form;
+        delete w.example_audio;
         if (slot?.isConnected)
             slot.outerHTML = exampleView(w).value;
     }
@@ -245,7 +251,7 @@ class FlashcardSession {
                     <div class="pg-flash-word">${rubyWord(w.word, shownReading(w))}</div>
                     ${w.pos_info && html `<div class="pg-flash-pos">${w.pos_info}</div>`}
                     <div class="pg-flash-btn-row">
-                        <button class="pg-speak-btn pg-flash-speak" data-action="speak" title="${t('fl.listen')}">🔊</button>
+                        ${speakButton({ saved: !!w.audio, label: t('fl.listen'), cls: 'pg-flash-speak', action: 'speak' })}
                         ${this.deps.hasSpeechRecog() && html `<button class="pg-flash-mic" data-action="mic" title="${t('fl.mic')}" data-active="false">🎤</button>`}
                     </div>
                 </div>
@@ -296,7 +302,7 @@ class FlashcardSession {
                     ${flipped && exampleView(w)}
                     ${w.notes && html `<div class="pg-flash-notes">${w.notes}</div>`}
                     <div class="pg-flash-btn-row">
-                        <button class="pg-speak-btn pg-flash-speak" data-action="speak" title="${t('fl.listen')}">🔊</button>
+                        ${speakButton({ saved: !!w.audio, label: t('fl.listen'), cls: 'pg-flash-speak', action: 'speak' })}
                         ${this.deps.hasSpeechRecog() && html `<button class="pg-flash-mic" data-action="mic" title="${t('fl.mic')}" data-active="false">🎤</button>`}
                     </div>
                 </div>
@@ -428,7 +434,12 @@ class FlashcardSession {
             case 'speak':
                 e.stopPropagation();
                 if (w)
-                    this.deps.speak(w.word, this.deps.getLang(), w.audio);
+                    this.deps.speak(w.word, this.deps.getLang(), { audio: w.audio, keep: { word: w.word, field: 'audio' } });
+                break;
+            case 'speak-example':
+                e.stopPropagation();
+                if (w?.example)
+                    this.deps.speak(w.example, this.deps.getLang(), { audio: w.example_audio, keep: { word: w.word, field: 'example_audio' } });
                 break;
             case 'mic': {
                 e.stopPropagation();

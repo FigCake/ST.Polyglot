@@ -2,7 +2,7 @@
 // named by their content: pg-media-<16 hex>.<ext>.
 //
 //   mediaIn(words)        the files a wordbook refers to
-//   noteUploaded(names)   files this session just stored (Anki import, restore)
+//   noteUploaded(names)   files this session just stored (Anki import, restore, made sounds)
 //   releaseMedia(a, b)    deletes the files `a` used — or this session stored —
 //                         that `b` does not use (nor the data in memory now);
 //                         called by data-store.ts once `b` is safely saved
@@ -30,6 +30,17 @@ export const isMediaName = (name) => typeof name === 'string' && MEDIA_NAME.test
 const AUDIO = new Set(['mp3', 'ogg', 'oga', 'opus', 'wav', 'm4a', 'aac', 'flac', 'webm']);
 const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp']);
 const extOf = (name) => /\.([a-z0-9]+)$/i.exec(name)?.[1].toLowerCase() ?? '';
+/** A 64-bit content fingerprint (two FNV-1a passes), as hex. */
+export function bytesHash(bytes) {
+    let a = 0x811c9dc5, b = 0x01000193 ^ bytes.length;
+    for (let i = 0; i < bytes.length; i++) {
+        a = Math.imul(a ^ bytes[i], 0x01000193);
+        b = Math.imul(b ^ bytes[i], 0x5bd1e995) ^ (b >>> 15);
+    }
+    return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
+}
+/** The user-files name for a media file's bytes (`original` gives the extension). */
+export const mediaFileName = (bytes, original) => `pg-media-${bytesHash(bytes)}.${extOf(original)}`;
 /** Whether a file of this name can be kept as a word's sound or picture. */
 export const keepableMedia = (name, kind) => (kind === 'sound' ? AUDIO : IMAGE).has(extOf(name));
 /** The media files the words refer to. */
@@ -40,6 +51,8 @@ export function mediaIn(words) {
             names.add(w.audio);
         if (isMediaName(w.image))
             names.add(w.image);
+        if (isMediaName(w.example_audio))
+            names.add(w.example_audio);
     }
     return names;
 }
@@ -52,6 +65,29 @@ async function mediaExists(name) {
         return false;
     }
 }
+/**
+ * Whether a file is known to be gone from the user's files: only a clear
+ * answer counts (verify says no, or the file answers 404). A server that does
+ * not answer (restarting, a network blip) says nothing, so nothing is replaced.
+ */
+export async function mediaGone(name) {
+    const url = `user/files/${name}`;
+    try {
+        const res = await fetch('/api/files/verify', { method: 'POST', headers: getRequestHeaders(), body: JSON.stringify({ urls: [url] }) });
+        if (res.ok) {
+            const verified = await res.json();
+            if (typeof verified[url] === 'boolean')
+                return verified[url] === false;
+        }
+    }
+    catch { /* ask the file itself */ }
+    try {
+        return (await fetch(userFileUrl(name), { method: 'HEAD', cache: 'no-store' })).status === 404;
+    }
+    catch {
+        return false;
+    }
+}
 /** Names checked per /api/files/verify request. */
 const VERIFY_BATCH = 500;
 /**
@@ -59,10 +95,14 @@ const VERIFY_BATCH = 500;
  * names (ST's /api/files/verify), or one HEAD per file on an ST without it.
  */
 export async function existingMedia(names) {
-    // Asked about again (a restore, a re-import): files queued for deletion stay, and a
-    // deletion already under way finishes first, so the answer is what will be there
-    for (const n of names)
+    // Asked about again (a restore, a re-import, a sound made again): files queued for
+    // deletion stay, and a deletion already under way finishes first, so the answer is
+    // what will be there. They are no longer this session's spare uploads either: until
+    // a word takes them (and they are noted again), no save may let them go.
+    for (const n of names) {
         doomed.delete(n);
+        uploaded.delete(n);
+    }
     await deletingNow;
     const found = new Set();
     for (let i = 0; i < names.length; i += VERIFY_BATCH) {

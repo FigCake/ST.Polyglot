@@ -32,16 +32,22 @@ import { cleanData, mergeUserData, list, num } from './user-data.js';
 import { isRecord } from './ai/client.js';
 export const BACKUP_FORMAT = 'polyglot-backup';
 const BACKUP_VERSION = 1;
-/** Settings keys that hold data (backed up separately), the API key, or where AI requests go. */
+/**
+ * Settings keys that hold data (backed up separately), or say where requests
+ * go with the keys left on the device: a restored file must not send a key to
+ * an address it chose. Every API key (a name ending in "_key") is left out too.
+ */
 const NOT_SETTINGS = new Set([
     '_wordbook', '_sets', 'saved_wrong_answers', 'saved_checks', 'saved_days',
     'ext_api_key', 'ext_base_url', 'provider', 'model', '_model_history', 'route_chat_source', 'route_model',
+    'voice_provider', 'voice_oa_url', 'voice_proxy',
 ]);
+const isApiKey = (k) => k.endsWith('_key');
 /**
  * Only known setting keys are restored. This also keeps keys such as
  * "__proto__" in a crafted file from reaching Object.assign.
  */
-const RESTORABLE = new Set(Object.keys(DEFAULT_SETTINGS).filter(k => !NOT_SETTINGS.has(k)));
+const RESTORABLE = new Set(Object.keys(DEFAULT_SETTINGS).filter(k => !NOT_SETTINGS.has(k) && !isApiKey(k)));
 // ── Pure ──────────────────────────────────────────────────────────────────────
 export function createBackup(settings, data, conjugations, now = new Date()) {
     return {
@@ -153,7 +159,7 @@ export async function openBackupZip(file) {
 }
 /** Without file storage there is nowhere to keep media: words lose their links to it. */
 export function withoutMedia(backup) {
-    return { ...backup, wordbook: backup.wordbook.map(({ audio: _a, image: _i, ...w }) => w) };
+    return { ...backup, wordbook: backup.wordbook.map(({ audio: _a, example_audio: _e, image: _i, made_sounds: _m, ...w }) => w) };
 }
 async function restoreConjugations(entries, replace) {
     if (replace)

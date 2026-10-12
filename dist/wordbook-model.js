@@ -8,6 +8,8 @@
 // (saved before languages were recorded) shows in every language.
 //
 // No DOM, no storage — unit-tested.
+import { langKey } from './utils.js';
+import { mergeSounds, renamedSounds, withExampleOf, withMadeList, EXAMPLE_FIELDS } from './word-sounds.js';
 /** Key of the "no chat" group in overviews and chat selections. */
 export const UNSORTED = '';
 export const chatsOf = (e) => e.chats ?? [];
@@ -16,8 +18,7 @@ export function inScope(e, scope, chatId) {
     return scope === 'all' || !chatId || chatsOf(e).includes(chatId);
 }
 export const langsOf = (e) => e.langs ?? [];
-/** How a study language is stored on entries ("Italian" and " italian" are one language). */
-export const langKey = (lang) => lang.trim().toLowerCase();
+export { langKey };
 /** Whether the entry belongs to study language `lang` (no filter: null; no recorded language: every one). */
 export const inLang = (e, lang) => !lang || !langsOf(e).length || langsOf(e).includes(lang);
 /** Group key of each chat the entry belongs to (UNSORTED when it has none). */
@@ -64,7 +65,7 @@ export function mergeEntries(a, b) {
     // The schedule comes whole from one copy, never mixed
     for (const k of SRS_FIELDS)
         delete merged[k];
-    return {
+    return mergeSounds(a, b, {
         ...merged,
         setIds: union(a.setIds, b.setIds),
         chats: union(a.chats, b.chats),
@@ -74,7 +75,7 @@ export function mergeEntries(a, b) {
         dateAdded: earliest(a.dateAdded, b.dateAdded),
         conj_cached: !!(a.conj_cached || b.conj_cached),
         ...srsOf(srs),
-    };
+    });
 }
 /** The review schedule fields, which always move together (FSRS and the older SM-2 ones). */
 const SRS_FIELDS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
@@ -87,7 +88,7 @@ function srsOf(e) {
             out[k] = e[k];
     return out;
 }
-const LIST_FIELDS = new Set(['setIds', 'chats', 'langs']);
+const LIST_FIELDS = new Set(['setIds', 'chats', 'langs', 'made_sounds']);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /** A list after both sides' additions and removals since `base`. */
 function rebaseList(base = [], local = [], server = []) {
@@ -99,7 +100,8 @@ function rebaseList(base = [], local = [], server = []) {
  * one side changed takes that change; lists get both sides' additions and
  * removals; notes are joined; other text changed on both sides keeps this
  * device's (`local`). The SRS state moves as one, from the side that
- * reviewed the word (both: the one reviewed more), so it is never a mix.
+ * reviewed the word (both: the one reviewed more), so it is never a mix; so
+ * does the example with its translation and sound, from the side that changed it.
  */
 export function rebaseEntry(base, local, server) {
     const b = base;
@@ -125,25 +127,36 @@ export function rebaseEntry(base, local, server) {
         if (v !== undefined)
             out[k] = v;
     }
-    return out;
+    // The side that changed the example text wins; a sound alone decides only when neither did
+    const textChanged = (e) => !same(e.example, b.example);
+    const groupChanged = (e) => EXAMPLE_FIELDS.some(k => !same(e[k], b[k]));
+    const exampleFrom = textChanged(l) ? local : textChanged(r) ? server : groupChanged(l) ? local : server;
+    const merged = withExampleOf(out, exampleFrom);
+    return withMadeList(merged, merged.made_sounds ?? []);
 }
 /** Fields that change without the learner editing the word: reviews, the conjugation flag, chat and language tags. */
 const UPKEEP_FIELDS = new Set([...SRS_FIELDS, 'conj_cached', 'chats', 'langs']);
 /**
  * A word this session still has but another device deleted since `base`:
- * gone, unless the learner edited it here (a review or a tag does not bring
- * a deleted word back). A word kept loses the sound or picture it had at
+ * gone, unless the learner edited it here (a review, a tag or a sound a voice
+ * service made does not bring a deleted word back). A word kept loses the sound or picture it had at
  * `base` when no word on the server uses it: the other device deleted the file.
  */
 export function keptAfterDeletion(base, local, serverMedia) {
     const b = base;
     const l = local;
-    const edited = [...new Set([...Object.keys(b), ...Object.keys(l)])].some(k => !UPKEEP_FIELDS.has(k) && !same(l[k], b[k]));
+    const made = new Set(local.made_sounds ?? []);
+    // A 🔊 press or a run that stored a made sound is upkeep too, not an edit
+    const upkeep = (k) => UPKEEP_FIELDS.has(k) || k === 'made_sounds'
+        || ((k === 'audio' || k === 'example_audio') && made.has(l[k]));
+    const edited = [...new Set([...Object.keys(b), ...Object.keys(l)])].some(k => !upkeep(k) && !same(l[k], b[k]));
     if (!edited)
         return null;
     const out = { ...local };
     if (out.audio && out.audio === base.audio && !serverMedia.has(out.audio))
         delete out.audio;
+    if (out.example_audio && out.example_audio === base.example_audio && !serverMedia.has(out.example_audio))
+        delete out.example_audio;
     if (out.image && out.image === base.image && !serverMedia.has(out.image))
         delete out.image;
     return out;
@@ -280,7 +293,8 @@ export function editEntry(wordbook, word, patch) {
         return { wordbook, word, merged: false, formChanged: false };
     const clean = Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v]));
     const nextWord = clean.word || entry.word;
-    const edited = { ...entry, ...clean, word: nextWord, base_form: clean.base_form || nextWord };
+    // A made sound of the old spelling does not come along (a recording does)
+    const edited = renamedSounds({ ...entry, ...clean, word: nextWord, base_form: clean.base_form || nextWord }, entry.word);
     const formChanged = edited.word !== entry.word || edited.base_form !== entry.base_form;
     if (formChanged)
         edited.conj_cached = false;

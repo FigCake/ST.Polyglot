@@ -31,6 +31,8 @@ const DATA_FILE = 'polyglot-data.json';
 /** One-time copy of the settings data, written before the first migration. */
 const MIGRATION_COPY = 'polyglot-data-before-migration.json';
 const SAVE_DELAY_MS = 800;
+/** A burst of small changes (a run making sounds) is saved at most this often, not after each one. */
+const BURST_SAVE_MS = 8000;
 const RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
 let mode = 'loading';
 let data = emptyData();
@@ -38,6 +40,8 @@ let data = emptyData();
 let dirty = false;
 let saving = null;
 let saveTimer;
+/** Every change waiting to be saved came in a burst (see commit). */
+let burstOnly = false;
 let retryTimer;
 let failures = 0;
 /** The file text as last read or written, to skip no-op reloads. */
@@ -106,8 +110,8 @@ export function onDataReplaced(listener) {
 }
 const emitReplaced = () => listeners.forEach(l => l());
 // ── Writing ──────────────────────────────────────────────────────────────────
-/** Replaces any part of the data and saves it. */
-export function replaceUserData(patch) {
+/** Replaces any part of the data and saves it (`burst`: one of many changes in a row, see commit). */
+export function replaceUserData(patch, burst = false) {
     if (mode === 'chat') {
         const meta = chatMetadata();
         if (patch.wordbook) {
@@ -128,24 +132,39 @@ export function replaceUserData(patch) {
     else {
         data = { ...data, ...patch };
     }
-    commit();
+    commit(burst);
 }
-/** Schedules a save after the live arrays were changed. */
-export function commit() {
+/**
+ * Schedules a save after the live arrays were changed. A `burst` change keeps
+ * a save already scheduled, or schedules one a few seconds away: a run of
+ * hundreds of changes writes the file every few seconds, not hundreds of times,
+ * and its changes are committed (a reload cannot drop them) all along.
+ */
+export function commit(burst = false) {
     if (mode === 'chat') {
         if (chatMetadata())
             saveChatMetadata();
         saveSettings();
         return;
     }
+    // Only burst changes waiting: the next save may wait a few seconds
+    burstOnly = burst && (burstOnly || !dirty);
     dirty = true;
     // While a save keeps failing, its back-off timer stays in charge
-    if (mode === 'file' && failures === 0)
+    if (mode !== 'file' || failures > 0)
+        return;
+    if (!burst)
         scheduleSave(SAVE_DELAY_MS);
+    else if (saveTimer === undefined)
+        scheduleSave(BURST_SAVE_MS);
+}
+function cancelSave() {
+    clearTimeout(saveTimer);
+    saveTimer = undefined;
 }
 function scheduleSave(delay) {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { void save(); }, delay);
+    cancelSave();
+    saveTimer = setTimeout(() => { saveTimer = undefined; void save(); }, delay);
 }
 /**
  * Takes in what another device saved since this session last read or wrote
@@ -175,12 +194,13 @@ async function catchUp() {
 function save() {
     if (saving)
         return saving;
-    clearTimeout(saveTimer);
+    cancelSave();
     // Until the file has loaded, `data` is only part of the learner's data
     if (mode !== 'file')
         return Promise.resolve();
     saving = (async () => {
         dirty = false;
+        burstOnly = false;
         const caught = await catchUp();
         if (caught === 'newer') {
             dirty = true;
@@ -212,7 +232,7 @@ function save() {
     })().finally(() => {
         saving = null;
         if (dirty && mode === 'file' && failures === 0)
-            scheduleSave(SAVE_DELAY_MS);
+            scheduleSave(burstOnly ? BURST_SAVE_MS : SAVE_DELAY_MS);
     });
     return saving;
 }
@@ -259,7 +279,7 @@ function switchToChatMode() {
     // saved outside a chat — so nothing is lost and no chat receives other chats' words
     const pending = data;
     mode = 'chat';
-    clearTimeout(saveTimer);
+    cancelSave();
     clearTimeout(retryTimer);
     dirty = false;
     const merged = mergeUserData(legacySettingsData(), pending);

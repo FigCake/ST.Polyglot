@@ -7,7 +7,8 @@ import { t } from '../../i18n.js';
 import { scopedWordbook, loadWordbook } from '../../wordbook.js';
 import { askConfirm } from '../../ui.manager.js';
 import { getSettings, getLang } from '../../runtime.js';
-import { speak } from '../../speech.js';
+import { speak } from '../../voice.js';
+import { speakButton } from '../../speak-button.js';
 import { toggleNoteEditor } from './note-editor.js';
 import { rubyWord, shownReading } from '../../furigana/word.js';
 import { userFileUrl } from '../../user-files.js';
@@ -92,7 +93,7 @@ function renderWord(container, w, actions) {
     setHtml(container, html `
         ${header(rubyWord(w.word, reading), html `<span class="pg-level-badge level-${levelClass(w.level)}">${levelLabel(w.level)}</span>`, html `
             ${dict && html `<a href="${dict}" target="_blank" rel="noopener" class="pg-icon-btn pg-dict-btn" title="${t('tap.lookUp')}">📖</a>`}
-            <button class="pg-speak-btn" title="${t('wb.listen')}" aria-label="${t('wb.listen')}">🔊</button>`)}
+            ${speakButton({ saved: !!entry?.audio, label: t('wb.listen') })}`)}
         <div class="pg-word-meta">
             <span class="pg-meta-base">${w.base_form ? rubyWord(w.base_form, reading) : ''}</span>
             <span class="pg-meta-pos">${w.pos_info ?? ''}</span>
@@ -112,7 +113,7 @@ function renderWord(container, w, actions) {
         ${entry && notesBlock(entry.notes)}
         ${saveButton(!!entry, t('det.addWord'))}
         ${ignoreButton()}`);
-    container.querySelector('.pg-speak-btn')?.addEventListener('click', () => speak(canonical, getLang(), entry?.audio));
+    container.querySelector('.pg-speak-btn')?.addEventListener('click', () => speak(canonical, getLang(), { audio: entry?.audio, keep: entry && { word: entry.word, field: 'audio' } }));
     container.querySelector('.pg-det-family-chips')?.addEventListener('click', e => {
         const form = e.target.closest('[data-word]')?.dataset.word;
         if (form)

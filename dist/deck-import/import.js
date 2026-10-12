@@ -11,23 +11,11 @@ import { getNativeLang } from '../runtime.js';
 import { currentChatId } from '../storage.js';
 import { storeMode } from '../data-store.js';
 import { writeUserFile } from '../user-files.js';
-import { existingMedia, inParallel, keepableMedia, noteUploaded, notePending } from '../media-files.js';
+import { existingMedia, inParallel, keepableMedia, noteUploaded, notePending, bytesHash, mediaFileName } from '../media-files.js';
 import { loadWordbook, saveWordbook, getSets, createSet, studyLangKey } from '../wordbook.js';
 import { mergeWordbooks } from '../wordbook-model.js';
 // ── Media ─────────────────────────────────────────────────────────────────────
-const extOf = (name) => /\.([a-z0-9]+)$/i.exec(name)?.[1].toLowerCase() ?? '';
-export { keepableMedia };
-/** A 64-bit content fingerprint (two FNV-1a passes), as hex. */
-export function bytesHash(bytes) {
-    let a = 0x811c9dc5, b = 0x01000193 ^ bytes.length;
-    for (let i = 0; i < bytes.length; i++) {
-        a = Math.imul(a ^ bytes[i], 0x01000193);
-        b = Math.imul(b ^ bytes[i], 0x5bd1e995) ^ (b >>> 15);
-    }
-    return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0');
-}
-/** The user-files name for a media file's bytes. */
-export const mediaFileName = (bytes, original) => `pg-media-${bytesHash(bytes)}.${extOf(original)}`;
+export { keepableMedia, bytesHash, mediaFileName };
 /** Files read, named and checked together: bounds memory and the size of each existence check. */
 const MEDIA_BATCH = 200;
 /** Uploads running at once (browsers allow about six connections per server). */
@@ -96,8 +84,9 @@ export const canStoreMedia = () => storeMode() === 'file';
 export function mediaOf(rows, available) {
     const names = new Set();
     for (const r of rows) {
-        if (r.sound && available.has(r.sound) && keepableMedia(r.sound, 'sound'))
-            names.add(r.sound);
+        for (const s of [r.sound, r.exampleSound])
+            if (s && available.has(s) && keepableMedia(s, 'sound'))
+                names.add(s);
         if (r.image && available.has(r.image) && keepableMedia(r.image, 'image'))
             names.add(r.image);
     }
@@ -138,6 +127,7 @@ export function addRows(rows, fallbackDeck, media) {
             ...(r.example && { example: r.example }),
             ...(r.notes && { notes: r.notes }),
             ...(r.sound && media.has(r.sound) && { audio: media.get(r.sound) }),
+            ...(r.exampleSound && media.has(r.exampleSound) && { example_audio: media.get(r.exampleSound) }),
             ...(r.image && media.has(r.image) && { image: media.get(r.image) }),
             setIds: [setId],
             chats: chatId ? [chatId] : [],

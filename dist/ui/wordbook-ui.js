@@ -21,6 +21,10 @@ import { getSets, createSet, deleteSet, removeFromWordbook, currentScope, isShar
 import { getSettings, getLang } from '../runtime.js';
 import { currentChatId } from '../storage.js';
 import { toggleReanalysis } from './reanalysis-bar.js';
+import { redrawRunProgress } from './run-progress.js';
+import { startSoundRun } from './sound-bar.js';
+import { soundsOffered } from '../sound-maker.js';
+import { lacksSound } from '../word-sounds.js';
 import { emptyFilter } from './wordbook/filters.js';
 import { isMissed, isCard, wordStatus } from '../srs.js';
 import { renderList, countLabel, selectedWords } from './wordbook/list.js';
@@ -40,10 +44,19 @@ function statusCounts() {
             counts[wordStatus(w)]++;
     return counts;
 }
+function toolbarCounts() {
+    const words = scopedWordbook();
+    return {
+        missed: words.filter(isMissed).length,
+        status: statusCounts(),
+        noSound: soundsOffered() ? words.filter(lacksSound).length : null,
+    };
+}
 let pane = null;
 // ── Markup ────────────────────────────────────────────────────────────────────
-const toolbar = (sets, missed, status) => html `
-    <div class="pg-reanalysis-bar pg-wb-reanalysis-bar" hidden></div>
+const toolbar = (sets, { missed, status, noSound }) => html `
+    <div class="pg-run-bar pg-wb-reanalysis-bar" hidden></div>
+    <div class="pg-run-bar pg-wb-sound-bar" hidden></div>
 
     <div class="pg-wb-search-row">
         <input type="search" class="pg-wb-search-inp" placeholder="${t('wb.searchPh')}" value="${filter.query}" aria-label="${t('wb.searchPh')}">
@@ -58,6 +71,10 @@ const toolbar = (sets, missed, status) => html `
             ${(missed > 0 || filter.missed) && html `
             <button class="pg-filter-pill pg-filter-missed ${filter.missed && 'active'}" data-action="missed" title="${t('wb.missedTip')}">
                 ${t('wb.missed', { n: missed })}
+            </button>`}
+            ${((noSound ?? 0) > 0 || filter.noSound) && html `
+            <button class="pg-filter-pill ${filter.noSound && 'active'}" data-action="no-sound" title="${t('snd.noSoundTip')}">
+                ${t('snd.noSound', { n: noSound ?? 0 })}
             </button>`}
         </div>
         <div class="pg-wb-set-row">
@@ -80,6 +97,8 @@ const toolbar = (sets, missed, status) => html `
         <button class="pg-wb-row-btn pg-wb-when-selected" data-action="reanalyse-selected" hidden>${t('wb.reanalyse')}</button>
         <button class="pg-wb-row-btn pg-wb-when-selected" data-action="known-selected" title="${t('wb.markKnown')}" hidden>${t('wb.toKnown')}</button>
         <button class="pg-wb-row-btn pg-wb-when-selected" data-action="ignore-selected" title="${t('wb.ignoreTip')}" hidden>${t('wb.ignore')}</button>
+        ${noSound !== null && html `
+        <button class="pg-wb-row-btn pg-wb-when-selected" data-action="sounds-selected" title="${t('snd.makeTip')}" hidden>${t('snd.make')}</button>`}
         <span class="pg-wb-count-spacer"></span>
         <button class="pg-wb-row-btn" data-action="dupes" title="${t('wb.dupFindTip')}">${t('wb.dupFind')}</button>
         <button class="pg-wb-row-btn" data-action="select-all">${t('wb.selectAll')}</button>
@@ -152,6 +171,7 @@ const ACTIONS = {
             showDuplicates(el, () => renderListOnly(root));
     },
     'missed': root => { filter.missed = !filter.missed; renderWordbook(root); },
+    'no-sound': root => { filter.noSound = !filter.noSound; renderWordbook(root); },
     'level': (root, el) => {
         filter.level = el.dataset.level ?? 'all';
         filter.pos = ''; // a POS filter on top of a level pill is confusing
@@ -204,10 +224,19 @@ const ACTIONS = {
     },
     'reanalyse-selected': root => {
         const list = listOf(root);
-        const bar = root.querySelector('.pg-wb-reanalysis-bar');
         const words = list ? selectedWords(list) : [];
-        if (bar && words.length)
-            toggleReanalysis({ bar, words, confirm: true, onDone: () => renderListOnly(root) });
+        // Looked up at each update in the tab shown now: it is redrawn, or rebuilt when the panel reopens
+        const bar = () => pane?.querySelector('.pg-wb-reanalysis-bar') ?? null;
+        if (words.length)
+            toggleReanalysis({ bar, words, confirm: true, onDone: () => { if (pane)
+                    renderListOnly(pane); } });
+    },
+    'sounds-selected': root => {
+        const list = listOf(root);
+        const words = list ? selectedWords(list) : [];
+        const bar = () => pane?.querySelector('.pg-wb-sound-bar') ?? null;
+        if (words.length)
+            void startSoundRun({ bar, words, onDone: refreshWordbook });
     },
     'delete-set': async (root, el) => {
         const id = el.dataset.id ?? '';
@@ -262,7 +291,9 @@ export function renderWordbook(root) {
         filter.query = '';
     const scroll = listOf(root)?.scrollTop ?? 0;
     pane = root;
-    setHtml(root, toolbar(getSets(), scopedWordbook().filter(isMissed).length, statusCounts()));
+    setHtml(root, toolbar(getSets(), toolbarCounts()));
+    // A run under way shows its progress and Stop in the redrawn toolbar at once
+    redrawRunProgress();
     if (!bound.has(root)) {
         bind(root);
         bound.add(root);
