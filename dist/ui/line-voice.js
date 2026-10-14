@@ -3,9 +3,10 @@
 // browser's voice, ST's TTS, or a voice service), in the study language and
 // the voice of the message's character (voice-cast.ts). Pressing it again
 // while it reads stops it. The message's 🎧 button reads all its lines in turn.
-// Beside it (shown when pointed at, always on touch screens) a bookmark saves
-// the line to the wordbook as a sentence: to hear it again there, and to say it
-// after the voice in the speaking drill.
+// Beside it a bookmark saves the line to the wordbook as a sentence, to hear
+// it again there and to say it after the voice in the speaking drill: shown
+// when the ▶ is pointed at, and on touch screens once the line has been heard
+// (one small icon per line until then).
 //
 //   “Ciao, come stai?” ▶🔖 she asked. 「元気？」 ▶🔖     —Hola ▶🔖 —dijo.
 //
@@ -31,6 +32,7 @@ const ALL_CLASS = 'pg-lines-play-btn';
 /** A line's ▶ and bookmark, together (pointing at the pair shows the bookmark). */
 const TOOLS_CLASS = 'pg-line-tools';
 const SAVE_CLASS = 'pg-line-save';
+const HEARD = 'pg-heard';
 const PLAYING = 'pg-playing';
 const enabled = () => getSettings().line_voice !== false;
 /** The lines a message's buttons read. */
@@ -47,9 +49,14 @@ function speakerOf(textEl) {
     const name = id !== null ? getContext().chat?.[Number(id)]?.name : undefined;
     return typeof name === 'string' && name ? name : mes?.getAttribute('ch_name') ?? undefined;
 }
+/** A line has been heard: its bookmark shows (touch screens hide it until then). */
+const heard = (play) => play?.parentElement?.classList.add(HEARD);
 /** A line's ▶ (play-glyph.ts), in the message character's voice. */
 function playButton(text) {
-    const btn = playGlyph(`${t('line.play')}: ${text}`, el => pressGlyph(el, () => speak(text, getLang(), { speaker: speakerOf(el) })));
+    const btn = playGlyph(`${t('line.play')}: ${text}`, el => {
+        heard(el);
+        pressGlyph(el, () => speak(text, getLang(), { speaker: speakerOf(el) }));
+    });
     btn.title = t('line.play');
     btn.classList.add(DECOR_CLASS);
     // A quick second press is not a double-click on the sentence (tap translation)
@@ -97,8 +104,10 @@ async function playAll(msgEl, allBtn) {
     let current = null;
     try {
         await speakAll(lines, getLang(), i => {
-            if (i >= 0)
+            if (i >= 0) {
                 showPlaying(current = textEl.querySelectorAll(`.${PLAY_CLASS}`)[i] ?? null);
+                heard(current);
+            }
             else if (isPlaying(current))
                 showPlaying(null);
         });
@@ -125,6 +134,8 @@ function setAllButton(msgEl, on) {
     extras.prepend(btn);
 }
 function draw(textEl) {
+    // Never twice: buttons left over (a copy of the message's HTML) go first
+    textEl.querySelectorAll(`.${TOOLS_CLASS}`).forEach(b => b.remove());
     const lines = spokenLines(textEl);
     if (!lines.length)
         return;

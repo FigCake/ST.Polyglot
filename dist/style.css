@@ -1210,7 +1210,11 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 /* Touch screens: a finger-sized target (invisible), the line spacing kept */
 @media (pointer: coarse) {
     :is(.mes_text, .pg-wordbook-item) .pg-line-play { padding: 0.7em 0.6em !important; margin: -0.6em -0.35em -0.6em 0 !important; opacity: 0.5; }
-    .mes_text .pg-line-save { padding: 0.7em 0.5em !important; margin: -0.6em -0.3em -0.6em 0 !important; opacity: 0.35; }
+    /* One small icon per line: smaller than on a desktop, and the bookmark only once the line has been heard */
+    :is(.mes_text, .pg-wordbook-item) .pg-line-play,
+    .mes_text .pg-line-save { font-size: 0.42em; }
+    .mes_text .pg-line-save { display: none; padding: 0.7em 0.5em !important; margin: -0.6em -0.3em -0.6em 0 !important; }
+    .mes_text .pg-heard .pg-line-save { display: inline-block; opacity: 0.45; }
 }
 /* 🎧 reads all of a message's lines; lit while it does */
 .mes_button.pg-lines-play-btn.pg-playing {
