@@ -2,7 +2,8 @@
 //
 //   1. dialogue     marks on lines of dialogue + their translate buttons ("dialogue only")
 //   2. annotation   highlight spans around hard words, grammar and idioms
-//   3. furigana     <ruby> readings over kanji (inside highlights too)
+//   3. saved        underlines on words being learnt, found without the AI (saved-marks.ts)
+//   4. furigana     <ruby> readings over kanji (inside highlights too)
 //
 // A layer only ever wraps text nodes, so the text stays the same. Layers are
 // always drawn in this order on clean text — a change to one layer strips
@@ -12,7 +13,7 @@
 // observer per decorated message redraws the layers when that happens.
 import { DELAY } from '../constants.js';
 import { mesTextOf } from '../st-dom.js';
-const ORDER = ['dialogue', 'annotation', 'furigana'];
+const ORDER = ['dialogue', 'annotation', 'saved', 'furigana'];
 /** Marks every element a layer inserts, so a re-rendered (clean) message can be recognised. */
 export const DECOR_CLASS = 'pg-decor';
 /** ST may replace a message's HTML repeatedly; past this many redraws something is looping. */

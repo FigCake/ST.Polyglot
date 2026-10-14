@@ -8,6 +8,7 @@
 
 - **Input Assistant** — Translate or check your input before sending (🌍 button): the grammar fix, then a more natural version under `---`, in the input box. Each check is kept in the correction archive (writing practice) with its explanation, for notes; the last 100 are kept
 - **Annotation** — Highlight vocabulary by CEFR level and grammar patterns on any AI message
+- **Words you are learning, in the chat** — Words you are learning (reviewed, not yet known) get a faint underline in character messages, found from the forms already saved with them — no AI request. Tap one for its card, which counts how often you have met it. New and known words are not marked, and known words are left out of annotation. On/off in Extensions → Polyglot
 - **Leave out of study** — Status windows and metadata (tags such as `<status>`, code blocks, folded boxes, `[bracket]` lines) are not analysed, and character, persona and group-member names are never highlighted or saved as words; JS-Slash-Runner frontends and hidden text are always left out. Set in Extensions → Polyglot, with a check of what the last message sends
 - **Tap to Translate** — Double-click a sentence (mouse), or select text and tap **Translate sentence** (touch), for an inline translation with verb forms; ask for a deeper sentence analysis from there
 - **Quick Lookup** — Select any word to get its dictionary form, POS, IPA, and meaning

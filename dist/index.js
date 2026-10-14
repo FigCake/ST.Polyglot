@@ -19,7 +19,8 @@ import { runChecker } from './features/checker.js';
 import { migrateChatWordbook, studyLangKey } from './wordbook.js';
 import { archiveCheck } from './check-archive.js';
 import { refreshWordbook } from './ui/wordbook-ui.js';
-import { initDataStore, onDataReplaced, storeMode } from './data-store.js';
+import { initDataStore, onDataReplaced, onDataChanged, storeMode } from './data-store.js';
+import { refreshSavedMarks, clearSavedMarks, resetSavedMarks, savedWordsChanged, countEncounters, resetEncounters, setSavedMarksPanelFn, } from './saved-marks.js';
 import { notify } from './ui.manager.js';
 import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, redrawAnnotations, relocateAnnotations, } from './annotator.js';
 import { t } from './i18n.js';
@@ -92,6 +93,8 @@ async function adoptChatWordbook() {
 function onChatChanged() {
     resetChatState();
     resetFuriganaState();
+    resetSavedMarks();
+    resetEncounters();
     cancelLookup();
     abortAllTapTranslate();
     removeTapBubbles();
@@ -100,6 +103,7 @@ function onChatChanged() {
         injectChatButtons();
         restoreAnnotations();
         restoreFuriganaWithRetry();
+        refreshSavedMarks();
         void adoptChatWordbook();
     }, DELAY.chatSwitch);
 }
@@ -110,11 +114,18 @@ function onToggle(name, handler) {
 // ── Initialisation ────────────────────────────────────────────────────────────
 (function init() {
     setOpenPanelFn(openLearningPanel); // highlight clicks in annotator.ts open the panel
+    setSavedMarksPanelFn(openLearningPanel);
+    // A word saved, reviewed or edited: the underlines follow (a moment later, once per run of changes)
+    onDataChanged(() => { savedWordsChanged(); refreshSavedMarks(); });
     buildSettingsPanel();
     onDataReplaced(refreshWordbook);
     eventSource.on(event_types.APP_READY, () => {
         // Words are readable at once (from memory); the file load merges them in
         void initDataStore().then(() => {
+            savedWordsChanged();
+            refreshSavedMarks();
+            // ST may still be drawing the chat: once more when it is likely done
+            setTimeout(() => refreshSavedMarks(), DELAY.chatSwitch * 3);
             if (storeMode() !== 'file')
                 return;
             void adoptChatWordbook();
@@ -132,8 +143,11 @@ function onToggle(name, handler) {
         injectAnnotateButtons();
         restoreAnnotations();
         restoreFurigana();
-        if (mesId !== undefined)
+        if (mesId !== undefined) {
             autoFurigana(String(mesId));
+            refreshSavedMarks([String(mesId)]);
+            countEncounters(String(mesId));
+        }
     });
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => {
@@ -142,10 +156,11 @@ function onToggle(name, handler) {
         // Back to a swipe that was analysed: ST has already drawn its text, so its analysis shows again
         restoreAnnotations();
         restoreFurigana();
+        refreshSavedMarks([String(id)]);
     });
     // An edited or deleted message: highlights whose text no longer matches go
     if (event_types.MESSAGE_UPDATED)
-        eventSource.on(event_types.MESSAGE_UPDATED, () => { restoreAnnotations(); restoreFurigana(); });
+        eventSource.on(event_types.MESSAGE_UPDATED, () => { restoreAnnotations(); restoreFurigana(); refreshSavedMarks(); });
     // After a deletion ST renumbers the later messages: their saved analyses move along
     if (event_types.MESSAGE_DELETED) {
         eventSource.on(event_types.MESSAGE_DELETED, () => {
@@ -153,6 +168,7 @@ function onToggle(name, handler) {
             relocateFurigana();
             restoreAnnotations();
             restoreFurigana();
+            refreshSavedMarks();
         });
     }
     // Older messages loaded with "Show more messages" get buttons and their saved highlights
@@ -164,6 +180,7 @@ function onToggle(name, handler) {
             relocateFurigana();
             restoreAnnotations();
             restoreFurigana();
+            refreshSavedMarks();
         });
     }
     injectChatButtons();
@@ -177,7 +194,8 @@ function onToggle(name, handler) {
     document.addEventListener('pg:language-change', onFuriganaSettingChange);
     // Lists may be limited to the study language
     document.addEventListener('pg:language-change', refreshWordbook);
-    document.addEventListener('pg:study-scope-change', redrawAnnotations);
+    document.addEventListener('pg:study-scope-change', () => { redrawAnnotations(); refreshSavedMarks(); });
+    onToggle('pg:saved-marks-toggle', on => (on ? refreshSavedMarks() : clearSavedMarks()));
     onToggle('pg:annotator-toggle', on => {
         if (on)
             injectAnnotateButtons();

@@ -9,6 +9,7 @@
 //
 // No DOM, no storage — unit-tested.
 import { langKey } from './utils.js';
+import { FORMS_KEPT } from './word-forms.js';
 import { mergeSounds, renamedSounds, withExampleOf, withMadeList, EXAMPLE_FIELDS } from './word-sounds.js';
 /** Key of the "no chat" group in overviews and chat selections. */
 export const UNSORTED = '';
@@ -75,6 +76,8 @@ export function mergeEntries(a, b) {
         chats: union(a.chats, b.chats),
         langs: union(a.langs, b.langs),
         collocations: a.collocations?.length ? a.collocations : b.collocations,
+        ...(a.forms || b.forms) && { forms: union(a.forms, b.forms).slice(-FORMS_KEPT) },
+        ...(a.seen || b.seen) && { seen: Math.max(a.seen ?? 0, b.seen ?? 0) },
         notes: joinNotes(a.notes, b.notes),
         dateAdded: earliest(a.dateAdded, b.dateAdded),
         conj_cached: !!(a.conj_cached || b.conj_cached),
@@ -92,7 +95,22 @@ function srsOf(e) {
             out[k] = e[k];
     return out;
 }
-const LIST_FIELDS = new Set(['setIds', 'chats', 'langs', 'made_sounds']);
+const LIST_FIELDS = new Set(['setIds', 'chats', 'langs', 'made_sounds', 'forms', 'renamed_from']);
+/** Earlier spellings a word remembers. */
+const RENAMES_KEPT = 3;
+/**
+ * `target` with the review schedule of `source` when `source` was reviewed
+ * more (the schedule moves whole). A word renamed on one device and reviewed
+ * under its old spelling on another keeps that review.
+ */
+export function withReviewsOf(target, source) {
+    if (!moreReviewed(source, target) || JSON.stringify(srsOf(source)) === JSON.stringify(srsOf(target)))
+        return target;
+    const out = { ...target };
+    for (const k of SRS_FIELDS)
+        delete out[k];
+    return { ...out, ...srsOf(source) };
+}
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 /** A list after both sides' additions and removals since `base`. */
 function rebaseList(base = [], local = [], server = []) {
@@ -126,6 +144,9 @@ export function rebaseEntry(base, local, server) {
             v = rebaseList(b[k], l[k], r[k]);
         else if (k === 'notes')
             v = joinNotes(l[k], r[k]);
+        // Met on both devices: the larger count (each counted its own messages)
+        else if (k === 'seen')
+            v = Math.max(Number(l[k]) || 0, Number(r[k]) || 0);
         else
             v = l[k];
         if (v !== undefined)
@@ -138,8 +159,8 @@ export function rebaseEntry(base, local, server) {
     const merged = withExampleOf(out, exampleFrom);
     return withMadeList(merged, merged.made_sounds ?? []);
 }
-/** Fields that change without the learner editing the word: reviews, the conjugation flag, chat and language tags. */
-const UPKEEP_FIELDS = new Set([...SRS_FIELDS, 'conj_cached', 'chats', 'langs']);
+/** Fields that change without the learner editing the word: reviews, the conjugation flag, chat and language tags, forms met, times met. */
+const UPKEEP_FIELDS = new Set([...SRS_FIELDS, 'conj_cached', 'chats', 'langs', 'forms', 'seen']);
 /**
  * A word this session still has but another device deleted since `base`:
  * gone, unless the learner edited it here (a review, a tag or a sound a voice
@@ -299,6 +320,9 @@ export function editEntry(wordbook, word, patch) {
     const nextWord = clean.word || entry.word;
     // A made sound of the old spelling does not come along (a recording does)
     const edited = renamedSounds({ ...entry, ...clean, word: nextWord, base_form: clean.base_form || nextWord }, entry.word);
+    // Another device may review it under the old spelling before it hears of the rename (user-data rebase)
+    if (nextWord !== entry.word)
+        edited.renamed_from = [...new Set([...(entry.renamed_from ?? []), entry.word])].filter(w => w !== nextWord).slice(-RENAMES_KEPT);
     const formChanged = edited.word !== entry.word || edited.base_form !== entry.base_form;
     if (formChanged)
         edited.conj_cached = false;

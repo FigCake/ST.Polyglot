@@ -31,6 +31,7 @@ import { drawDialogue, stripDialogue, LINE_CLASS } from './ui/dialogue-layer.js'
 import { showFuriganaFor, hideFuriganaFor, clearChatFurigana } from './furigana/messages.js';
 import { textHash } from './furigana/model.js';
 import { showStopBar, hideStopBar } from './stop-bar.js';
+import { knownWordsIn, isKnownWord, recordSeenForms } from './saved-marks.js';
 import { setLayer, hasLayer, messagesWith, resetLayers, pruneDetachedDecor, untilRendered, cancelUntilRendered, DECOR_CLASS, } from './ui/message-decor.js';
 let openPanel = () => { };
 /** Registers openLearningPanel (called once by index.ts). */
@@ -83,7 +84,9 @@ function highlightClass(token) {
 function tokensOf(data) {
     const skip = wordSkipper();
     return [
-        ...(data.hard_words ?? []).filter(w => !skip(w.word, w.base_form)).map(w => ({ type: 'word', text: w.word, data: w })),
+        // Known words are left out (the request asked for that too; a reply may still list one)
+        ...(data.hard_words ?? []).filter(w => !skip(w.word, w.base_form) && !isKnownWord(w.word, w.base_form))
+            .map(w => ({ type: 'word', text: w.word, data: w })),
         ...(data.grammar_patterns ?? []).map(g => ({ type: 'grammar', text: g.pattern, data: g })),
         ...(data.idioms ?? []).filter(i => !skip(i.phrase, i.base_form)).map(i => ({ type: 'idiom', text: i.phrase, data: i })),
     ]
@@ -392,7 +395,7 @@ export async function runAnnotator(msgEl, mesId) {
     const readings = showFuriganaFor(mesId, lines);
     try {
         const { data } = await ai.json({
-            prompt: annotatorPrompt(studied, getLang(), getSettings().cefr_level, getNativeLang(), skippedNames()),
+            prompt: annotatorPrompt(studied, getLang(), getSettings().cefr_level, getNativeLang(), skippedNames(), knownWordsIn(studied)),
             signal: abort.signal,
             accept: acceptAnnotation,
             merge: mergeAnnotations,
@@ -407,6 +410,8 @@ export async function runAnnotator(msgEl, mesId) {
         const result = { ...data, h: hash, ...(dialogue && { dialogue: true }) };
         show(msgNow, mesId, result);
         persist(mesId, result);
+        // The forms saved words were met in: found without the AI from now on
+        recordSeenForms(data.hard_words ?? []);
         const added = saveIdioms(data.idioms);
         if (added)
             notify(t('ann.idiomsAdded', { n: added }), 'info', 2500);

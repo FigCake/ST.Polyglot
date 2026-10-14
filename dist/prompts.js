@@ -50,10 +50,11 @@ Return ONLY valid JSON (no markdown, no extra text):
 Text:
 <text>${text}</text>`;
 }
-export function annotatorPrompt(text, lang, level, nativeLang, names = []) {
+export function annotatorPrompt(text, lang, level, nativeLang, names = [], known = []) {
     const rule = baseFormRule(lang);
     const reading = readingField(lang, 'the BASE FORM');
-    const skip = names.length ? `- Do not list these names or words; they are not vocabulary: ${names.join(', ')}\n` : '';
+    const skip = (names.length ? `- Do not list these names or words; they are not vocabulary: ${names.join(', ')}\n` : '')
+        + (known.length ? `- The learner already knows these words; do not list them: ${known.join(', ')}\n` : '');
     return `You are a meticulous language tutor. Analyze the following ${lang} text for a CEFR ${level} learner.
 IMPORTANT: Analyze the ENTIRE text. Identify AT LEAST 30 items if the text is long enough.
 Study only the story: narration and dialogue. Skip status windows, stat blocks, trackers, UI panels,

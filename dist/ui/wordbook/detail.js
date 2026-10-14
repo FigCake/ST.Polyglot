@@ -99,6 +99,7 @@ function renderWord(container, w, actions) {
             <span class="pg-meta-pos">${w.pos_info ?? ''}</span>
         </div>
         <div class="pg-word-meaning">${w.meaning}</div>
+        ${(entry?.seen ?? 0) > 0 && html `<div class="pg-det-seen">${t('det.seen', { n: entry?.seen ?? 0 })}</div>`}
         ${entry?.image && html `<img class="pg-word-img" src="${userFileUrl(entry.image)}" alt="">`}
         ${(w.word_family?.length ?? 0) > 0 && html `
         <div class="pg-det-family">

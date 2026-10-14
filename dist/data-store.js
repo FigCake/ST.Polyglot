@@ -146,7 +146,22 @@ export function onDataReplaced(listener) {
     listeners.add(listener);
     return () => listeners.delete(listener);
 }
-const emitReplaced = () => listeners.forEach(l => l());
+const emitReplaced = () => { listeners.forEach(l => l()); dataChanged(); };
+const changeListeners = new Set();
+let changeTimer;
+/** How long a run of changes is gathered before change listeners hear of it. */
+const CHANGE_NOTICE_MS = 300;
+/** Calls `listener` a moment after the data changed (a word saved, reviewed, edited, or the whole data replaced). */
+export function onDataChanged(listener) {
+    changeListeners.add(listener);
+    return () => changeListeners.delete(listener);
+}
+function dataChanged() {
+    if (!changeListeners.size)
+        return;
+    clearTimeout(changeTimer);
+    changeTimer = setTimeout(() => changeListeners.forEach(l => l()), CHANGE_NOTICE_MS);
+}
 // ── Writing ──────────────────────────────────────────────────────────────────
 /** A new save id (random; crypto.randomUUID needs https, which a LAN ST may not have). */
 function newRev() {
@@ -184,6 +199,7 @@ export function replaceUserData(patch, burst = false) {
  * and its changes are committed (a reload cannot drop them) all along.
  */
 export function commit(burst = false) {
+    dataChanged();
     if (mode === 'chat') {
         if (chatMetadata())
             saveChatMetadata();

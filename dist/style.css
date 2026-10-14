@@ -1128,8 +1128,26 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .pg-hl-grammar { background-color: rgba(220, 130, 220, 0.25); }
 .pg-hl-idiom   { background-color: rgba(140, 120, 240, 0.22); }
 
+/* Words being learnt, found without the AI (saved-marks.ts): a thin underline in the text's own colour.
+   On an analysis highlight of such a word, the underline replaces the level colour (one mark per word). */
+.pg-saved-mark,
+.pg-clickable-word.pg-saved-word {
+    background-color: transparent;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.22em;
+    text-decoration-color: color-mix(in srgb, currentColor 55%, transparent);
+    cursor: pointer;
+}
+.pg-saved-mark:hover,
+.pg-clickable-word.pg-saved-word:hover { text-decoration-color: currentColor; filter: none; }
+
 
 /* ── 📝 Word detail view ── */
+
+/* How often a word being learnt was met in chats (saved-marks.ts counts) */
+.pg-det-seen { font-size: 0.85em; opacity: 0.7; font-variant-numeric: tabular-nums; }
 
 .pg-word-detail-header {
     display: flex;

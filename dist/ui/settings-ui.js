@@ -187,6 +187,7 @@ function panel(s) {
                     <label class="checkbox_label"><input type="checkbox" data-setting="enabled_checker" ${s.enabled_checker && html `checked`}><span>${t('set.checker')}</span></label>
                     <label class="checkbox_label"><input type="checkbox" data-setting="enabled_annotator" ${s.enabled_annotator && html `checked`}><span>${t('set.aiStudy')}</span></label>
                     <label class="checkbox_label" title="${t('set.dialogueOnlyHint')}"><input type="checkbox" data-setting="dialogue_only" ${s.dialogue_only && html `checked`}><span>${t('set.dialogueOnly')}</span></label>
+                    <label class="checkbox_label" title="${t('set.markSavedHint')}"><input type="checkbox" data-setting="mark_saved_words" ${s.mark_saved_words !== false && html `checked`}><span>${t('set.markSaved')}</span></label>
                 </div>
 
                 ${field(t('set.targetLang'), html `<select class="text_pole" data-setting="language">${options(LANGUAGES, s.language)}</select>`)}
@@ -247,6 +248,7 @@ function studyScopeChanged() {
 const SETTING_EFFECTS = {
     enabled_checker: (_, on) => document.dispatchEvent(new CustomEvent('pg:checker-toggle', { detail: { on } })),
     enabled_annotator: (_, on) => document.dispatchEvent(new CustomEvent('pg:annotator-toggle', { detail: { on } })),
+    mark_saved_words: (_, on) => document.dispatchEvent(new CustomEvent('pg:saved-marks-toggle', { detail: { on } })),
     language: (root, value, previous) => {
         show(root, '.pg-lang-custom', value === 'Custom');
         languageChanged(root);

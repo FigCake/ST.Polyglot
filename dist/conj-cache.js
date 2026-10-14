@@ -5,6 +5,9 @@
 import { KEY } from './constants.js';
 // ── DB handle ─────────────────────────────────────────────────────────────────
 let dbPromise = null;
+/** Bumped by every change to the cache, so readers of many tables (saved-marks.ts) know to read them again. */
+let version = 0;
+export const conjCacheVersion = () => version;
 /** The conjugation IndexedDB, opened (and created) once and shared by every call. */
 function _getConjDB() {
     dbPromise ??= new Promise((resolve, reject) => {
@@ -44,6 +47,7 @@ export async function getConjCache(word, currentLang) {
 }
 /** Saves a table under the word's base form, tagged with the learning language. */
 export async function setConjCache(word, data, currentLang) {
+    version++;
     try {
         const db = await _getConjDB();
         const entry = { data, lang: currentLang, cachedAt: Date.now() };
@@ -62,6 +66,7 @@ export async function setConjCache(word, data, currentLang) {
 }
 /** Called when a wordbook entry is deleted or its base form changes. */
 export async function deleteConjCache(word) {
+    version++;
     try {
         const db = await _getConjDB();
         await new Promise((resolve, reject) => {
@@ -80,6 +85,7 @@ export async function deleteConjCache(word) {
 }
 /** Wipes the store. Does NOT reset `conj_cached` flags (wordbook.ts `clearAllConjCache` does). */
 export async function clearConjCacheStore() {
+    version++;
     try {
         const db = await _getConjDB();
         await new Promise((resolve, reject) => {

@@ -52,6 +52,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     voice_oa_key: '', voice_oa_voice: '', voice_oa_model: '', voice_oa_url: '',
     voice_fish_key: '', voice_fish_voice: '', voice_fish_model: '',
     dialogue_only: false,
+    mark_saved_words: true,
     wordbook_scope: 'chat',
     wordbook_lang_only: true,
     furigana_enabled: true,

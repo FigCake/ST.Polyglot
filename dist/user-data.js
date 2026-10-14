@@ -9,7 +9,7 @@
 //   days          study totals per day (new words, reviews, forgotten)
 //
 // Pure — validation, merging and the file format. No DOM, no I/O.
-import { mergeWordbooks, mergeEntries, rebaseEntry, keptAfterDeletion, SRS_FIELDS } from './wordbook-model.js';
+import { mergeWordbooks, mergeEntries, rebaseEntry, keptAfterDeletion, withReviewsOf, SRS_FIELDS } from './wordbook-model.js';
 import { isRecord } from './ai/client.js';
 /** How many corrected messages the archive keeps. */
 export const CHECKS_KEPT = 100;
@@ -44,7 +44,7 @@ function typedFields(v) {
     for (const k of TEXT_FIELDS)
         if (k in out && typeof out[k] !== 'string')
             delete out[k];
-    for (const k of ['collocations', 'made_sounds']) {
+    for (const k of ['collocations', 'made_sounds', 'forms', 'renamed_from']) {
         if (!(k in out))
             continue;
         if (Array.isArray(out[k]))
@@ -55,6 +55,8 @@ function typedFields(v) {
     for (const k of SRS_FIELDS)
         if (k in out && !Number.isFinite(out[k]))
             delete out[k];
+    if ('seen' in out && !(Number.isFinite(out.seen) && out.seen >= 0))
+        delete out.seen;
     // A word never reviewed is new: the SM-2 defaults older versions gave it are dropped
     if (out.srs_reviewed_at === undefined && out.srs_stability === undefined) {
         for (const k of ['srs_interval', 'srs_ease', 'srs_due', 'srs_streak'])
@@ -150,12 +152,41 @@ export function mergeUserData(current, incoming) {
 export function rebaseUserData(base, local, server) {
     const serverMedia = new Set(server.wordbook.flatMap(e => [e.audio, e.example_audio, e.image]));
     return {
-        wordbook: rebase(base.wordbook, local.wordbook, server.wordbook, e => e.word, (l, r, b) => (b ? rebaseEntry(b, l, r) : mergeEntries(l, r)), (l, b) => keptAfterDeletion(b, l, serverMedia)),
+        wordbook: withRenamedReviews(base.wordbook, local.wordbook, server.wordbook, rebase(base.wordbook, local.wordbook, server.wordbook, e => e.word, (l, r, b) => (b ? rebaseEntry(b, l, r) : mergeEntries(l, r)), (l, b) => keptAfterDeletion(b, l, serverMedia))),
         sets: rebase(base.sets, local.sets, server.sets, s => s.id, l => l),
         wrongAnswers: rebase(base.wrongAnswers, local.wrongAnswers, server.wrongAnswers, w => w.question, l => l),
         checks: recentChecks(rebase(base.checks, local.checks, server.checks, c => c.id, l => l)),
         days: rebaseDays(base.days, local.days, server.days),
     };
+}
+/**
+ * A word renamed on one side and reviewed under its old spelling on the other:
+ * the renamed word takes that review (when it is the more reviewed). Without
+ * this the rename looks like a deletion plus an addition and the review is lost.
+ */
+function withRenamedReviews(base, local, server, merged) {
+    const before = new Map(base.map(e => [e.word, e]));
+    const reviewedSince = (e) => {
+        const b = before.get(e.word);
+        return !!b && SRS_FIELDS.some(k => b[k] !== e[k]);
+    };
+    // Old spellings reviewed on either side since the base
+    const reviews = new Map();
+    for (const e of [...local, ...server])
+        if (reviewedSince(e))
+            reviews.set(e.word, reviews.get(e.word) ?? e);
+    if (!reviews.size)
+        return merged;
+    const present = new Set(merged.map(e => e.word));
+    return merged.map(e => {
+        let out = e;
+        for (const old of e.renamed_from ?? []) {
+            const review = present.has(old) ? undefined : reviews.get(old);
+            if (review)
+                out = withReviewsOf(out, review);
+        }
+        return out;
+    });
 }
 /** Day totals with what this session counted since `base` added to the server's. */
 function rebaseDays(base, local, server) {
