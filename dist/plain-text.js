@@ -23,6 +23,37 @@ export function plainTextNodes(root) {
 }
 /** The concatenated plain text (offsets in it match plainOffsetIn). */
 export const plainText = (root) => plainTextNodes(root).map(n => n.data).join('');
+const BLOCK = 'p, div, li, blockquote, h1, h2, h3, h4, h5, h6, pre, td, th, dd, dt';
+/**
+ * Plain-text offsets where a paragraph begins on the page: the first text of
+ * each block element (<p>, <div>, <li>…) and the text after a <br>. The plain
+ * text has no line break there when ST renders paragraphs as elements.
+ */
+export function blockStarts(root) {
+    const starts = new Set([0]);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
+        acceptNode: n => n instanceof Element && (NOT_TEXT.has(n.tagName) || n.matches(ADDED))
+            ? NodeFilter.FILTER_REJECT
+            : NodeFilter.FILTER_ACCEPT,
+    });
+    let offset = 0, block, afterBreak = false;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (n instanceof Element) {
+            if (n.tagName === 'BR')
+                afterBreak = true;
+            continue;
+        }
+        if (!(n instanceof Text))
+            continue;
+        const own = n.parentElement?.closest(BLOCK) ?? null;
+        if (afterBreak || (block !== undefined && own !== block))
+            starts.add(offset);
+        afterBreak = false;
+        block = own;
+        offset += n.data.length;
+    }
+    return starts;
+}
 /** The text hash of every rendered message, by message index. */
 export function shownTextHashes() {
     const out = new Map();

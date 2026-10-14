@@ -91,8 +91,12 @@ export function splitForSpeech(text, lang, max = maxUtteranceChars(lang)) {
 let playing = [];
 /** The recording being played (a sound file, or a voice service's answer). */
 let recording = null;
+/** Ends the wait of whatever is being read aloud now (stopSpeech, or the next sound). */
+let settle = null;
 const revoke = (src) => { if (src.startsWith('blob:'))
     URL.revokeObjectURL(src); };
+/** Longest wait for the browser's voice to say it has finished (it sometimes never does). */
+const browserWaitMs = (text) => 10_000 + text.length * 250;
 /** Stops what is being read aloud: a recording or the browser's voice. */
 export function stopSpeech() {
     if (recording) {
@@ -102,36 +106,82 @@ export function stopSpeech() {
     recording = null;
     if ('speechSynthesis' in window)
         window.speechSynthesis.cancel();
+    settle?.();
+    settle = null;
+}
+/** A wait that ends when `done` is called, or when the next sound or stopSpeech() takes over. */
+function waitTurn() {
+    settle?.();
+    let done = () => { };
+    const ended = new Promise(resolve => {
+        done = () => { if (settle === done)
+            settle = null; resolve(); };
+    });
+    settle = done;
+    return { done, ended };
 }
 /**
  * Plays a sound (a file URL, or a blob: URL it then owns). If it cannot be
  * played, `onFail` gets the error, unless something else started meanwhile.
+ * The promise ends when the sound has played, was stopped, or failed (after
+ * `onFail` has run).
  */
 export function playSound(src, onFail) {
-    const player = recording = new Audio(src);
-    player.onended = () => revoke(src);
-    player.play().catch(error => {
-        revoke(src);
-        if (recording === player) {
-            recording = null;
-            onFail(error);
-        }
+    return new Promise(resolve => {
+        const turn = waitTurn();
+        // A failure's fallback reads in its own turn (which ends this one): wait for the fallback instead
+        let failed = false;
+        void turn.ended.then(() => { if (!failed)
+            resolve(); });
+        const player = recording = new Audio(src);
+        player.onended = () => { revoke(src); turn.done(); };
+        player.play().catch(async (error) => {
+            revoke(src);
+            try {
+                if (recording === player) {
+                    recording = null;
+                    failed = true;
+                    await onFail(error);
+                }
+            }
+            finally {
+                turn.done();
+                resolve();
+            }
+        });
     });
 }
-/** The browser's own voice, at a learner-friendly rate (`code`: BCP-47). */
-export function speakWithBrowser(text, code) {
+/**
+ * The browser's own voice, at a learner-friendly rate (`code`: BCP-47), with
+ * one of its voices by name when given. Ends when it has been said or stopped.
+ */
+export function speakWithBrowser(text, code, voiceName = '') {
     if (!('speechSynthesis' in window)) {
         notify(t('tts.noSupport'), 'err', 2500);
-        return;
+        return Promise.resolve();
     }
     window.speechSynthesis.cancel();
-    const queue = splitForSpeech(text, code).map(chunk => Object.assign(new SpeechSynthesisUtterance(chunk), { lang: code, rate: SPEECH_RATE }));
+    const turn = waitTurn();
+    const voice = voiceName ? window.speechSynthesis.getVoices?.().find(v => v.name === voiceName) : undefined;
+    const queue = splitForSpeech(text, code).map(chunk => Object.assign(new SpeechSynthesisUtterance(chunk), { lang: voice?.lang ?? code, rate: SPEECH_RATE }, voice && { voice }));
     playing = queue;
-    if (!queue.length)
-        return;
-    queue[queue.length - 1].onend = () => { if (playing === queue)
-        playing = []; };
+    if (!queue.length) {
+        turn.done();
+        return turn.ended;
+    }
+    const last = queue[queue.length - 1];
+    last.onend = last.onerror = () => { if (playing === queue)
+        playing = []; turn.done(); };
+    const timer = setTimeout(turn.done, browserWaitMs(text));
     queue.forEach(u => window.speechSynthesis.speak(u));
+    return turn.ended.finally(() => clearTimeout(timer));
+}
+/** The browser's voices for a language (BCP-47 code, matched on its language part). */
+export function browserVoices(code) {
+    if (!('speechSynthesis' in window))
+        return [];
+    const lang = code.slice(0, 2).toLowerCase();
+    return (window.speechSynthesis.getVoices?.() ?? []).filter(v => v.lang.toLowerCase().startsWith(lang)).map(v => v.name);
 }
 // ── Pronunciation scoring ─────────────────────────────────────────────────────
 /**

@@ -4,6 +4,8 @@
 //            └─ ElevenLabs · Google · OpenAI-compatible · Fish Audio:
 //               key, voice (with a list where the service has one), model,
 //               speed, keep the sound on the word, send through ST's proxy
+//   character voices   a voice per character of the open chat, for the lines' ▶
+//                      (voice-cast.ts); with ST's TTS, its own voice map is used
 //   [Try]    reads a greeting in the study language
 //
 // Fields write settings through the tab's data-setting handler; changing the
@@ -13,6 +15,8 @@ import { t } from '../../i18n.js';
 import { getSettings, getLang } from '../../runtime.js';
 import { notify } from '../../ui.manager.js';
 import { tryVoice, voiceList, notifyVoiceError } from '../../voice.js';
+import { castVoice, setCastVoice, castNames, chatCharacters } from '../../voice-cast.js';
+import { browserVoices, speechLangCode } from '../../speech.js';
 import { DEFAULTS, DIRECT_PROVIDERS, VOICE_SPEEDS, DEFAULT_VOICE_SPEED } from '../../tts.js';
 /** Services: a translated name (`key`) or a brand name (`name`). */
 const PROVIDERS = [
@@ -99,7 +103,29 @@ function serviceRows(s) {
             <input type="checkbox" class="pg-pset-check" data-setting="voice_proxy" ${!!s.voice_proxy && html `checked`}>
         </label>
         <span class="pg-pset-hint">${t('tts.hintProxy')}</span>`}
+        <details class="pg-voice-cast">
+            <summary>${t('cast.title')}</summary>
+            <div class="pg-voice-cast-rows"></div>
+        </details>
         <button class="pg-btn pg-btn-secondary pg-btn-block" data-voice="try">🔊 ${t('tts.try')}</button>`;
+}
+/** The character voice rows, drawn when opened (the open chat decides who is listed). */
+function castRows(s) {
+    const p = s.voice_provider ?? 'browser';
+    if (p === 'st')
+        return html `<span class="pg-pset-hint">${t('cast.hintSt')}</span>`;
+    const names = [...new Set([...chatCharacters(), ...castNames(p)])];
+    // Browser voices are listed here; a service's come from its "list" button above
+    const list = p === 'browser' ? 'pg-cast-voices' : 'pg-voice-list';
+    return html `
+        ${names.length ? names.map(name => html `
+        <label class="pg-pset-field">
+            <span class="pg-pset-label">${name}</span>
+            <input type="text" class="text_pole" data-cast="${name}" value="${castVoice(p, name)}" placeholder="${t('cast.default')}"
+                   autocomplete="off" spellcheck="false" list="${list}">
+        </label>`) : html `<span class="pg-pset-hint">${t('cast.none')}</span>`}
+        ${p === 'browser' && html `<datalist id="pg-cast-voices">${browserVoices(speechLangCode(getLang())).map(v => html `<option value="${v}"></option>`)}</datalist>`}
+        <span class="pg-pset-hint">${t('cast.hint')}</span>`;
 }
 /** The section's body: the service picker and its rows. */
 export function voiceSection(s) {
@@ -143,6 +169,21 @@ export function bindVoiceSettings(root) {
         }
     });
     fillKeys(root);
+    // Character voices: drawn on opening, saved as typed (not data-setting fields)
+    root.addEventListener('toggle', e => {
+        const box = e.target;
+        if (!box.matches?.('.pg-voice-cast') || !box.open)
+            return;
+        const rows = box.querySelector('.pg-voice-cast-rows');
+        if (rows)
+            setHtml(rows, castRows(getSettings()));
+    }, true);
+    root.addEventListener('change', e => {
+        const input = e.target;
+        if (input.dataset?.cast === undefined)
+            return;
+        setCastVoice(getSettings().voice_provider ?? 'browser', input.dataset.cast, input.value);
+    });
     root.addEventListener('click', e => {
         const btn = e.target.closest('button[data-voice]');
         if (!btn)

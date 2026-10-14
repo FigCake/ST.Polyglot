@@ -11,7 +11,7 @@
 // unknown tags when rendering (<status> keeps its text), so tag blocks are
 // found in the raw message and located in the rendered text by content.
 import { getSettings, getContext, saveSettings } from './runtime.js';
-import { plainText, plainTextNodes, readableText } from './plain-text.js';
+import { plainText, plainTextNodes, readableText, blockStarts } from './plain-text.js';
 import { dialogueLines, dialogueText } from './dialogue.js';
 import { mesIdOf } from './st-dom.js';
 import { fieldText } from './deck-import/fields.js';
@@ -172,6 +172,13 @@ export function skippedNodes(textEl, ranges = skippedRanges(textEl)) {
     return nodes;
 }
 /**
+ * The dialogue lines of a rendered message (dialogue.ts), quotation marks in
+ * skipped parts left out, with paragraphs where the page has them.
+ */
+export function messageLines(textEl, plain = plainText(textEl), skipped = skippedRanges(textEl)) {
+    return dialogueLines(maskRanges(plain, skipped), blockStarts(textEl));
+}
+/**
  * What 📖 studies in a message: its dialogue lines or its whole text, without
  * skipped parts. Skipped parts are blanked before lines are found, so quotes
  * in a status window are not dialogue.
@@ -180,7 +187,7 @@ export function studiedText(textEl, dialogueOnly) {
     const plain = plainText(textEl);
     const skipped = skippedRanges(textEl);
     if (dialogueOnly) {
-        const lines = dialogueLines(maskRanges(plain, skipped));
+        const lines = messageLines(textEl, plain, skipped);
         return { text: dialogueText(plain, lines), plain, skipped, lines };
     }
     return { text: skipped.length ? keptText(plain, skipped) : readableText(textEl), plain, skipped };

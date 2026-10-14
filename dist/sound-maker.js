@@ -41,8 +41,8 @@ const HEARD_MAX = 60;
 /** Requests on their way: pressing 🔊 again before the answer does not pay twice. */
 const asked = new Map();
 /** The chosen direct service's MP3 for `text`, read in language `lang` (a language name). */
-export async function makeSound(text, lang, { signal, fresh = false, cache = true } = {}) {
-    const c = ttsConfig(getSettings());
+export async function makeSound(text, lang, { signal, fresh = false, cache = true, voice } = {}) {
+    const c = { ...ttsConfig(getSettings()), ...(voice && { voice }) };
     // '' for a language Polyglot does not know: the service's own voice decides (a Google voice, its language)
     const code = knownLangCode(lang) ?? '';
     const key = cacheKey(c, `${lang}\u0002${text}`, code);

@@ -20,7 +20,7 @@ import { plainText, plainOffsetIn } from '../plain-text.js';
 import { showBubble, closeBubble } from './tap/bubble.js';
 import { removeSelectionTooltip, setupTextSelectionTooltip } from './tap/lookup.js';
 import { LINE_CLASS } from './dialogue-layer.js';
-import { dialogueLines } from '../dialogue.js';
+import { messageLines } from '../study-scope.js';
 const MIN_SENTENCE = 3;
 /** A double-click this soon after a touch came from a double-tap, not a mouse. */
 const TOUCH_GRACE_MS = 800;
@@ -59,7 +59,7 @@ function targetAt({ node, offset }) {
     const at = plainOffsetIn(textEl, node, offset);
     // In a message studied as dialogue, a line is translated whole
     const line = textEl.querySelector(`.${LINE_CLASS}`)
-        ? dialogueLines(full).find(l => at >= l.start && at < l.end)
+        ? messageLines(textEl, full).find(l => at >= l.start && at < l.end)
         : undefined;
     const sentence = line ? full.slice(line.start, line.end).trim() : sentenceAround(full, Math.max(0, at));
     if (sentence.length < MIN_SENTENCE)

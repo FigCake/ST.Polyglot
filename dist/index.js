@@ -21,6 +21,7 @@ import { archiveCheck } from './check-archive.js';
 import { refreshWordbook } from './ui/wordbook-ui.js';
 import { initDataStore, onDataReplaced, onDataChanged, storeMode } from './data-store.js';
 import { refreshSavedMarks, clearSavedMarks, resetSavedMarks, savedWordsChanged, countEncounters, resetEncounters, setSavedMarksPanelFn, } from './saved-marks.js';
+import { refreshLineVoice, clearLineVoice, resetLineVoice } from './ui/line-voice.js';
 import { notify } from './ui.manager.js';
 import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, redrawAnnotations, relocateAnnotations, } from './annotator.js';
 import { t } from './i18n.js';
@@ -94,6 +95,7 @@ function onChatChanged() {
     resetChatState();
     resetFuriganaState();
     resetSavedMarks();
+    resetLineVoice();
     resetEncounters();
     cancelLookup();
     abortAllTapTranslate();
@@ -103,9 +105,14 @@ function onChatChanged() {
         injectChatButtons();
         restoreAnnotations();
         restoreFuriganaWithRetry();
-        refreshSavedMarks();
+        refreshMessageMarks();
         void adoptChatWordbook();
     }, DELAY.chatSwitch);
+}
+/** What is drawn over character messages without the AI: underlines on words being learnt, ▶ after lines of dialogue. */
+function refreshMessageMarks(mesIds) {
+    refreshSavedMarks(mesIds);
+    refreshLineVoice(mesIds);
 }
 /** Subscribes to a `pg:*-toggle` event dispatched by the settings UI. */
 function onToggle(name, handler) {
@@ -123,9 +130,9 @@ function onToggle(name, handler) {
         // Words are readable at once (from memory); the file load merges them in
         void initDataStore().then(() => {
             savedWordsChanged();
-            refreshSavedMarks();
+            refreshMessageMarks();
             // ST may still be drawing the chat: once more when it is likely done
-            setTimeout(() => refreshSavedMarks(), DELAY.chatSwitch * 3);
+            setTimeout(() => refreshMessageMarks(), DELAY.chatSwitch * 3);
             if (storeMode() !== 'file')
                 return;
             void adoptChatWordbook();
@@ -145,7 +152,7 @@ function onToggle(name, handler) {
         restoreFurigana();
         if (mesId !== undefined) {
             autoFurigana(String(mesId));
-            refreshSavedMarks([String(mesId)]);
+            refreshMessageMarks([String(mesId)]);
             countEncounters(String(mesId));
         }
     });
@@ -156,11 +163,11 @@ function onToggle(name, handler) {
         // Back to a swipe that was analysed: ST has already drawn its text, so its analysis shows again
         restoreAnnotations();
         restoreFurigana();
-        refreshSavedMarks([String(id)]);
+        refreshMessageMarks([String(id)]);
     });
     // An edited or deleted message: highlights whose text no longer matches go
     if (event_types.MESSAGE_UPDATED)
-        eventSource.on(event_types.MESSAGE_UPDATED, () => { restoreAnnotations(); restoreFurigana(); refreshSavedMarks(); });
+        eventSource.on(event_types.MESSAGE_UPDATED, () => { restoreAnnotations(); restoreFurigana(); refreshMessageMarks(); });
     // After a deletion ST renumbers the later messages: their saved analyses move along
     if (event_types.MESSAGE_DELETED) {
         eventSource.on(event_types.MESSAGE_DELETED, () => {
@@ -168,7 +175,7 @@ function onToggle(name, handler) {
             relocateFurigana();
             restoreAnnotations();
             restoreFurigana();
-            refreshSavedMarks();
+            refreshMessageMarks();
         });
     }
     // Older messages loaded with "Show more messages" get buttons and their saved highlights
@@ -180,7 +187,7 @@ function onToggle(name, handler) {
             relocateFurigana();
             restoreAnnotations();
             restoreFurigana();
-            refreshSavedMarks();
+            refreshMessageMarks();
         });
     }
     injectChatButtons();
@@ -194,8 +201,9 @@ function onToggle(name, handler) {
     document.addEventListener('pg:language-change', onFuriganaSettingChange);
     // Lists may be limited to the study language
     document.addEventListener('pg:language-change', refreshWordbook);
-    document.addEventListener('pg:study-scope-change', () => { redrawAnnotations(); refreshSavedMarks(); });
+    document.addEventListener('pg:study-scope-change', () => { redrawAnnotations(); refreshMessageMarks(); });
     onToggle('pg:saved-marks-toggle', on => (on ? refreshSavedMarks() : clearSavedMarks()));
+    onToggle('pg:line-voice-toggle', on => (on ? refreshLineVoice() : clearLineVoice()));
     onToggle('pg:annotator-toggle', on => {
         if (on)
             injectAnnotateButtons();

@@ -980,6 +980,11 @@
     color: var(--pg-t3);
 }
 
+/* Character voices (voice-settings.ts): folded until needed */
+.pg-voice-cast { margin-top: 6px; }
+.pg-voice-cast > summary { cursor: pointer; font-size: 13px; color: var(--pg-t2); }
+.pg-voice-cast-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+
 .pg-btn-block  { width: 100%; }
 .pg-btn-danger { color: var(--pg-err) !important; }
 
@@ -1142,6 +1147,35 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 }
 .pg-saved-mark:hover,
 .pg-clickable-word.pg-saved-word:hover { text-decoration-color: currentColor; filter: none; }
+
+/* ▶ after a line of dialogue (ui/line-voice.ts): small and quiet until pointed at */
+.mes_text .pg-line-play {
+    display: inline-block;
+    vertical-align: 0.1em;
+    margin: 0 0.15em 0 0.3em;
+    padding: 0.15em 0.25em;
+    border: 0;
+    background: none;
+    color: inherit;
+    font-size: 0.6em;
+    line-height: 1;
+    opacity: 0.35;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.mes_text .pg-line-play:hover,
+.mes_text .pg-line-play:focus-visible { opacity: 0.9; }
+/* Reading now: full strength (pressed again, it stops) */
+.mes_text .pg-line-play.pg-playing { opacity: 1; }
+/* 🎧 reads all of a message's lines; lit while it does */
+.mes_button.pg-lines-play-btn.pg-playing {
+    color: var(--pg-t1) !important;
+    opacity: 1 !important;
+}
+/* Touch screens: a finger-sized target, the line spacing kept */
+@media (pointer: coarse) {
+    .mes_text .pg-line-play { padding: 0.6em 0.5em; margin: -0.45em -0.2em -0.45em 0.05em; opacity: 0.45; }
+}
 
 
 /* ── 📝 Word detail view ── */
