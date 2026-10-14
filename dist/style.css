@@ -1696,6 +1696,9 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     object-fit: contain;
 }
 
+/* "Sounds and pictures done / total" under the export buttons while a backup or Anki export reads them */
+.pg-io-progress { font-variant-numeric: tabular-nums; }
+
 
 /* ── style-features.css ── */
 /* Feature-specific styles */

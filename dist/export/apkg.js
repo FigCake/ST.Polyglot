@@ -194,14 +194,18 @@ const READ_PARALLEL = 4;
  * Downloads `entries` as an Anki package for study language `lang`, with the
  * sounds and pictures that can be read. Returns how many words and files it
  * holds, and how many files could not be read (left out of their notes).
+ * `onMedia` hears how many files have been read.
  */
-export async function exportToApkg(entries, sets, lang) {
+export async function exportToApkg(entries, sets, lang, onMedia) {
     const names = storeMode() === 'file' ? [...mediaIn(entries)] : [];
     const media = new Map();
+    let done = 0;
+    onMedia?.(0, names.length);
     await inParallel(names, READ_PARALLEL, async (name) => {
         const data = await readUserBytes(name);
         if (data)
             media.set(name, data);
+        onMedia?.(++done, names.length);
     });
     const deck = lang.trim() || 'Words';
     downloadBlob(buildApkg({ entries, sets, deckName: `Polyglot::${deck}`, media }), `Polyglot_${deck.replace(/[^\p{L}\p{N}_-]+/gu, '_')}_${new Date().toISOString().slice(0, 10)}.apkg`);

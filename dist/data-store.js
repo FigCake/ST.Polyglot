@@ -38,7 +38,7 @@ import { getSettings, saveSettings } from './runtime.js';
 import { chatMetadata, saveChatMetadata } from './storage.js';
 import { notify } from './ui.manager.js';
 import { t } from './i18n.js';
-import { readUserFile, writeUserFile } from './user-files.js';
+import { readUserFile, writeUserFile, userFileVersion } from './user-files.js';
 import { mediaIn, releaseMedia, sweepPending } from './media-files.js';
 import { journal, journalNow, clearJournal, readJournals, dropJournals } from './save-journal.js';
 import { emptyData, hasData, mergeUserData, parseData, rebaseUserData, serializeData, } from './user-data.js';
@@ -65,6 +65,18 @@ let retryTimer;
 let failures = 0;
 /** The file text as last read or written: the base the next save's changes are measured from. */
 let lastText = '';
+/**
+ * The server's version tag (ETag) of the file while it still holds lastText;
+ * null when unknown. A read with it gets "unchanged" and nothing is downloaded,
+ * so a save of a large wordbook does not first fetch the whole file again.
+ */
+let lastEtag = null;
+/**
+ * lastEtag came with a full read of lastText. A tag taken right after this
+ * session's own write (writtenVersion) is not: the read-back then reads the
+ * whole file once instead of trusting it.
+ */
+let etagRead = false;
 /** lastText's save history, its own id first (null: a file from before histories were kept). */
 let lastRevs = null;
 /** lastText (or a save grown from it) was read back from the server after it was written. */
@@ -205,14 +217,19 @@ function scheduleSave(delay) {
  * Polyglot wrote it and it must never be written over.
  */
 async function catchUp() {
-    const res = await readUserFile(DATA_FILE);
+    const res = await readUserFile(DATA_FILE, lastEtag ?? undefined);
     if (res.status === 'error')
         return 'retry';
-    if (res.status === 'missing' || res.text === lastText)
+    if (res.status === 'unchanged' || res.status === 'missing')
         return 'ok';
+    if (res.text === lastText) {
+        lastEtag = res.etag ?? null;
+        etagRead = true;
+        return 'ok';
+    }
     if (attempted && res.text === attempted.text) {
         // The write that looked failed reached the server, and nothing came after it
-        setBase(attempted.text, attempted.revs, attempted.media);
+        setBase(attempted.text, attempted.revs, attempted.media, res.etag);
         return 'ok';
     }
     const server = parseData(res.text);
@@ -236,7 +253,7 @@ async function catchUp() {
         data = merged;
     }
     // What the file holds now is the next save's base, whether or not this save's write succeeds
-    setBase(res.text, server.revs, mediaIn(server.data.wordbook));
+    setBase(res.text, server.revs, mediaIn(server.data.wordbook), res.etag);
     emitReplaced();
     return 'ok';
 }
@@ -260,13 +277,26 @@ function grownFrom(revs) {
     return null;
 }
 /** The file read or written now becomes the base of the next save. */
-function setBase(text, revs, media) {
+function setBase(text, revs, media, etag) {
     lastText = text;
+    lastEtag = etag ?? null;
+    etagRead = true;
     lastRevs = revs;
     lastConfirmed = true;
     attempted = null;
     // Media the file refers to joins what this session saved: files only one of them used are released after the next save
     savedMedia = new Set([...savedMedia, ...media]);
+}
+/**
+ * The version tag of the file just written, so the next save need not download
+ * it: taken only when the server's copy has the size just written. Another
+ * device's write of the same size in the moment between would be missed until
+ * the read-back, which reads the whole file once (etagRead is false), and that
+ * device's own read-back puts its change back.
+ */
+async function writtenVersion(text) {
+    const version = await userFileVersion(DATA_FILE);
+    return version && version.size === new TextEncoder().encode(text).length ? version.etag : null;
 }
 /** A little after a save, reads the file back: a device that read it before the save landed may have written over it. */
 function scheduleConfirm() {
@@ -276,13 +306,23 @@ function scheduleConfirm() {
 async function confirmSave() {
     if (mode !== 'file' || saving || dirty || lastConfirmed)
         return;
-    const res = await readUserFile(DATA_FILE);
-    if (res.status !== 'ok' || mode !== 'file' || saving || dirty)
+    const res = await readUserFile(DATA_FILE, etagRead ? lastEtag ?? undefined : undefined);
+    if (mode !== 'file' || saving || dirty)
         return;
-    if (res.text === lastText) {
+    if (res.status === 'unchanged') {
         lastConfirmed = true;
         return;
     }
+    if (res.status !== 'ok')
+        return;
+    if (res.text === lastText) {
+        lastConfirmed = true;
+        lastEtag = res.etag ?? null;
+        etagRead = true;
+        return;
+    }
+    // Changed since: the tag no longer stands for lastText
+    lastEtag = null;
     const parsed = parseData(res.text);
     if (!parsed.ok)
         return;
@@ -319,6 +359,8 @@ function save() {
             lastText = text;
             lastRevs = revs;
             lastConfirmed = false;
+            lastEtag = await writtenVersion(text);
+            etagRead = false;
             attempted = null;
             releaseMedia(savedMedia, media, mediaIn(data.wordbook));
             savedMedia = media;
@@ -498,6 +540,8 @@ async function load() {
         }
         lastText = text;
         lastRevs = revs;
+        lastEtag = await writtenVersion(text);
+        etagRead = false;
         dropJournals(journals);
         if (!dirty)
             clearJournal();
@@ -508,6 +552,8 @@ async function load() {
     }
     else {
         lastText = res.status === 'ok' ? res.text : '';
+        lastEtag = res.status === 'ok' ? res.etag ?? null : null;
+        etagRead = true;
         lastRevs = serverRevs;
     }
     lastConfirmed = true;
@@ -551,9 +597,14 @@ function takeInJournal(server, serverRevs, entry) {
 async function reloadIfChanged() {
     if (mode !== 'file' || dirty || saving)
         return;
-    const res = await readUserFile(DATA_FILE);
-    if (res.status !== 'ok' || res.text === lastText || dirty || saving)
+    const res = await readUserFile(DATA_FILE, etagRead ? lastEtag ?? undefined : undefined);
+    if (res.status !== 'ok' || dirty || saving)
         return;
+    if (res.text === lastText) {
+        lastEtag = res.etag ?? null;
+        etagRead = true;
+        return;
+    }
     const parsed = parseData(res.text);
     if (!parsed.ok)
         return;
@@ -565,6 +616,8 @@ async function reloadIfChanged() {
     }
     data = parsed.data;
     lastText = res.text;
+    lastEtag = res.etag ?? null;
+    etagRead = true;
     lastRevs = parsed.revs;
     lastConfirmed = true;
     savedMedia = mediaIn(data.wordbook);

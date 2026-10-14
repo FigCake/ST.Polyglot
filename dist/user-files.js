@@ -2,7 +2,9 @@
 // the same place ST's Data Bank keeps attachments.
 //
 //   write   POST /api/files/upload  { name, data: base64 }  — atomic on the server
-//   read    GET  /user/files/<name>                          — static, so no-store
+//   read    GET  /user/files/<name>                          — static, so no-store; with the
+//           version tag (ETag) of a copy the caller holds, ST answers 304 and sends nothing
+//   version HEAD /user/files/<name>                          — the ETag and size, no content
 //   delete  POST /api/files/delete  { path: 'user/files/<name>' }
 //
 // Every call reports an outcome instead of throwing, so callers can tell a
@@ -36,24 +38,44 @@ export function toBase64(data) {
     }
     return btoa(parts.join(''));
 }
-export async function readUserFile(name) {
+/**
+ * Reads a file. With `etag` (the version tag of a copy the caller holds) a file
+ * the server still has in that version is not sent again: 'unchanged'.
+ */
+export async function readUserFile(name, etag) {
     assertName(name);
     try {
         const res = await fetch(`${userFileUrl(name)}?t=${Date.now()}`, {
             cache: 'no-store',
+            // A no-store request otherwise goes out with "Cache-Control: no-cache", and ST then always sends the whole file
+            headers: etag ? { 'If-None-Match': etag, 'Cache-Control': 'max-age=0' } : undefined,
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
+        if (res.status === 304)
+            return { status: 'unchanged' };
         if (res.status === 404)
             return { status: 'missing' };
         if (!res.ok) {
             recordProblem('file', `read ${name}: HTTP ${res.status}`);
             return { status: 'error' };
         }
-        return { status: 'ok', text: await res.text() };
+        return { status: 'ok', text: await res.text(), etag: res.headers.get('ETag') ?? undefined };
     }
     catch (e) {
         recordProblem('file', `read ${name}: ${errorText(e)}`);
         return { status: 'error' };
+    }
+}
+/** A file's version tag (ETag) and size in bytes, without its content; null when unknown. */
+export async function userFileVersion(name) {
+    assertName(name);
+    try {
+        const res = await fetch(`${userFileUrl(name)}?t=${Date.now()}`, { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS) });
+        const etag = res.headers.get('ETag'), size = Number(res.headers.get('Content-Length'));
+        return res.ok && etag && Number.isFinite(size) ? { etag, size } : null;
+    }
+    catch {
+        return null;
     }
 }
 /** A file's bytes, or null when it is missing or unreadable. */
@@ -74,7 +96,9 @@ export async function readUserBytes(name) {
 export async function writeUserFile(name, data, signal) {
     assertName(name);
     try {
-        const body = JSON.stringify({ name, data: toBase64(data) });
+        // Base64 needs no escaping: the body is put together directly (JSON.stringify of a
+        // multi-MB string costs a noticeable moment on every save of a large wordbook)
+        const body = `{"name":${JSON.stringify(name)},"data":"${toBase64(data)}"}`;
         const res = await fetch('/api/files/upload', {
             method: 'POST',
             headers: getRequestHeaders(),

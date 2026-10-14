@@ -97,6 +97,7 @@ function render(s) {
                     <i class="fa-solid ${b.icon}"></i>
                 </button>`)}
             </div>
+            <div class="pg-pset-hint pg-io-progress" aria-live="polite" hidden></div>
             <button class="pg-btn pg-btn-secondary pg-btn-block" data-action="reanalyse" title="${t('wb.reanalyseTip')}">
                 ✨ ${t('wb.reanalyse')}
             </button>
@@ -155,13 +156,24 @@ async function confirmed(question, doneLabel, fn) {
     notify(`${doneLabel} ✓`);
 }
 /** Disables a button and shows a spinner while `fn` runs. */
+/**
+ * Runs `fn` with the button showing a spinner; `progress(done, total)` shows
+ * "Sounds and pictures done / total" under the buttons (reading thousands takes a while).
+ */
 async function withBusy(btn, fn) {
     const idle = btn.innerHTML;
     btn.disabled = true;
     btn.setAttribute('aria-busy', 'true');
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+    const line = btn.closest('.pg-pset')?.querySelector('.pg-io-progress');
+    const progress = (done, total) => {
+        if (!line || !total)
+            return;
+        line.textContent = t('pnl.set.mediaProgress', { done: done.toLocaleString(), total: total.toLocaleString() });
+        line.hidden = false;
+    };
     try {
-        await fn();
+        await fn(progress);
     }
     catch (err) {
         // An export that fails (too many files for one zip, a picture that cannot be read…) says why
@@ -169,6 +181,8 @@ async function withBusy(btn, fn) {
         notify(t('pnl.set.exportFailed', { err: err instanceof Error ? err.message : String(err) }), 'err', 8000);
     }
     finally {
+        if (line)
+            line.hidden = true;
         btn.disabled = false;
         btn.removeAttribute('aria-busy');
         btn.innerHTML = idle;
@@ -207,8 +221,8 @@ async function exportApkg(btn) {
         notify(t('wb.noExport'), 'warn');
         return;
     }
-    await withBusy(btn, async () => {
-        const r = await exportToApkg(wordbook, getSets(), getLang());
+    await withBusy(btn, async (progress) => {
+        const r = await exportToApkg(wordbook, getSets(), getLang(), progress);
         notify([t('pnl.set.apkgDone', { n: r.words, m: r.media }), r.missing ? t('pnl.set.apkgMissing', { n: r.missing }) : '']
             .filter(Boolean).join(' '), r.missing ? 'warn' : 'info', 4000);
     });
@@ -223,7 +237,7 @@ const ACTIONS = {
     'import': () => triggerImport(),
     'csv': () => exportToCSV(scopedWordbook()),
     'txt': () => exportToFlashcardTxt(scopedWordbook()),
-    'backup': (_, btn) => withBusy(btn, async () => { await saveBackup(); }),
+    'backup': (_, btn) => withBusy(btn, async (progress) => { await saveBackup(false, progress); }),
     'pdf': (_, btn) => exportPdf(btn),
     'apkg': (_, btn) => exportApkg(btn),
     'reanalyse': reanalyse,

@@ -96,8 +96,11 @@ export function parseBackup(text) {
 // ── Effects ───────────────────────────────────────────────────────────────────
 export const BACKUP_JSON = 'polyglot-backup.json';
 const MEDIA_DIR = 'media/';
-/** Saves a backup file (a zip when words have media); returns how many words and media files it holds, and how many files on the server could not be read into it. */
-export async function downloadBackup() {
+/**
+ * Saves a backup file (a zip when words have media); returns how many words and media files it holds, and how many files
+ * on the server could not be read into it. `onMedia` hears how many sounds and pictures have been read (thousands take a while).
+ */
+export async function downloadBackup(onMedia) {
     const backup = createBackup(getSettings(), userData(), await listConjCache());
     const name = `Polyglot_Backup_${backup.exportedAt.slice(0, 10)}`;
     const json = JSON.stringify(backup, null, 1);
@@ -110,7 +113,12 @@ export async function downloadBackup() {
     const unread = [];
     // Six reads at a time (one by one took minutes for thousands of files); the zip keeps the list's order
     const read = [];
-    await inParallel(media.map((_, i) => i), 6, async (i) => { read[i] = await readUserBytes(media[i]); });
+    let done = 0;
+    onMedia?.(0, media.length);
+    await inParallel(media.map((_, i) => i), 6, async (i) => {
+        read[i] = await readUserBytes(media[i]);
+        onMedia?.(++done, media.length);
+    });
     media.forEach((file, i) => {
         const data = read[i];
         if (data)

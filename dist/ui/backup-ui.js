@@ -9,9 +9,9 @@ import { getSettings } from '../runtime.js';
  * Downloads a backup; false (after telling the user) when it could not be
  * made, or — with `complete` — when some media files could not be read into it.
  */
-export async function saveBackup(complete = false) {
+export async function saveBackup(complete = false, onMedia) {
     try {
-        const { words, media, missing } = await downloadBackup();
+        const { words, media, missing } = await downloadBackup(onMedia);
         notify(media ? t('pnl.set.backupDoneMedia', { n: words, m: media }) : t('pnl.set.backupDone', { n: words }), 'ok', 3000);
         if (missing)
             notify(t('pnl.set.backupMissing', { n: missing }), 'warn', 8000);
