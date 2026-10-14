@@ -6,6 +6,7 @@ import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { scopedWordbook, getSets } from '../wordbook.js';
 import { isMissed } from '../srs.js';
+import { logStudy } from '../study-log.js';
 const MAX_PAIRS = 12;
 const MIN_PAIRS = 4;
 /** How long a wrong pair stays red, and the pause before the completion message. */
@@ -48,6 +49,7 @@ function startGame(gameEl, words) {
         const score = gameEl.querySelector('.pg-match-score');
         if (score)
             score.textContent = `${++matched} / ${pairs.length}`;
+        logStudy();
         if (matched === pairs.length) {
             setTimeout(() => setHtml(gameEl, html `<div class="pg-match-complete">${t('mat.done', { n: pairs.length })}</div>`), FEEDBACK_MS);
         }

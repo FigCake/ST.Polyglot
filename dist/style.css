@@ -1148,10 +1148,10 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .pg-saved-mark:hover,
 .pg-clickable-word.pg-saved-word:hover { text-decoration-color: currentColor; filter: none; }
 
-/* ▶ after a line of dialogue (ui/line-voice.ts): a small glyph in the text — no border, no fill;
+/* ▶ after a line of dialogue (ui/line-voice.ts) or a saved sentence (play-glyph.ts): a small glyph in the text — no border, no fill;
    pointed at, only its colour changes (to the theme's quote colour). The !important resets keep
    ST themes and custom CSS from dressing it as a button. */
-.mes_text .pg-line-play {
+:is(.mes_text, .pg-wordbook-item) .pg-line-play {
     display: inline-block;
     vertical-align: 0.12em;
     margin: 0 0.1em 0 0.25em !important;
@@ -1169,20 +1169,48 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     -webkit-tap-highlight-color: transparent;
     transition: color 0.15s, opacity 0.15s;
 }
-.mes_text .pg-line-play:hover,
-.mes_text .pg-line-play:focus-visible,
-.mes_text .pg-line-play:active {
+:is(.mes_text, .pg-wordbook-item) .pg-line-play:hover,
+:is(.mes_text, .pg-wordbook-item) .pg-line-play:focus-visible,
+:is(.mes_text, .pg-wordbook-item) .pg-line-play:active {
     color: var(--SmartThemeQuoteColor, currentColor);
     opacity: 1;
     background: none !important;
     border: none !important;
     box-shadow: none !important;
 }
+/* A line's bookmark (save as a sentence): the same small glyph, shown when the line's ▶ is pointed at,
+   always (faint) on touch screens, and kept once saved */
+.mes_text .pg-line-tools { white-space: nowrap; }
+.mes_text .pg-line-save {
+    display: inline-block;
+    vertical-align: 0.12em;
+    margin: 0 0.1em 0 0 !important;
+    padding: 0.1em 0.15em !important;
+    border: none !important;
+    outline: none;
+    box-shadow: none !important;
+    background: none !important;
+    color: inherit;
+    font-size: 0.5em;
+    line-height: 1;
+    opacity: 0;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s, opacity 0.15s;
+}
+.mes_text .pg-line-tools:hover .pg-line-save,
+.mes_text .pg-line-save:focus-visible { opacity: 0.6; }
+.mes_text .pg-line-save:hover,
+.mes_text .pg-line-save:active { opacity: 1; color: var(--SmartThemeQuoteColor, currentColor); background: none !important; border: none !important; }
+.mes_text .pg-line-save.pg-saved { opacity: 0.45; }
+
 /* Reading now (pressed again, it stops) */
-.mes_text .pg-line-play.pg-playing { color: var(--SmartThemeQuoteColor, currentColor); opacity: 1; }
+:is(.mes_text, .pg-wordbook-item) .pg-line-play.pg-playing { color: var(--SmartThemeQuoteColor, currentColor); opacity: 1; }
 /* Touch screens: a finger-sized target (invisible), the line spacing kept */
 @media (pointer: coarse) {
-    .mes_text .pg-line-play { padding: 0.7em 0.6em !important; margin: -0.6em -0.35em -0.6em 0 !important; opacity: 0.5; }
+    :is(.mes_text, .pg-wordbook-item) .pg-line-play { padding: 0.7em 0.6em !important; margin: -0.6em -0.35em -0.6em 0 !important; opacity: 0.5; }
+    .mes_text .pg-line-save { padding: 0.7em 0.5em !important; margin: -0.6em -0.3em -0.6em 0 !important; opacity: 0.35; }
 }
 /* 🎧 reads all of a message's lines; lit while it does */
 .mes_button.pg-lines-play-btn.pg-playing {
@@ -2667,6 +2695,10 @@ mark.pg-wb-hl {
     color: var(--pg-t1);
 }
 
+/* A quiz made at the learner's level because the wordbook had too little for it */
+.pg-quiz-note { font-size: 12px; color: var(--pg-t3); margin: 2px 0 10px; }
+.pg-quiz-drill-header { flex-wrap: wrap; }
+
 /* Targeted exam — wrong-answer count header */
 .pg-quiz-targeted-header {
     display: flex;
@@ -3937,6 +3969,9 @@ mark.pg-wb-hl {
     background: var(--pg-layer-1);
     color: var(--pg-t1);
 }
+
+.pg-speak-source { margin-bottom: 8px; }
+.pg-speak-mode-btn:disabled { opacity: 0.4; cursor: default; }
 
 .pg-speak-progress {
     font-size: 0.78em;

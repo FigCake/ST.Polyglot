@@ -3,8 +3,11 @@
 // browser's voice, ST's TTS, or a voice service), in the study language and
 // the voice of the message's character (voice-cast.ts). Pressing it again
 // while it reads stops it. The message's 🎧 button reads all its lines in turn.
+// Beside it (shown when pointed at, always on touch screens) a bookmark saves
+// the line to the wordbook as a sentence: to hear it again there, and to say it
+// after the voice in the speaking drill.
 //
-//   “Ciao, come stai?” ▶ she asked. 「元気？」 ▶     —Hola ▶ —dijo.
+//   “Ciao, come stai?” ▶🔖 she asked. 「元気？」 ▶🔖     —Hola ▶🔖 —dijo.
 //
 // Lines are what dialogue.ts finds (the quotation marks of every language,
 // apostrophes told apart from single quotes, dash dialogue); lines in skipped
@@ -20,8 +23,14 @@ import { messageLines } from '../study-scope.js';
 import { speak, speakAll, stopSpeaking } from '../voice.js';
 import { getSettings, getLang, getContext } from '../runtime.js';
 import { t } from '../i18n.js';
-const BUTTON_CLASS = 'pg-line-play';
+import { PLAY_CLASS, playGlyph, pressGlyph, showPlaying, isPlaying } from './play-glyph.js';
+import { loadWordbook, addToWordbook } from '../wordbook.js';
+import { SENTENCE_MAX } from '../wordbook-model.js';
+import { notify } from '../ui.manager.js';
 const ALL_CLASS = 'pg-lines-play-btn';
+/** A line's ▶ and bookmark, together (pointing at the pair shows the bookmark). */
+const TOOLS_CLASS = 'pg-line-tools';
+const SAVE_CLASS = 'pg-line-save';
 const PLAYING = 'pg-playing';
 const enabled = () => getSettings().line_voice !== false;
 /** The lines a message's buttons read. */
@@ -38,47 +47,39 @@ function speakerOf(textEl) {
     const name = id !== null ? getContext().chat?.[Number(id)]?.name : undefined;
     return typeof name === 'string' && name ? name : mes?.getAttribute('ch_name') ?? undefined;
 }
-/** The line button reading now (shown as playing). */
-let playing = null;
-function showPlaying(btn) {
-    // While it reads, the ▶ is a ■
-    playing?.classList.remove(PLAYING, 'fa-stop');
-    playing?.classList.add('fa-play');
-    playing = btn;
-    btn?.classList.remove('fa-play');
-    btn?.classList.add(PLAYING, 'fa-stop');
-}
-/**
- * A bare icon, not a <button>: ST themes, custom CSS and phones style buttons
- * (border, fill on hover, size), and this should look like a glyph in the text.
- */
+/** A line's ▶ (play-glyph.ts), in the message character's voice. */
 function playButton(text) {
-    const btn = document.createElement('span');
-    btn.className = `${BUTTON_CLASS} ${DECOR_CLASS} fa-solid fa-play`;
-    btn.setAttribute('role', 'button');
-    btn.tabIndex = 0;
+    const btn = playGlyph(`${t('line.play')}: ${text}`, el => pressGlyph(el, () => speak(text, getLang(), { speaker: speakerOf(el) })));
     btn.title = t('line.play');
-    btn.setAttribute('aria-label', `${t('line.play')}: ${text}`);
-    btn.addEventListener('click', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (btn.classList.contains(PLAYING)) {
-            stopSpeaking();
-            return;
-        }
-        showPlaying(btn);
-        void speak(text, getLang(), { speaker: speakerOf(btn) }).finally(() => { if (playing === btn)
-            showPlaying(null); });
-    });
-    btn.addEventListener('keydown', e => {
-        if (e.key !== 'Enter' && e.key !== ' ')
-            return;
-        e.preventDefault();
-        btn.click();
-    });
+    btn.classList.add(DECOR_CLASS);
     // A quick second press is not a double-click on the sentence (tap translation)
     btn.addEventListener('dblclick', e => e.stopPropagation());
     return btn;
+}
+/** Shows a line's bookmark as saved. */
+function showSaved(el) {
+    el.classList.replace('fa-regular', 'fa-solid');
+    el.classList.add('pg-saved');
+    el.title = t('line.saved');
+    el.setAttribute('aria-label', t('line.saved'));
+}
+/** A line's bookmark: saves it to the wordbook as a sentence (once), with who said it (whose voice reads it again). */
+function saveButton(text, saved) {
+    const el = playGlyph(t('line.save'), () => {
+        if (el.classList.contains('pg-saved'))
+            return;
+        const speaker = speakerOf(el);
+        addToWordbook({ word: text.slice(0, SENTENCE_MAX), base_form: '', meaning: '', level: 'sentence', ...(speaker && { speaker }) }, { quiet: true });
+        document.querySelectorAll(`.${SAVE_CLASS}`).forEach(b => { if (b.dataset.line === text)
+            showSaved(b); });
+        notify(t('line.savedNote'), 'info', 3000);
+    });
+    el.className = `${SAVE_CLASS} fa-regular fa-bookmark`;
+    el.dataset.line = text;
+    if (saved)
+        showSaved(el);
+    el.addEventListener('dblclick', e => e.stopPropagation());
+    return el;
 }
 /** Reads all of a message's lines in turn (its 🎧 button); pressed again, stops. */
 async function playAll(msgEl, allBtn) {
@@ -97,8 +98,8 @@ async function playAll(msgEl, allBtn) {
     try {
         await speakAll(lines, getLang(), i => {
             if (i >= 0)
-                showPlaying(current = textEl.querySelectorAll(`.${BUTTON_CLASS}`)[i] ?? null);
-            else if (playing === current)
+                showPlaying(current = textEl.querySelectorAll(`.${PLAY_CLASS}`)[i] ?? null);
+            else if (isPlaying(current))
                 showPlaying(null);
         });
     }
@@ -133,6 +134,7 @@ function draw(textEl) {
         nodes.push({ node, start: offset });
         offset += node.data.length;
     }
+    const saved = new Set(loadWordbook().filter(e => e.level === 'sentence').map(e => e.word));
     // From the last line back: splitting a node keeps the text before the cut in it
     for (const line of [...lines].reverse()) {
         const last = line.after - 1;
@@ -142,11 +144,14 @@ function draw(textEl) {
         const cut = line.after - at.start;
         if (cut < at.node.data.length)
             at.node.splitText(cut);
-        at.node.after(playButton(line.text));
+        const tools = document.createElement('span');
+        tools.className = `${TOOLS_CLASS} ${DECOR_CLASS}`;
+        tools.append(playButton(line.text), saveButton(line.text, saved.has(line.text.slice(0, SENTENCE_MAX))));
+        at.node.after(tools);
     }
 }
 function strip(textEl) {
-    textEl.querySelectorAll(`.${BUTTON_CLASS}`).forEach(b => b.remove());
+    textEl.querySelectorAll(`.${TOOLS_CLASS}`).forEach(b => b.remove());
     textEl.normalize();
 }
 const DECORATION = { draw, strip };

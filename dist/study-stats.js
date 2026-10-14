@@ -3,7 +3,9 @@
 import { studyDay, dayKey, dueCount, dueAhead, isKnown } from './srs.js';
 const DAY_MS = 86_400_000;
 const dayOf = (key) => Math.round(Date.UTC(+key.slice(0, 4), +key.slice(5, 7) - 1, +key.slice(8, 10)) / DAY_MS);
-const studied = (d) => d.n + d.r > 0;
+/** Everything studied that day: words reviewed and other study (quizzes, writing…). */
+export const studiedCount = (d) => d.n + d.r + (d.o ?? 0);
+const studied = (d) => studiedCount(d) > 0;
 export function studyStats(days, pool, now = Date.now()) {
     const today = studyDay(now);
     const byDay = new Map(days.map(d => [dayOf(d.d), d]));
@@ -29,7 +31,7 @@ export function studyStats(days, pool, now = Date.now()) {
     return {
         streak, best, studiedToday,
         day: today,
-        counts: new Map([...byDay].filter(([, d]) => studied(d)).map(([day, d]) => [day, d.n + d.r])),
+        counts: new Map([...byDay].filter(([, d]) => studied(d)).map(([day, d]) => [day, studiedCount(d)])),
         today: byDay.get(today) ?? { d: dayKey(today), n: 0, r: 0, a: 0 },
         accuracy: ratings30 ? Math.max(0, 1 - again30 / ratings30) : null,
         ratings30,

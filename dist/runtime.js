@@ -57,6 +57,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     voice_cast: {},
     wordbook_scope: 'chat',
     wordbook_lang_only: true,
+    wordbook_hide_known: true,
     furigana_enabled: true,
     furigana_display: 'show',
     furigana_size: 0.65,

@@ -6,6 +6,7 @@ import { getConjCache } from '../../conj-cache.js';
 import { ai, getLang, getNativeLang } from '../../runtime.js';
 import { showConjugationPopup } from '../../features/conjugation.js';
 import { addToWordbook } from '../wordbook-ui.js';
+import { SENTENCE_MAX } from '../../wordbook-model.js';
 import { rubyWord, shownReading, readingOf } from '../../furigana/word.js';
 import { runDeepAnalysis, cancelDeepAnalysis } from './deep-analysis.js';
 // ── Views ─────────────────────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ function bindActions(bubble, sentence, result) {
                     saveVerb(verb, btn);
                 break;
             case 'save-sentence':
-                addToWordbook({ word: sentence.trim().slice(0, 80), base_form: '', meaning: result.translation, level: 'sentence' });
+                addToWordbook({ word: sentence.trim().slice(0, SENTENCE_MAX), base_form: '', meaning: result.translation, level: 'sentence' });
                 markDone(btn, t('wb.saved'));
                 break;
             case 'deep':

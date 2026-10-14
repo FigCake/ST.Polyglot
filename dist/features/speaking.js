@@ -4,13 +4,21 @@
 //   Shadowing  hear the word, say it  → speech-recognition match score
 //   Random     either, per card (dictation when speech recognition is unavailable)
 //
+// Over words, or over saved sentences (lines of dialogue saved from the chat,
+// sentences saved from a translation): hear it, then say it after the voice.
+//
 // Design rules:
 //   • speak / runPronunciationCheck are injected via SpeakingDeps.
-//   • Card pool = every entry in the current wordbook scope with a word.
+//   • Card pool = the current wordbook scope's words (not grammar patterns), or its sentences.
 import { shuffleArray, similarityScore } from '../utils.js';
 import { html, setHtml } from '../html.js';
 import { scopedWordbook } from '../wordbook.js';
+import { isCard } from '../srs.js';
 import { t } from '../i18n.js';
+const SOURCES = [
+    { source: 'words', key: 'speak.srcWords' },
+    { source: 'sentences', key: 'speak.srcSentences' },
+];
 const MODE_CHOICES = [
     { mode: 'random', key: 'speak.modeRandom' },
     { mode: 'dictation', key: 'speak.modeDictation' },
@@ -65,18 +73,24 @@ function cardView(mode) {
 // ── Session ───────────────────────────────────────────────────────────────────
 class SpeakingSession {
     root;
-    words;
+    sources;
     deps;
     pool = [];
     index = 0;
     choice = 'random';
+    source;
     recognition = null;
     area;
-    constructor(root, words, deps) {
+    constructor(root, sources, deps, initial) {
         this.root = root;
-        this.words = words;
+        this.sources = sources;
         this.deps = deps;
+        this.source = initial && sources[initial].length ? initial : sources.words.length ? 'words' : 'sentences';
         setHtml(root, html `
+            ${sources.sentences.length > 0 && html `
+            <div class="pg-speak-mode-group pg-speak-source" role="group">${SOURCES.map(c => html `
+                <button class="pg-speak-mode-btn ${c.source === this.source && 'active'}" data-action="source" data-source="${c.source}" ${!sources[c.source].length && html `disabled`}>${t(c.key)} ${sources[c.source].length}</button>`)}
+            </div>`}
             <div class="pg-speak-controls">
                 <div class="pg-speak-mode-group" role="group">${MODE_CHOICES.map(c => html `
                     <button class="pg-speak-mode-btn ${c.mode === this.choice && 'active'}" data-action="mode" data-mode="${c.mode}">${t(c.key)}</button>`)}
@@ -90,7 +104,7 @@ class SpeakingSession {
     }
     get entry() { return this.pool[this.index]; }
     restart() {
-        this.pool = shuffleArray(this.words);
+        this.pool = shuffleArray(this.sources[this.source]);
         this.index = 0;
         this.render();
     }
@@ -112,7 +126,7 @@ class SpeakingSession {
             return;
         }
         setHtml(this.area, cardView(this.modeFor()));
-        this.deps.speak(w.word, this.deps.getLang(), { audio: w.audio, keep: { word: w.word, field: 'audio' } }); // play on open
+        this.deps.speak(w.word, this.deps.getLang(), { audio: w.audio, keep: { word: w.word, field: 'audio' }, speaker: w.speaker }); // play on open
     }
     /** Shows the answer and the Next button. */
     reveal() {
@@ -137,6 +151,7 @@ class SpeakingSession {
         out.className = `pg-pronun-result ${grade.cls}`;
         out.textContent = `${score}% — ${t(grade.key)}`;
         button.hidden = true;
+        this.deps.logStudy?.();
         this.reveal();
     }
     listen(mic) {
@@ -147,7 +162,7 @@ class SpeakingSession {
         const out = this.area.querySelector('.pg-pronun-result');
         const w = this.entry;
         if (w && out)
-            this.recognition = this.deps.runPronunciationCheck(w.word, mic, out, () => this.reveal());
+            this.recognition = this.deps.runPronunciationCheck(w.word, mic, out, () => { this.deps.logStudy?.(); this.reveal(); });
     }
     onClick(e) {
         const el = e.target.closest('[data-action]');
@@ -155,13 +170,18 @@ class SpeakingSession {
             return;
         switch (el.dataset.action) {
             case 'mode':
-                this.root.querySelectorAll('.pg-speak-mode-btn').forEach(b => b.classList.toggle('active', b === el));
+                this.root.querySelectorAll('[data-action="mode"]').forEach(b => b.classList.toggle('active', b === el));
                 this.choice = el.dataset.mode;
+                this.restart();
+                break;
+            case 'source':
+                this.root.querySelectorAll('[data-action="source"]').forEach(b => b.classList.toggle('active', b === el));
+                this.source = el.dataset.source;
                 this.restart();
                 break;
             case 'play':
                 if (this.entry)
-                    this.deps.speak(this.entry.word, this.deps.getLang(), { audio: this.entry.audio, keep: { word: this.entry.word, field: 'audio' } });
+                    this.deps.speak(this.entry.word, this.deps.getLang(), { audio: this.entry.audio, keep: { word: this.entry.word, field: 'audio' }, speaker: this.entry.speaker });
                 break;
             case 'check':
                 this.check(el);
@@ -179,11 +199,13 @@ class SpeakingSession {
         }
     }
 }
-export function renderSpeaking(container, deps) {
-    const words = scopedWordbook().filter(e => e.word?.trim());
-    if (!words.length) {
+/** Opens the drill; `initial` picks words or saved sentences first (when there are any). */
+export function renderSpeaking(container, deps, initial) {
+    const entries = scopedWordbook().filter(e => e.word?.trim());
+    const sources = { words: entries.filter(isCard), sentences: entries.filter(e => e.level === 'sentence') };
+    if (!sources.words.length && !sources.sentences.length) {
         setHtml(container, html `<div class="pg-error-msg">${t('speak.noEntries')}</div>`);
         return;
     }
-    new SpeakingSession(container, words, deps);
+    new SpeakingSession(container, sources, deps, initial);
 }

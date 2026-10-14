@@ -25,6 +25,15 @@ import { scoreView } from './quiz-score.js';
 import { sanitizeQuestions } from './quiz-sanitize.js';
 import { acceptList, unionBy } from '../ai/client.js';
 import { cleanRawMessage } from '../study-scope.js';
+import { ENOUGH_WORDS } from '../quiz-material.js';
+/** The missed questions' words go back into today's reviews. */
+export function relearnMissed(deps, words) {
+    const missed = words.filter((w) => !!w);
+    if (missed.length)
+        deps.material?.relearn(missed);
+}
+/** A line over a quiz made at the learner's level because the wordbook had too little for it. */
+export const generalNote = (level) => html `<div class="pg-quiz-note">${t('qz.generalNote', { level })}</div>`;
 const TARGETED_SAMPLE = 5;
 /** Combines two cut-off question lists, dropping repeats. */
 const sameQuestion = unionBy(q => q.question.trim().toLowerCase());
@@ -84,6 +93,7 @@ function showScore(view, questions, wrong) {
         return;
     scoreEl.hidden = false;
     setHtml(scoreEl, scoreView(questions.length, wrong.length));
+    relearnMissed(view.deps, wrong.map(i => questions[i].word));
     scoreEl.querySelector('.pg-quiz-retry')?.addEventListener('click', () => {
         renderQuiz(view, wrong.map(i => ({ ...questions[i], options: shuffleArray(questions[i].options) })), true);
     });
@@ -127,6 +137,7 @@ function renderQuiz(view, questions, isRetry = false) {
         card.querySelector('.pg-quiz-exp')?.removeAttribute('hidden');
         if (!ok)
             wrong.push(Number(card.dataset.idx));
+        view.deps.logStudy?.();
         if (++answered === questions.length) {
             answers.abort();
             showScore(view, questions, wrong.sort((a, b) => a - b));
@@ -175,10 +186,17 @@ export async function runMiniQuiz(container, deps, historyCount = UI.quizHistory
         prompt: quizPrompt(history, deps.getLang(), cefr_level, deps.getNativeLang(), questionCount),
     }, signal);
 }
-/** 20 fill-in-the-blank questions on prepositions, verb forms and idioms. */
+/**
+ * Fill-in-the-blank questions on 10–20 random words being studied; with too
+ * few in the wordbook, 20 general ones at the learner's level.
+ */
 export function runClozeQuiz(container, deps) {
+    const level = deps.getSettings().cefr_level;
+    const words = deps.material?.words() ?? [];
+    const enough = words.length >= ENOUGH_WORDS;
     return generate(container, deps, {
-        prompt: clozeQuizPrompt(deps.getLang(), deps.getSettings().cefr_level, deps.getNativeLang()),
+        prompt: clozeQuizPrompt(deps.getLang(), level, deps.getNativeLang(), enough ? words : []),
+        header: enough ? undefined : generalNote(level),
     });
 }
 /** Half mock exam: 10 grammar/vocab + 15 reading questions at the learner's level. */
@@ -194,23 +212,28 @@ export function runReadingExam(container, deps) {
             </div>`,
     });
 }
-/** Drill on a random verb whose conjugation table is cached. */
+/**
+ * Verb forms of a few random verbs being studied (with the conjugation tables
+ * opened for them); without any, of common verbs at the learner's level.
+ */
 export async function runConjDrill(container, deps) {
     const signal = startSession(container);
     const lang = deps.getLang();
+    const level = deps.getSettings().cefr_level;
     setHtml(container, skeleton(3));
-    const entries = await deps.getAllConjCache(lang).catch(() => []);
+    const verbs = deps.material?.verbs() ?? [];
+    const tables = verbs.length ? await deps.getAllConjCache(lang).catch(() => []) : [];
     if (signal.aborted)
         return;
-    if (!entries.length) {
-        setHtml(container, message('error', t('qz.conjNoCache')));
-        return;
-    }
-    const { word, data } = entries[Math.floor(Math.random() * entries.length)];
+    const key = (w) => w.normalize('NFKC').toLowerCase().trim();
+    const byWord = new Map(tables.map(e => [key(e.word), e.data]));
+    const drill = verbs.map(v => ({ word: v.word, table: byWord.get(key(v.word)) }));
     return generate(container, deps, {
-        prompt: conjDrillPrompt(JSON.stringify(data), lang, deps.getNativeLang()),
+        prompt: conjDrillPrompt(drill, lang, level, deps.getNativeLang()),
         skeleton: 3,
-        header: html `<div class="pg-quiz-drill-header"><span class="pg-quiz-drill-verb">${word}</span></div>`,
+        header: drill.length
+            ? html `<div class="pg-quiz-drill-header">${drill.map(v => html `<span class="pg-quiz-drill-verb">${v.word}</span>`)}</div>`
+            : generalNote(level),
     }, signal);
 }
 /** New questions modelled on up to five random saved wrong answers. */

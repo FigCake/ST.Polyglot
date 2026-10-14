@@ -90,6 +90,7 @@ export function sanitizeQuestion(raw, random = Math.random) {
     if (options.length < 2)
         return null;
     const passage = asText(q.passage);
+    const word = asText(q.word);
     return {
         type: asText(q.type),
         question,
@@ -97,6 +98,7 @@ export function sanitizeQuestion(raw, random = Math.random) {
         answer,
         explanation: asText(q.explanation),
         ...(passage ? { passage } : {}),
+        ...(word ? { word } : {}),
     };
 }
 /** Repairs what can be repaired and drops what cannot. */

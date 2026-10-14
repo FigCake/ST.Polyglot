@@ -10,11 +10,14 @@ import { getSettings, getLang, getNativeLang, ai, getContext } from '../../runti
 import { speak } from '../../voice.js';
 import { hasSpeechRecognition, runPronunciationCheck, setActiveRecognition, getActiveRecognition, abortActiveRecognition, } from '../../speech.js';
 import { html, setHtml } from '../../html.js';
-import { askConfirm } from '../../ui.manager.js';
+import { askConfirm, notify } from '../../ui.manager.js';
 import { t } from '../../i18n.js';
 import { getAllConjEntries } from '../../conj-cache.js';
 import { wrongAnswersData, replaceUserData, onDataReplaced } from '../../data-store.js';
+import { logStudy } from '../../study-log.js';
 import { recentWrongAnswers } from '../../user-data.js';
+import { scopedWordbook, loadWordbook, saveWordbook } from '../../wordbook.js';
+import { studyWords, grammarItems, studyVerbs, relearn } from '../../quiz-material.js';
 import { renderDetail } from '../wordbook-ui.js';
 import { renderStudyRecord } from './study-record.js';
 import { renderFlashcard } from '../../features/flashcard.js';
@@ -36,6 +39,21 @@ const quizDeps = {
     saveWrongAnswers: wrongAnswers => replaceUserData({ wrongAnswers: recentWrongAnswers(wrongAnswers) }),
     // Language-scoped so tables from a previously studied language are skipped
     getAllConjCache: (lang) => getAllConjEntries(lang),
+    logStudy: () => logStudy(),
+    // Quizzes that do not use the chat work on the study language's words
+    material: {
+        words: () => studyWords(scopedWordbook('all')),
+        grammar: () => grammarItems(scopedWordbook('all')),
+        verbs: () => studyVerbs(scopedWordbook('all')),
+        relearn: words => {
+            const wordbook = loadWordbook();
+            const back = relearn(wordbook, words);
+            if (!back.length)
+                return;
+            saveWordbook(wordbook);
+            notify(t('qz.relearned', { n: back.length }), 'info', 4000);
+        },
+    },
 };
 const QUIZ_VARIANTS = [
     { id: 'quick', icon: '⚡', title: 'qz.modeQuick', desc: 'qz.modeQuickDesc', run: c => runMiniQuiz(c, quizDeps, 3, 5) },
@@ -89,7 +107,7 @@ const MODES = [
     {
         id: 'speak', icon: '🎤', key: 'pnl.learn.speak',
         render: c => renderSpeaking(c, {
-            speak, getLang, hasSpeechRecognition, runPronunciationCheck: pronounce,
+            speak, getLang, hasSpeechRecognition, runPronunciationCheck: pronounce, logStudy: () => logStudy(),
         }),
     },
 ];

@@ -135,14 +135,28 @@ Return ONLY:
 Text:
 <text>${chatHistory}</text>`;
 }
-/** 20 fill-in-the-blank questions (prepositions, verbs, idioms) at the CEFR level; no chat history. */
-export function clozeQuizPrompt(lang, level, nativeLang) {
-    return `You are an expert ${lang} language tutor. Create exactly 20 fill-in-the-blank questions for a CEFR ${level} learner whose native language is ${nativeLang}.
-
+/** How a quiz built on the learner's words asks for those words back: the word each question tests. */
+const wordList = (words) => words.map(w => `- ${w.word}${w.meaning ? ` (${w.meaning})` : ''}`).join('\n');
+/**
+ * Fill-in-the-blank questions (four options). With the learner's words: one
+ * question on each word, the word given back in "word". Without (too few
+ * saved): 20 general questions on prepositions, verb forms and idioms at the
+ * CEFR level. No chat history either way.
+ */
+export function clozeQuizPrompt(lang, level, nativeLang, words = []) {
+    const focus = words.length
+        ? `Create exactly ${words.length} fill-in-the-blank questions for a CEFR ${level} learner whose native language is ${nativeLang}, one on each of these ${lang} words or expressions the learner is studying (the meaning in parentheses is only a guide):
+${wordList(words)}
+Each blank is filled by that word, in the form the sentence needs (conjugated, agreed, inflected). The distractors are other words or forms that a learner could confuse with it.
+- "word": the word from the list exactly as written there.
+- "type": "vocab", "verb", "preposition" or "idiom", whichever fits the word.`
+        : `Create exactly 20 fill-in-the-blank questions for a CEFR ${level} learner whose native language is ${nativeLang}.
 Focus EXCLUSIVELY on these three categories (distribute evenly, ~7 each):
   1. "preposition" — choosing the correct preposition or prepositional phrase
   2. "verb"        — correct conjugation/tense/mood/aspect of a given verb
   3. "idiom"       — completing a fixed expression or collocation
+- "word": leave empty.`;
+    return `You are an expert ${lang} language tutor. ${focus}
 
 Each question presents a natural ${lang} sentence with one blank (___), and four options.
 Pitch difficulty precisely at CEFR ${level}. Do NOT base questions on any specific text.
@@ -152,13 +166,14 @@ Rules:
   Add a brief ${nativeLang} hint in parentheses when helpful (e.g. "(infinitive: essere)").
 - options: four choices in ${lang}. Distractors must be plausible but clearly wrong.
 - answer: must match one option exactly.
-- explanation: grammar rule or idiom explanation in ${nativeLang}, 2 sentences.
+- explanation: grammar rule or word use explained in ${nativeLang}, 2 sentences.
 
 Return ONLY valid JSON:
 {
   "questions": [
     {
-      "type": "preposition|verb|idiom",
+      "type": "vocab|verb|preposition|idiom",
+      "word": "",
       "question": "${lang} sentence with ___",
       "options": ["A", "B", "C", "D"],
       "answer": "correct option text",
@@ -479,17 +494,21 @@ Field rules:
 ${FILL_RULES(nativeLang)}`;
 }
 /** A conjugation drill from a cached table (`conjJson` is ConjData as a JSON string). */
-export function conjDrillPrompt(conjJson, lang, nativeLang, count = 10) {
+export function conjDrillPrompt(verbs, lang, level, nativeLang, count = 10) {
+    const tables = verbs.filter(v => v.table).map(v => `${v.word}: ${JSON.stringify(v.table)}`).join('\n');
+    const source = verbs.length
+        ? `Use these ${lang} verbs the learner is studying, spreading the questions over all of them: ${verbs.map(v => v.word).join(', ')}.
+${tables && `Conjugation tables the learner has opened (use their forms and person labels):\n${tables}\n`}- "word": the verb (as listed) the question tests.`
+        : `Choose 3 to 5 verbs a CEFR ${level} learner of ${lang} needs (common regular and irregular ones), spreading the questions over them.
+- "word": the infinitive of the verb the question tests.`;
     return `You are a ${lang} grammar drill coach.
-Using the conjugation table below, generate exactly ${count} multiple-choice questions testing the learner's knowledge of verb forms.
-
-Conjugation data (JSON):
-${conjJson}
+Generate exactly ${count} multiple-choice questions testing the learner's knowledge of verb forms, at CEFR ${level}.
+${source}
 
 Rules:
 - Each question asks for the correct conjugated form given a person + tense.
-- "question": e.g. "io / Presente → ?" or "they / Past → ?" — use the person label from the table.
-- "options": 4 choices — 1 correct form + 3 plausible distractors from OTHER cells in the table.
+- "question": e.g. "parlare — io / Presente → ?" — name the verb, the person and the tense.
+- "options": 4 choices — 1 correct form + 3 plausible distractors (other persons or tenses of the same verb).
 - "answer": the exact correct form string.
 - "explanation": one sentence in ${nativeLang} explaining the form or any irregularity.
 - "type": always "verb".
@@ -498,7 +517,7 @@ Rules:
 Return ONLY valid JSON — no preamble, no fences:
 {
   "questions": [
-    { "type": "verb", "question": "...", "options": ["...","...","...","..."], "answer": "...", "explanation": "..." }
+    { "type": "verb", "word": "...", "question": "...", "options": ["...","...","...","..."], "answer": "...", "explanation": "..." }
   ]
 }`;
 }
@@ -605,11 +624,19 @@ Return ONLY:
   "corrected": "", "errors": [{ "original": "", "correction": "", "type": "", "explanation": "" }], "model": "" }`;
 }
 /** One-gap grammar questions with typed answers, like the grammar sections of language exams. */
-export function typedGrammarPrompt(lang, level, nativeLang, count = 10, context = '') {
+export function typedGrammarPrompt(lang, level, nativeLang, count = 10, material = { grammar: [], words: [] }) {
+    const { grammar, words } = material;
+    const points = grammar.length
+        ? `Build the questions on these grammar points the learner saved, and on grammar easily confused with them (a similar form, the contrasting mood or tense, a near-synonymous construction) — about half on the saved points, half on the confusable ones:
+${grammar.map(g => `- ${g.pattern}${g.meaning ? ` (${g.meaning})` : ''}`).join('\n')}`
+        : `Cover the grammar these exams test at ${level}, spread over different points: verb forms (tense, mood, aspect, conjugation), agreement, prepositions or particles, articles or cases, pronouns, connectors, word formation — whichever matter in ${lang} at ${level}.`;
+    const vocabulary = words.length
+        ? `\nWhere natural, build the sentences with these words the learner is studying, and when a sentence uses one of them, give it in "word" exactly as listed:\n${wordList(words)}\n`
+        : '';
     return `You are an expert ${lang} tutor writing the grammar section of a ${lang} exam for a CEFR ${level} learner whose native language is ${nativeLang}.
 Create exactly ${count} fill-in-the-gap questions the learner answers by TYPING the missing form — like the grammar tasks standardised ${lang} exams use at ${level}.
 
-Cover the grammar these exams test at ${level}, spread over different points: verb forms (tense, mood, aspect, conjugation), agreement, prepositions or particles, articles or cases, pronouns, connectors, word formation — whichever matter in ${lang} at ${level}.
+${points}
 
 Rules:
 - "sentence": a natural ${lang} sentence with exactly one gap written ___ (three underscores). The gap is one word or a short form (at most 3 words).
@@ -617,7 +644,8 @@ Rules:
 - "answers": every correct fill, exactly as it would be written. For Japanese, include both the kanji and the kana spelling when both are common.
 - "point": the grammar point in ${nativeLang}, 2–5 words.
 - "explanation": why, in ${nativeLang}, one or two sentences.
-${context && `\nWhere natural, use words and situations from this conversation:\n<conversation>\n${context}\n</conversation>\n`}
+- "word": the learner's word the sentence uses (from the list), or empty.
+${vocabulary}
 Return ONLY:
-{ "questions": [{ "sentence": "", "hint": "", "answers": [""], "point": "", "explanation": "" }] }`;
+{ "questions": [{ "sentence": "", "hint": "", "answers": [""], "point": "", "explanation": "", "word": "" }] }`;
 }

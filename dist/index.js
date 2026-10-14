@@ -18,6 +18,7 @@ import { ST_SEL, mesSelector } from './st-dom.js';
 import { runChecker } from './features/checker.js';
 import { migrateChatWordbook, studyLangKey } from './wordbook.js';
 import { archiveCheck } from './check-archive.js';
+import { logStudy } from './study-log.js';
 import { refreshWordbook } from './ui/wordbook-ui.js';
 import { initDataStore, onDataReplaced, onDataChanged, storeMode } from './data-store.js';
 import { refreshSavedMarks, clearSavedMarks, resetSavedMarks, savedWordsChanged, countEncounters, resetEncounters, setSavedMarksPanelFn, } from './saved-marks.js';
@@ -31,7 +32,11 @@ import { eventSource, event_types, SlashCommandParser, SlashCommand, ARGUMENT_TY
 // ── Chat-UI entry points ──────────────────────────────────────────────────────
 const WAND_ICON = '<i class="fa-solid fa-earth-europe"></i>';
 const SPINNER_ICON = '<i class="fa-solid fa-spinner fa-spin"></i>';
-const checkerDeps = () => ({ ai, getSettings, getLang, getNativeLang, setWandBusy, archive: archiveCheck, langKey: studyLangKey });
+// A checked message counts as study (today's record)
+const checkerDeps = () => ({
+    ai, getSettings, getLang, getNativeLang, setWandBusy, langKey: studyLangKey,
+    archive: (entry) => { archiveCheck(entry); logStudy(); },
+});
 /** Adds the 🌍 input-assistant button next to ST's send button. */
 function injectWandButton() {
     if (!getSettings().enabled_checker)

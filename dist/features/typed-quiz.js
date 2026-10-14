@@ -17,23 +17,11 @@ import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
 import { scoreView } from './quiz-score.js';
 import { typedGrammarPrompt } from '../prompts.js';
-import { cleanRawMessage } from '../study-scope.js';
 import { unionBy } from '../ai/client.js';
 import { acceptTypedQuestions, gradeTyped, BLANK } from './writing-model.js';
-import { startSession } from './quiz.js';
+import { startSession, relearnMissed, generalNote } from './quiz.js';
+import { ENOUGH_WORDS } from '../quiz-material.js';
 const COUNT = 10;
-/** Recent chat used as a theme for the sentences (status windows left out). */
-const CONTEXT_MESSAGES = 4;
-const CONTEXT_MAX_CHARS = 2000;
-function chatContext(deps) {
-    const s = deps.getSettings();
-    const text = (deps.getContext().chat ?? [])
-        .map(m => cleanRawMessage(m.mes ?? '', s))
-        .filter(Boolean)
-        .slice(-CONTEXT_MESSAGES)
-        .join('\n');
-    return text.slice(-CONTEXT_MAX_CHARS);
-}
 const skeleton = () => html `${[0, 1, 2].map(() => html `
     <div class="pg-skeleton-quiz pg-skeleton">
         <div class="pg-skeleton-line pg-skeleton"></div>
@@ -88,6 +76,7 @@ function render(container, deps, questions, signal, isRetry = false) {
             cardEl.querySelector('.pg-typed-close')?.removeAttribute('hidden');
         if (grade !== 'correct')
             wrong.push(i);
+        deps.logStudy?.();
         // On to the next unanswered card
         const next = [...container.querySelectorAll('.pg-typed-input')].find(x => !x.readOnly);
         if (!blankToo)
@@ -118,6 +107,7 @@ function showScore(container, deps, questions, wrong, signal) {
         return;
     scoreEl.hidden = false;
     setHtml(scoreEl, scoreView(questions.length, wrong.length));
+    relearnMissed(deps, wrong.map(i => questions[i].word));
     scoreEl.querySelector('.pg-quiz-retry')?.addEventListener('click', () => {
         render(container, deps, wrong.map(i => questions[i]), startSession(container), true);
     });
@@ -136,13 +126,22 @@ function showScore(container, deps, questions, wrong, signal) {
         exp.after(btn);
     }
 }
-/** Ten typed grammar questions at the learner's level, themed on the recent chat when there is one. */
+/**
+ * Ten typed grammar questions on the saved grammar patterns (and grammar
+ * easily confused with them), with words being studied in the sentences;
+ * with too little in the wordbook, general ones at the learner's level.
+ */
 export async function runTypedGrammar(container, deps) {
     const signal = startSession(container);
-    setHtml(container, skeleton());
+    const level = deps.getSettings().cefr_level;
+    const grammar = deps.material?.grammar() ?? [];
+    const words = deps.material?.words() ?? [];
+    const enough = grammar.length > 0 || words.length >= ENOUGH_WORDS;
+    const note = enough ? null : generalNote(level);
+    setHtml(container, html `${note}${skeleton()}`);
     try {
         const { data } = await deps.ai.json({
-            prompt: typedGrammarPrompt(deps.getLang(), deps.getSettings().cefr_level, deps.getNativeLang(), COUNT, chatContext(deps)),
+            prompt: typedGrammarPrompt(deps.getLang(), level, deps.getNativeLang(), COUNT, enough ? { grammar, words } : undefined),
             signal,
             accept: acceptTypedQuestions,
             merge: unionBy(q => q.sentence),
@@ -150,6 +149,12 @@ export async function runTypedGrammar(container, deps) {
         if (signal.aborted)
             return;
         render(container, deps, data, signal);
+        // The questions replaced the page: the note goes back on top
+        if (note) {
+            const box = document.createElement('div');
+            setHtml(box, note);
+            container.prepend(...box.childNodes);
+        }
     }
     catch (e) {
         if (signal.aborted)

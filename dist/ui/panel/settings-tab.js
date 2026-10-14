@@ -108,6 +108,7 @@ function render(s) {
                 <input type="checkbox" class="pg-pset-check pg-scope-check" ${currentScope() === 'chat' && html `checked`}>
             </label>`}
             ${toggleRow('wordbook_lang_only', t('pnl.set.langOnly', { lang: getLang() }), s.wordbook_lang_only !== false)}
+            ${toggleRow('wordbook_hide_known', t('pnl.set.hideKnown'), s.wordbook_hide_known !== false)}
             ${wordsWithoutLang() > 0 && html `
             <button class="pg-btn pg-btn-secondary pg-btn-block" data-action="adopt-lang">
                 ${t('pnl.set.adoptLang', { n: wordsWithoutLang(), lang: getLang() })}
@@ -264,6 +265,7 @@ const SETTING_EFFECTS = {
     panel_floating: on => { const panel = findPanelEl(); if (panel)
         setFloating(panel, !!on); },
     wordbook_lang_only: () => refreshWordbook(),
+    wordbook_hide_known: () => refreshWordbook(),
 };
 function readInput(el) {
     if (el instanceof HTMLInputElement && el.type === 'checkbox')

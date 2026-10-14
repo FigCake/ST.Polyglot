@@ -84,6 +84,8 @@ export function mergeEntries(a, b) {
         ...srsOf(srs),
     });
 }
+/** Longest sentence saved to the wordbook (a line of dialogue, a translated sentence). */
+export const SENTENCE_MAX = 300;
 /** The review schedule fields, which always move together (FSRS, the older SM-2 ones, and when it was reset). */
 export const SRS_FIELDS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
     'srs_interval', 'srs_ease', 'srs_streak', 'srs_reset_at'];

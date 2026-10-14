@@ -260,6 +260,7 @@ export function addToWordbook(wordData, { quiet = false } = {}) {
         ...(typeof wordData.pos === 'string' && wordData.pos && { pos: wordData.pos }),
         ...(typeof wordData.ipa === 'string' && wordData.ipa && { ipa: wordData.ipa }),
         ...(typeof wordData.notes === 'string' && wordData.notes && { notes: wordData.notes }),
+        ...(typeof wordData.speaker === 'string' && wordData.speaker && { speaker: wordData.speaker }),
         ...(Array.isArray(wordData.collocations) && wordData.collocations.length
             && { collocations: wordData.collocations.filter((c) => typeof c === 'string') }),
         setIds: [],

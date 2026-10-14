@@ -129,6 +129,7 @@ export function acceptTypedQuestions(v) {
         answers: texts(q.answers, 5),
         point: text(q.point),
         explanation: text(q.explanation),
+        ...(text(q.word) && { word: text(q.word) }),
     })).filter(q => q.sentence.split(BLANK).length === 2 && q.answers.length > 0);
     return out.length ? out : null;
 }

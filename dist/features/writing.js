@@ -249,6 +249,9 @@ async function rate(container, deps) {
         });
         if (abort.signal.aborted || session !== s)
             return;
+        // Rating the same text again is not more study
+        if (s.rated !== text)
+            deps.logStudy?.();
         s.feedback = data;
         s.rated = text;
         renderSession(container, deps, partial);

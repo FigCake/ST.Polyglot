@@ -13,7 +13,7 @@ import { getSettings } from '../../runtime.js';
 import { daysData } from '../../data-store.js';
 import { scopedWordbook } from '../../wordbook.js';
 import { isFresh, isCard } from '../../srs.js';
-import { studyStats } from '../../study-stats.js';
+import { studyStats, studiedCount } from '../../study-stats.js';
 const DAY_MS = 86_400_000;
 const dateOf = (day) => new Date(day * DAY_MS);
 const lines = (text) => html `${text.split('\n').map((line, i) => html `${i > 0 && raw('<br>')}${line}`)}`;
@@ -65,7 +65,7 @@ function statsRow(s, fresh) {
         : html `<div class="pg-record-stat"><span class="pg-record-val">${value}</span><span class="pg-record-lab">${label}</span></div>`;
     return html `
         <div class="pg-record-stats">
-            ${item(s.today.n + s.today.r, t('rec.today'))}
+            ${item(studiedCount(s.today), t('rec.today'))}
             ${item(left, t('rec.due'), left > 0 ? 'review' : undefined)}
             ${item(pct, t('rec.accuracy'))}
             ${item(`${s.known}/${s.words}`, t('rec.words'))}

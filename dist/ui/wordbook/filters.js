@@ -16,11 +16,17 @@ function matchesQuery(w, q) {
     const has = (s) => !!s && s.toLowerCase().includes(q);
     return has(w.word) || has(w.base_form) || has(w.meaning) || has(w.notes) || (w.collocations ?? []).some(has);
 }
-/** Entries matching every active filter, newest first. */
-export function applyFilter(wordbook, f) {
+/**
+ * Whether the list leaves a word out as known (setting "hide known words"):
+ * not when known words are asked for (the status filter) or searched for.
+ */
+export const hiddenAsKnown = (w, f, hideKnown) => hideKnown && f.status !== 'known' && !f.query.trim() && isCard(w) && wordStatus(w) === 'known';
+/** Entries matching every active filter, newest first (known words left out with `hideKnown`). */
+export function applyFilter(wordbook, f, hideKnown = false) {
     const q = f.query.trim().toLowerCase();
     return wordbook
-        .filter(w => matchesLevel(w, f.level) &&
+        .filter(w => !hiddenAsKnown(w, f, hideKnown) &&
+        matchesLevel(w, f.level) &&
         (!f.pos || w.pos === f.pos) &&
         (!f.missed || isMissed(w)) &&
         (!f.noSound || lacksSound(w)) &&

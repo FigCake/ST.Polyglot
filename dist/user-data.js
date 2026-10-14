@@ -20,7 +20,8 @@ export const recentWrongAnswers = (list) => list.length <= WRONG_KEPT ? list : [
 export const recentChecks = (list) => [...list].sort((a, b) => b.at - a.at).slice(0, CHECKS_KEPT);
 export const DATA_FORMAT = 'polyglot-data';
 /**
- * 2: the correction archive and study days. Older versions write back only
+ * 2: the correction archive and study days. 3: other study on study days (StudyDay.o).
+ * Older versions write back only
  * the fields they know, so a tab still running one would drop them; a newer
  * version number makes it refuse the file instead (parseData: 'newer').
  *
@@ -29,7 +30,7 @@ export const DATA_FORMAT = 'polyglot-data';
  * field on corrections or days, or a new top-level list, is dropped by them:
  * raise this number with it.
  */
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 export const emptyData = () => ({ wordbook: [], sets: [], wrongAnswers: [], checks: [], days: [] });
 export const hasData = (d) => d.wordbook.length > 0 || d.sets.length > 0 || d.wrongAnswers.length > 0 || d.checks.length > 0 || d.days.length > 0;
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -37,7 +38,7 @@ const strings = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string'
 export const num = (v, fallback) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
 /** Optional fields that must be text when present (anything else would break the views that read them). */
 const TEXT_FIELDS = ['meaning_lang', 'pos_info', 'pos', 'ipa', 'reading', 'notes', 'original_form', 'context_meaning',
-    'example', 'example_translation', 'example_form', 'example_audio', 'audio', 'image', 'dateAdded'];
+    'example', 'example_translation', 'example_form', 'example_audio', 'audio', 'image', 'dateAdded', 'speaker'];
 /** The entry without optional fields of the wrong type (a backup or chat metadata may hold anything). */
 function typedFields(v) {
     const out = { ...v };
@@ -98,7 +99,9 @@ function cleanCheck(v) {
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const count = (v) => Math.max(0, Math.round(num(v, 0)));
 const byDate = (list) => list.sort((a, b) => (a.d < b.d ? -1 : a.d > b.d ? 1 : 0));
-const maxDay = (a, b) => ({ d: a.d, n: Math.max(a.n, b.n), r: Math.max(a.r, b.r), a: Math.max(a.a, b.a) });
+/** A study day with its "other study" count only when there is some (keeps the file small). */
+const withOther = (day, o) => (o > 0 ? { ...day, o } : day);
+const maxDay = (a, b) => withOther({ d: a.d, n: Math.max(a.n, b.n), r: Math.max(a.r, b.r), a: Math.max(a.a, b.a) }, Math.max(a.o ?? 0, b.o ?? 0));
 /** Days of the same date combined (the larger totals: they are the same day counted twice). */
 function unionDays(lists) {
     const days = new Map();
@@ -111,7 +114,7 @@ function unionDays(lists) {
 function cleanDays(v) {
     const days = (Array.isArray(v) ? v : [])
         .filter(x => isRecord(x) && typeof x.d === 'string' && DAY_KEY.test(x.d))
-        .map((x) => ({ d: x.d, n: count(x.n), r: count(x.r), a: count(x.a) }));
+        .map((x) => withOther({ d: x.d, n: count(x.n), r: count(x.r), a: count(x.a) }, count(x.o)));
     return unionDays([days]);
 }
 /** Validated data from untrusted fields; unusable items are dropped, not fatal. */
@@ -193,8 +196,8 @@ function rebaseDays(base, local, server) {
     const zero = (d) => ({ d, n: 0, r: 0, a: 0 });
     const index = (list) => new Map(list.map(x => [x.d, x]));
     const b = index(base), l = index(local), s = index(server);
-    const sum = (d, k) => Math.max(0, (s.get(d) ?? zero(d))[k] + (l.get(d) ?? zero(d))[k] - (b.get(d) ?? zero(d))[k]);
-    return byDate([...new Set([...l.keys(), ...s.keys()])].map(d => ({ d, n: sum(d, 'n'), r: sum(d, 'r'), a: sum(d, 'a') })));
+    const sum = (d, k) => Math.max(0, ((s.get(d) ?? zero(d))[k] ?? 0) + ((l.get(d) ?? zero(d))[k] ?? 0) - ((b.get(d) ?? zero(d))[k] ?? 0));
+    return byDate([...new Set([...l.keys(), ...s.keys()])].map(d => withOther({ d, n: sum(d, 'n'), r: sum(d, 'r'), a: sum(d, 'a') }, sum(d, 'o'))));
 }
 function rebase(base, local, server, key, combine, 
 /** What stays of an item deleted elsewhere that this session changed (null: nothing). */
