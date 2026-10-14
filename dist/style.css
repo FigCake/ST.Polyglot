@@ -1001,7 +1001,7 @@
     cursor: pointer;
 }
 .pg-link-btn:hover { opacity: 1; }
-.pg-pset-footer { display: flex; justify-content: center; padding: 12px 0 4px; }
+.pg-pset-footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; padding: 12px 0 4px; }
 
 /* Document dialog (open-source licenses) */
 .pg-dim .pg-dialog.pg-doc-dialog { max-width: 720px; max-height: 85vh; }
@@ -1252,6 +1252,7 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
             line-height: 1.5;
             color: var(--pg-t1, #e0e0e0);
             white-space: pre-wrap;
+            overflow-wrap: anywhere;
         }
 
         /* Label */

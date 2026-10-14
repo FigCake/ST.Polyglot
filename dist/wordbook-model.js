@@ -42,8 +42,12 @@ export function tagLang(e, lang) {
     return true;
 }
 // ── Merging ───────────────────────────────────────────────────────────────────
-const progressOf = (e) => [e.srs_reviewed_at ?? 0, e.srs_stability ?? e.srs_interval ?? 0];
-/** True when `a` has seen more review than `b` (latest review first, then longest interval). */
+/** The last thing done to the word's schedule (a review, or a reset after it) and the interval it left. */
+function progressOf(e) {
+    const reviewed = e.srs_reviewed_at ?? 0, reset = e.srs_reset_at ?? 0;
+    return reset > reviewed ? [reset, 0] : [reviewed, e.srs_stability ?? e.srs_interval ?? 0];
+}
+/** True when `a` has seen more review than `b` (latest review or reset first, then longest interval). */
 function moreReviewed(a, b) {
     const [ra, ia] = progressOf(a), [rb, ib] = progressOf(b);
     return ra !== rb ? ra > rb : ia >= ib;
@@ -77,9 +81,9 @@ export function mergeEntries(a, b) {
         ...srsOf(srs),
     });
 }
-/** The review schedule fields, which always move together (FSRS and the older SM-2 ones). */
-const SRS_FIELDS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
-    'srs_interval', 'srs_ease', 'srs_streak'];
+/** The review schedule fields, which always move together (FSRS, the older SM-2 ones, and when it was reset). */
+export const SRS_FIELDS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
+    'srs_interval', 'srs_ease', 'srs_streak', 'srs_reset_at'];
 /** An entry's schedule fields that are set. */
 function srsOf(e) {
     const out = {};

@@ -23,6 +23,7 @@ import { srsRate, previewDays, todaysCards, forecast, isNew, isFresh, isMissed, 
 import { logReview, newWordsToday } from '../study-log.js';
 import { cardKind, clozeOf, gradeWord } from '../card-kind.js';
 import { findWord } from '../utils.js';
+import { errorText } from '../diagnostics.js';
 import { acceptObject, missingKeys } from '../ai/client.js';
 import { userFileUrl } from '../user-files.js';
 import { withoutSound } from '../word-sounds.js';
@@ -120,10 +121,10 @@ async function loadExample(w, card, deps) {
         if (slot?.isConnected)
             slot.outerHTML = exampleView(w).value;
     }
-    catch {
+    catch (e) {
         if (request.signal.aborted || !slot?.isConnected)
             return;
-        setHtml(slot, html `<div class="pg-flash-example pg-flash-example-err">—</div>`);
+        setHtml(slot, html `<div class="pg-flash-example pg-flash-example-err" title="${errorText(e)}">—</div>`);
     }
     finally {
         if (exampleRequest === request)

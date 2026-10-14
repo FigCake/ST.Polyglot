@@ -18,6 +18,8 @@ import { mergeWordbooks } from '../wordbook-model.js';
 export { keepableMedia, bytesHash, mediaFileName };
 /** Files read, named and checked together: bounds memory and the size of each existence check. */
 const MEDIA_BATCH = 200;
+/** Bytes of media a batch holds in memory before it is uploaded. */
+const MEDIA_BATCH_BYTES = 128 * 1024 * 1024;
 /** Uploads running at once (browsers allow about six connections per server). */
 const UPLOADS_AT_ONCE = 6;
 /**
@@ -31,12 +33,17 @@ export async function storeMedia(names, read, onProgress, signal) {
     const written = new Set();
     let done = 0, failed = 0;
     const tick = () => onProgress({ done: ++done, total: names.length });
-    for (let i = 0; i < names.length && !signal?.aborted; i += MEDIA_BATCH) {
+    for (let i = 0; i < names.length && !signal?.aborted;) {
+        // A batch holds at most MEDIA_BATCH files and about MEDIA_BATCH_BYTES of them in memory
         const files = new Map();
-        for (const name of names.slice(i, i + MEDIA_BATCH)) {
+        let held = 0;
+        while (i < names.length && files.size < MEDIA_BATCH && held < MEDIA_BATCH_BYTES) {
+            const name = names[i++];
             const bytes = await read(name).catch(() => null);
-            if (bytes)
+            if (bytes) {
                 files.set(name, { file: mediaFileName(bytes, name), bytes });
+                held += bytes.length;
+            }
             else {
                 failed++;
                 tick();
@@ -54,14 +61,15 @@ export async function storeMedia(names, read, onProgress, signal) {
             else
                 toUpload.push(entry);
         }
-        // Two package names with the same content upload once
+        // Two package names with the same content upload once. Listed in one write per batch
+        // (one per file rewrote the whole list each time: slow for thousands of files)
+        notePending(toUpload.map(([, { file }]) => file));
         const uploads = new Map();
         await inParallel(toUpload, UPLOADS_AT_ONCE, async ([name, { file, bytes }]) => {
             if (signal?.aborted)
                 return;
             let upload = uploads.get(file);
             if (!upload) {
-                notePending([file]);
                 upload = writeUserFile(file, bytes, signal).then(r => r === 'ok', () => false);
                 uploads.set(file, upload);
             }

@@ -5,51 +5,9 @@
 // (ai/client.ts). From ST it only reads request headers, which keys are set,
 // the current chat-completion connection and its connection profiles.
 import { findProfile, profileSource, sendThroughProfile } from './ai/st-profiles.js';
-// @ts-expect-error — no type declarations for ST internals
-import { getRequestHeaders } from '../../../../../script.js';
-// @ts-expect-error — no type declarations for ST internals
-import { getContext } from '../../../../extensions.js';
-// @ts-expect-error — no type declarations for ST internals
-import { SECRET_KEYS, secret_state } from '../../../../secrets.js';
+import { getRequestHeaders, getContext, SECRET_KEYS, secret_state } from './st.js';
+import { providerById } from './ai/providers.js';
 // ── Provider config tables ────────────────────────────────────────────────────
-/** Polyglot provider key → ST chat_completion_source value. */
-const PROVIDER_SOURCE = {
-    openai: 'openai',
-    claude: 'claude',
-    google: 'makersuite',
-    openrouter: 'openrouter',
-    deepseek: 'deepseek',
-    vertexai: 'vertexai',
-};
-/** Model suggestions for the settings dropdown; any model string is accepted. */
-export const PROVIDER_MODELS = {
-    openai: [
-        'gpt-5.2', 'gpt-5.1', 'gpt-5.1-chat-latest',
-        'gpt-4o', 'gpt-4o-mini',
-    ],
-    claude: [
-        'claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001',
-        'claude-3-5-sonnet-20241022',
-    ],
-    google: [
-        'gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview',
-        'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-    ],
-    openrouter: [
-        'google/gemini-3.1-pro-preview', 'google/gemini-3-pro-preview', 'google/gemini-3-flash-preview',
-        'google/gemini-2.5-pro', 'google/gemini-2.5-flash',
-        'anthropic/claude-sonnet-4-6', 'anthropic/claude-haiku-4-5',
-        'openai/gpt-5.2', 'openai/gpt-5.1', 'openai/gpt-4o',
-        'deepseek/deepseek-chat-v3-5', 'deepseek/deepseek-r2',
-    ],
-    deepseek: [
-        'deepseek-chat-v3-5', 'deepseek-r2', 'deepseek-chat', 'deepseek-reasoner',
-    ],
-    vertexai: [
-        'gemini-3.1-pro-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview',
-        'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-    ],
-};
 /** ST backend source → chatCompletionSettings model-key mapping. */
 export const ROUTE_MODEL_KEY = new Map([
     ['openai', 'openai_model'],
@@ -63,15 +21,6 @@ export const ROUTE_MODEL_KEY = new Map([
     ['groq', 'groq_model'],
     ['custom', 'custom_model'],
 ]);
-/** Provider key → ST SECRET_KEYS value, to check the key is set before sending. */
-const PROVIDER_SECRET_KEY = {
-    openai: SECRET_KEYS.OPENAI,
-    claude: SECRET_KEYS.CLAUDE,
-    google: SECRET_KEYS.MAKERSUITE,
-    openrouter: SECRET_KEYS.OPENROUTER,
-    deepseek: SECRET_KEYS.DEEPSEEK,
-    // vertexai omitted — ST handles Express / Service Account auth internally
-};
 // ── Request plumbing ──────────────────────────────────────────────────────────
 const TEMPERATURE = 0.3;
 function buildMessages(system, user) {
@@ -158,10 +107,10 @@ async function postChat({ url, headers, body, signal, errorLabel, networkHint })
         }
         catch (e) {
             if (request.timedOut())
-                throw new Error(`${errorLabel}: no response within ${REQUEST_TIMEOUT_MS / 1000} s.`);
+                throw new Error(`${errorLabel}: no response within ${REQUEST_TIMEOUT_MS / 1000} s.`, { cause: e });
             if (e instanceof Error && e.name === 'AbortError')
                 throw e;
-            throw new Error(networkHint);
+            throw new Error(networkHint, { cause: e });
         }
         if (!resp.ok) {
             const detail = await resp.text().catch(() => '');
@@ -233,7 +182,8 @@ async function completeViaST(system, user, s, signal) {
     const ccs = getContext().chatCompletionSettings ?? {};
     const source = s.route_chat_source || ccs.chat_completion_source || 'openai';
     const modelKey = ROUTE_MODEL_KEY.get(source) || 'model';
-    const model = s.route_model || ccs[modelKey] || '';
+    const stModel = ccs[modelKey];
+    const model = s.route_model || (typeof stModel === 'string' ? stModel : '');
     return postChat({
         url: ST_GENERATE_URL,
         headers: getRequestHeaders(),
@@ -259,12 +209,13 @@ async function completeViaST(system, user, s, signal) {
 }
 /** A known provider routed through ST's backend, reusing ST's stored API keys. */
 async function completeViaProvider(system, user, s, signal) {
-    const source = PROVIDER_SOURCE[s.provider];
-    if (!source)
+    const provider = providerById(s.provider);
+    if (!provider)
         throw new Error(`Unknown provider: ${s.provider}`);
+    const source = provider.source;
     if (!s.model)
         throw new Error('No model selected. Please choose a model in the settings.');
-    const secretKey = PROVIDER_SECRET_KEY[s.provider];
+    const secretKey = provider.secret && SECRET_KEYS[provider.secret];
     if (secretKey && !secret_state[secretKey]) {
         throw new Error(`${s.provider.toUpperCase()} API key is not set. Enter it in SillyTavern's API settings.`);
     }
@@ -301,12 +252,12 @@ async function completeViaProfile(system, user, s, signal) {
     }
     catch (e) {
         if (request.timedOut())
-            throw new Error(`Connection profile: no response within ${REQUEST_TIMEOUT_MS / 1000} s.`);
+            throw new Error(`Connection profile: no response within ${REQUEST_TIMEOUT_MS / 1000} s.`, { cause: e });
         if (e instanceof Error && e.name === 'AbortError')
             throw e;
         if (e instanceof TypeError && /fetch|network/i.test(e.message))
-            throw new Error(ST_NETWORK_HINT);
-        throw new Error(`Connection profile "${profile.name || profile.id}": ${e?.message || 'the request failed'}`);
+            throw new Error(ST_NETWORK_HINT, { cause: e });
+        throw new Error(`Connection profile "${profile.name || profile.id}": ${e?.message || 'the request failed'}`, { cause: e });
     }
     finally {
         request.release();

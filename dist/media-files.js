@@ -23,8 +23,7 @@
 //
 // Only names of that exact shape are ever deleted.
 import { deleteUserFile, userFileUrl } from './user-files.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { getRequestHeaders } from '../../../../../script.js';
+import { getRequestHeaders } from './st.js';
 import { KEY } from './constants.js';
 const MEDIA_NAME = /^pg-media-[0-9a-f]{16}\.[a-z0-9]{2,5}$/;
 export const isMediaName = (name) => typeof name === 'string' && MEDIA_NAME.test(name);

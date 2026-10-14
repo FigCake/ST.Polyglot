@@ -65,14 +65,6 @@ export const UI = {
     /** Recent chat messages sent with a quiz prompt. */
     quizHistoryMessages: 6,
 };
-// ── Native-language tags ───────────────────────────────────────────────────────
-// BCP-47 short tags for the supported UI / explanation languages.
-const NATIVE_LANG_TAG = {
-    Korean: 'ko',
-    English: 'en',
-    Italian: 'it',
-    Spanish: 'es',
-};
 /** Human-readable language name used inside AI prompts. */
 const NATIVE_LANG_LABEL = {
     ko: 'Korean',

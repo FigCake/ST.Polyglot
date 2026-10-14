@@ -201,20 +201,20 @@ export function cleanRawMessage(raw, scope) {
 }
 // ── Names ─────────────────────────────────────────────────────────────────────
 /** How words are compared: case, width and surrounding punctuation ignored, "Anna's" as "Anna". */
-export const wordKey = (word) => word.normalize('NFKC').toLowerCase()
+export const nameKey = (word) => word.normalize('NFKC').toLowerCase()
     .replace(/^[\p{P}\p{S}\s]+|[\p{P}\p{S}\s]+$/gu, '')
     .replace(/['’]s$/u, '');
 /** Keys of names (each part of a full name too) and of listed words. */
 export function skipKeys(names, words) {
     const keys = new Set();
     for (const name of names) {
-        keys.add(wordKey(name));
+        keys.add(nameKey(name));
         for (const part of name.split(/[\s\p{P}]+/u))
             if (part.length >= 2)
-                keys.add(wordKey(part));
+                keys.add(nameKey(part));
     }
     for (const word of words)
-        keys.add(wordKey(word));
+        keys.add(nameKey(word));
     keys.delete('');
     return keys;
 }
@@ -249,10 +249,10 @@ export function skippedNames() {
 export function skipWords(words) {
     const s = getSettings();
     const list = parseList(s.skip_words);
-    const keys = new Set(list.map(wordKey));
+    const keys = new Set(list.map(nameKey));
     const added = [];
     for (const word of words.map(w => w.trim())) {
-        const key = wordKey(word);
+        const key = nameKey(word);
         if (!key || /[,\n]/.test(word) || keys.has(key))
             continue;
         keys.add(key);
@@ -271,5 +271,5 @@ export function skipWords(words) {
 export function wordSkipper() {
     const s = getSettings();
     const keys = skipKeys(s.skip_names ? chatNames() : [], parseList(s.skip_words));
-    return (...forms) => keys.size > 0 && forms.some(f => !!f && keys.has(wordKey(f)));
+    return (...forms) => keys.size > 0 && forms.some(f => !!f && keys.has(nameKey(f)));
 }

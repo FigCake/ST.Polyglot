@@ -1,4 +1,5 @@
-// Wordbook data layer — CRUD, sets, CSV/TXT export, CSV parsing.
+// Wordbook data layer — CRUD, sets, CSV/TXT export (and splitting CSV text into
+// records for ui/wordbook/import.ts, which reads the files).
 //
 // One shared wordbook holds every chat's words; each entry lists the chats it
 // belongs to. Pure rules live in wordbook-model.ts; where the data is stored
@@ -19,6 +20,7 @@ import { t } from './i18n.js';
 import { chatValue, currentChatId } from './storage.js';
 import { skipWords } from './study-scope.js';
 import { withSound, withoutSound } from './word-sounds.js';
+import { cleanData } from './user-data.js';
 import { inScope, inLang, langKey, langsOf, tagChat, tagLang, mergeWordbooks, removeChats, removeWords, moveChats, chatOverview, findDuplicates, mergeGroup, editEntry, } from './wordbook-model.js';
 // ── Wordbook read / write ─────────────────────────────────────────────────────
 /** Every chat's words, as a live array: mutate, then saveWordbook(). Use scopedWordbook() for display. */
@@ -167,7 +169,10 @@ export async function migrateChatWordbook() {
     const legacy = legacyChatWordbook.get();
     if (!chatId || !Array.isArray(legacy) || storeMode() !== 'file')
         return 0;
-    const incoming = legacy.filter(e => e?.word).map(e => ({ ...e, chats: [chatId] }));
+    // A chat file can come from someone else: only valid entries, and no sound or picture
+    // links (pre-1.5 words had none; a crafted file could point at any of the user's files)
+    const incoming = cleanData({ wordbook: legacy }).wordbook
+        .map(({ audio: _a, example_audio: _e, image: _i, made_sounds: _m, ...e }) => ({ ...e, chats: [chatId] }));
     if (incoming.length)
         saveWordbook(mergeWordbooks(loadWordbook(), incoming).wordbook);
     if (!(await flush()) || currentChatId() !== chatId)
@@ -276,9 +281,14 @@ export function exportToCSV(wordbook) {
     }
     downloadText(wordbookCsv(wordbook), 'Polyglot_Wordbook.csv');
 }
-/** The CSV export's text: RFC 4180 quoting; newlines collapse so each entry is one row. */
+/**
+ * The CSV export's text: RFC 4180 quoting; newlines collapse so each entry is
+ * one row. A cell starting with = + - @ or a tab gets a leading ' so a
+ * spreadsheet shows it as text instead of running it as a formula (the
+ * import takes the ' off again).
+ */
 export function wordbookCsv(wordbook) {
-    const esc = (v) => String(v || '').replace(/[\n\r]/g, ' ').replace(/"/g, '""');
+    const esc = (v) => String(v || '').replace(/[\n\r]/g, ' ').replace(/^[=+\-@\t]/, "'$&").replace(/"/g, '""');
     return [
         '"word","base_form","meaning","level","original_form","context_meaning"',
         ...wordbook.map(e => `"${esc(e.word)}","${esc(e.base_form)}","${esc(e.meaning)}","${esc(e.level)}","${esc(e.original_form)}","${esc(e.context_meaning)}"`),

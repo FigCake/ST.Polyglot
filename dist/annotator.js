@@ -15,12 +15,11 @@
 //   • Highlighting only wraps text nodes; it never rewrites the message HTML.
 //   • Message text is read through plain-text.ts (no furigana readings), and
 //     what study-scope.ts skips (status windows, names) is neither sent nor highlighted.
-import { KEY, DELAY } from './constants.js';
+import { KEY } from './constants.js';
 import { ST_SEL, mesSelector, mesIdOf, mesTextOf } from './st-dom.js';
 import { levelClass, findWord, entryList, withEntryFor, relocateEntries } from './utils.js';
 import { annotatorPrompt } from './prompts.js';
 import { notify } from './ui.manager.js';
-import { html, setHtml } from './html.js';
 import { t } from './i18n.js';
 import { addToWordbook } from './wordbook.js';
 import { chatValue, currentChatId } from './storage.js';
@@ -31,6 +30,7 @@ import { studiedText, skippedNodes, skippedNames, wordSkipper } from './study-sc
 import { drawDialogue, stripDialogue, LINE_CLASS } from './ui/dialogue-layer.js';
 import { showFuriganaFor, hideFuriganaFor, clearChatFurigana } from './furigana/messages.js';
 import { textHash } from './furigana/model.js';
+import { showStopBar, hideStopBar } from './stop-bar.js';
 import { setLayer, hasLayer, messagesWith, resetLayers, pruneDetachedDecor, untilRendered, cancelUntilRendered, DECOR_CLASS, } from './ui/message-decor.js';
 let openPanel = () => { };
 /** Registers openLearningPanel (called once by index.ts). */
@@ -277,25 +277,6 @@ export function clearCurrentChatAnnotations() {
     document.querySelectorAll('.pg-annotate-btn').forEach(b => b.classList.remove('pg-btn-active'));
     setTimeout(() => { suppressRestore = false; }, 0);
 }
-// ── Snackbar ──────────────────────────────────────────────────────────────────
-function showSnackbar(onStop) {
-    hideSnackbar();
-    const el = Object.assign(document.createElement('div'), { id: 'pg-snackbar', className: 'pg-snackbar' });
-    setHtml(el, html `
-        <span class="pg-snackbar-text"><i class="fa-solid fa-spinner fa-spin"></i>&nbsp; ${t('ann.analysing')}</span>
-        <button class="pg-snackbar-stop">${t('ann.stop')}</button>`);
-    el.querySelector('.pg-snackbar-stop')?.addEventListener('click', () => { onStop(); hideSnackbar(); });
-    document.body.appendChild(el);
-    void el.offsetWidth; // reflow so the entry transition runs on mobile
-    el.classList.add('pg-snackbar-visible');
-}
-function hideSnackbar() {
-    const el = document.getElementById('pg-snackbar');
-    if (!el)
-        return;
-    el.classList.remove('pg-snackbar-visible');
-    setTimeout(() => el.remove(), DELAY.snackbarFadeOut);
-}
 // ── Run ───────────────────────────────────────────────────────────────────────
 function messageButton(className, title, onClick) {
     const btn = Object.assign(document.createElement('div'), {
@@ -406,7 +387,7 @@ export async function runAnnotator(msgEl, mesId) {
     const abort = new AbortController();
     requests.set(mesId, abort);
     btn?.classList.add('pg-btn-busy');
-    showSnackbar(() => { abort.abort(); hideFuriganaFor(mesId); });
+    showStopBar(abort, () => { abort.abort(); hideFuriganaFor(mesId); });
     // Readings run alongside: the wait is the longer request, not both
     const readings = showFuriganaFor(mesId, lines);
     try {
@@ -441,6 +422,6 @@ export async function runAnnotator(msgEl, mesId) {
         btn?.classList.remove('pg-btn-busy');
         if (requests.get(mesId) === abort)
             requests.delete(mesId);
-        hideSnackbar();
+        hideStopBar(abort);
     }
 }

@@ -9,12 +9,10 @@ import { KEY } from './constants.js';
 import { getLangFromSettings, getNativeLangFromSettings } from './utils.js';
 import { complete } from './api.js';
 import { createAiClient } from './ai/client.js';
+import { defaultModels } from './ai/providers.js';
 import { notify } from './ui.manager.js';
 import { t } from './i18n.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { extension_settings, getContext } from '../../../../extensions.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { saveSettingsDebounced } from '../../../../../script.js';
+import { extension_settings, getContext, saveSettingsDebounced } from './st.js';
 // ── Defaults ──────────────────────────────────────────────────────────────────
 export const DEFAULT_SETTINGS = Object.freeze({
     enabled_checker: true,
@@ -28,14 +26,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     provider: 'st',
     model: '', // selected model name (unused when provider is 'st')
     // last-used model per provider — restored when switching back to a provider
-    _model_history: {
-        openai: 'gpt-5.1',
-        claude: 'claude-sonnet-4-6',
-        google: 'gemini-3.1-pro-preview',
-        openrouter: 'google/gemini-3.1-pro-preview',
-        deepseek: 'deepseek-chat-v3-5',
-        vertexai: 'gemini-3.1-pro-preview',
-    },
+    _model_history: defaultModels(),
     // ST default connection only (provider='st')
     route_chat_source: '',
     route_model: '',
@@ -78,15 +69,24 @@ const LEGACY_PROVIDER_MAP = {
     anthropic: 'claude', openai: 'openai', openrouter: 'openrouter', custom: 'custom',
 };
 // ── Settings access ───────────────────────────────────────────────────────────
-/** Returns the live settings object, creating, back-filling and migrating it as needed. */
+/** Settings objects already back-filled and migrated: once each, not at every one of the many reads. */
+const prepared = new WeakSet();
+/** Returns the live settings object, creating, back-filling and migrating it the first time it is seen. */
 export function getSettings() {
     extension_settings[KEY.module] ??= structuredClone(DEFAULT_SETTINGS);
     const s = extension_settings[KEY.module];
+    if (!prepared.has(s)) {
+        prepareSettings(s);
+        prepared.add(s);
+    }
+    return s;
+}
+/** Back-fills keys added since and migrates old values (on first use, and after a backup's settings are restored). */
+export function prepareSettings(s) {
     backfillDefaults(s);
     migrateLegacyProvider(s);
     migrateFurigana(s);
     dropRemovedTts(s);
-    return s;
 }
 export function saveSettings() { saveSettingsDebounced(); }
 /** Applies a partial update to the live settings and schedules a save. */

@@ -14,6 +14,7 @@ import { askConfirm } from '../../ui.manager.js';
 import { t } from '../../i18n.js';
 import { getAllConjEntries } from '../../conj-cache.js';
 import { wrongAnswersData, replaceUserData, onDataReplaced } from '../../data-store.js';
+import { recentWrongAnswers } from '../../user-data.js';
 import { renderDetail } from '../wordbook-ui.js';
 import { renderStudyRecord } from './study-record.js';
 import { renderFlashcard } from '../../features/flashcard.js';
@@ -32,7 +33,7 @@ function pronounce(target, micBtn, resultEl, onSettled) {
 const quizDeps = {
     ai, getContext, getSettings, getLang, getNativeLang, askConfirm,
     wrongAnswers: wrongAnswersData,
-    saveWrongAnswers: wrongAnswers => replaceUserData({ wrongAnswers }),
+    saveWrongAnswers: wrongAnswers => replaceUserData({ wrongAnswers: recentWrongAnswers(wrongAnswers) }),
     // Language-scoped so tables from a previously studied language are skipped
     getAllConjCache: (lang) => getAllConjEntries(lang),
 };

@@ -9,6 +9,7 @@
 // hash of the text and dropped when the text changes.
 //
 // Pure — no DOM, no I/O.
+import { fnv1a } from '../hash.js';
 // ── Characters ────────────────────────────────────────────────────────────────
 const KANJI_CHAR = /[\p{Script=Han}々〆ヵヶ]/u;
 const KANJI_RUN = /[\p{Script=Han}々〆ヵヶ]+/gu;
@@ -162,8 +163,5 @@ export function kanjiChunks(text, max = 400) {
 }
 /** A short, stable fingerprint of a text (FNV-1a, 32 bit). */
 export function textHash(text) {
-    let h = 0x811c9dc5;
-    for (let i = 0; i < text.length; i++)
-        h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
-    return (h >>> 0).toString(36) + text.length.toString(36);
+    return fnv1a(text).toString(36) + text.length.toString(36);
 }

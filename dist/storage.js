@@ -9,8 +9,7 @@
 //                                                             answers and the correction archive)
 //   localStorage    per browser                               media uploads no save has accounted for yet
 //   IndexedDB       per browser                               conjugation tables (conj-cache.ts) — a cache
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { getContext, saveMetadataDebounced } from '../../../../extensions.js';
+import { getContext, saveMetadataDebounced } from './st.js';
 /** Null when no chat is loaded. */
 export function chatMetadata() {
     return getContext()?.chatMetadata ?? null;

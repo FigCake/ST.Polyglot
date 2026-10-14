@@ -17,6 +17,11 @@ import { SqliteFile } from './sqlite.js';
 export class AnkiFormatError extends Error {
 }
 const SEP = '\u001f';
+/**
+ * Largest sound or picture taken from a package. A tiny compressed entry can
+ * describe hundreds of megabytes; a word's media is far smaller than this.
+ */
+export const MEDIA_MAX_BYTES = 64 * 1024 * 1024;
 /** Note types and decks of a schema 11 collection (JSON in the col table). */
 function legacyCollection(db) {
     const [col] = [...db.rows('col')];
@@ -124,7 +129,7 @@ const STUB_NOTE = /please update to the latest anki version/i;
 export async function readAnkiPackage(file) {
     const entries = await readZip(file);
     const entry = (name) => entries.get(name);
-    const read = (e) => readEntry(file, e);
+    const read = (e, max) => readEntry(file, e, max);
     const modern = entry('collection.anki21b');
     const legacy = entry('collection.anki21') ?? entry('collection.anki2');
     if (!modern && !legacy)
@@ -153,8 +158,8 @@ export async function readAnkiPackage(file) {
             const e = zipName === undefined ? undefined : entry(zipName);
             if (!e)
                 return null;
-            const bytes = await read(e);
-            return isZstd(bytes) ? zstdDecompress(bytes) : bytes;
+            const bytes = await read(e, MEDIA_MAX_BYTES);
+            return isZstd(bytes) ? zstdDecompress(bytes, MEDIA_MAX_BYTES) : bytes;
         },
     };
 }

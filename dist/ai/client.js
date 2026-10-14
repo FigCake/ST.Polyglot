@@ -26,6 +26,7 @@
 //
 // Pure apart from the injected `complete` function — unit-testable.
 import { extractJson } from './json-repair.js';
+import { recordProblem, errorText } from '../diagnostics.js';
 export class AiResponseError extends Error {
     raw;
     constructor(message, raw) {
@@ -70,26 +71,37 @@ function combine(req, retry, first) {
 export function createAiClient(complete, system = JSON_SYSTEM_PROMPT) {
     return {
         async json(req) {
-            const first = await attempt(complete, system, req, req.prompt);
-            if (first.kind === 'ok')
-                return first.result;
-            let second = null;
             try {
-                second = await attempt(complete, system, req, req.prompt + RETRY_NOTE[first.problem](first.fields));
+                return await jsonOnce(req);
             }
             catch (e) {
-                // A failed retry must not hide a usable first answer — unless the user cancelled.
-                if (req.signal?.aborted || !first.partial)
-                    throw e;
+                // Kept for "Copy diagnostics": the request's error, or the start of the reply that could not be used
+                if (!req.signal?.aborted)
+                    recordProblem('ai', e instanceof AiResponseError ? `${e.message} Reply: ${e.raw}` : errorText(e));
+                throw e;
             }
-            if (second?.kind === 'ok')
-                return second.result;
-            const best = combine(req, second?.kind === 'problem' ? second.partial : undefined, first.partial);
-            if (best)
-                return best;
-            throw new AiResponseError('The model did not return valid JSON in the expected format.', second?.raw ?? first.raw);
         },
     };
+    async function jsonOnce(req) {
+        const first = await attempt(complete, system, req, req.prompt);
+        if (first.kind === 'ok')
+            return first.result;
+        let second = null;
+        try {
+            second = await attempt(complete, system, req, req.prompt + RETRY_NOTE[first.problem](first.fields));
+        }
+        catch (e) {
+            // A failed retry must not hide a usable first answer — unless the user cancelled.
+            if (req.signal?.aborted || !first.partial)
+                throw e;
+        }
+        if (second?.kind === 'ok')
+            return second.result;
+        const best = combine(req, second?.kind === 'problem' ? second.partial : undefined, first.partial);
+        if (best)
+            return best;
+        throw new AiResponseError('The model did not return valid JSON in the expected format.', second?.raw ?? first.raw);
+    }
 }
 // ── accept() helpers ──────────────────────────────────────────────────────────
 export const isRecord = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);

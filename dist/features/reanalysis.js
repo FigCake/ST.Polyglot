@@ -15,6 +15,8 @@
 //   • A field the reply does not give leaves the entry's value alone; a reply
 //     the client had to repair after it was cut off is never applied (its
 //     last value may be half-written): the batch's words go one by one.
+//   • A field the learner edited while the request ran (it no longer has the
+//     value the request was made with) keeps the learner's value.
 //   • AbortController allows the user to stop mid-batch at any time.
 //   • On abort or error the wordbook is saved with whatever was completed.
 //   • Failures in a row stop the run, so a provider that is down, or a model
@@ -52,9 +54,15 @@ function _sanitise(raw) {
             : undefined,
     };
 }
-/** Applies a cleaned result to the entry in place. Returns true if anything changed. */
-function _applyResult(entry, result, originalWord, nativeLang) {
+const snapshot = (e) => ({ pos: e.pos, ipa: e.ipa || undefined, collocations: JSON.stringify(e.collocations ?? []), base_form: e.base_form });
+/**
+ * Applies a cleaned result to the entry in place. Returns true if anything
+ * changed. `asked`: the entry as the request saw it; a field changed since
+ * (edited by the learner meanwhile) is left alone.
+ */
+function _applyResult(entry, result, originalWord, nativeLang, asked = snapshot(entry)) {
     let changed = false;
+    const now = snapshot(entry);
     // Meaning and level are filled only when missing
     if (!entry.meaning?.trim() && result.meaning) {
         entry.meaning = result.meaning;
@@ -65,17 +73,17 @@ function _applyResult(entry, result, originalWord, nativeLang) {
         entry.level = result.level;
         changed = true;
     }
-    if (result.pos && entry.pos !== result.pos) {
+    if (result.pos && entry.pos !== result.pos && now.pos === asked.pos) {
         entry.pos = result.pos;
         changed = true;
     }
     // '' and undefined both mean "no IPA"; otherwise every run would count as a change
     const nextIpa = result.ipa || undefined;
-    if (result.ipa !== undefined && nextIpa !== entry.ipa) {
+    if (result.ipa !== undefined && nextIpa !== entry.ipa && now.ipa === asked.ipa) {
         entry.ipa = nextIpa;
         changed = true;
     }
-    if (result.collocations &&
+    if (result.collocations && now.collocations === asked.collocations &&
         (result.collocations.length > 0 || (entry.collocations && entry.collocations.length > 0))) {
         const next = result.collocations.length > 0 ? result.collocations : undefined;
         if (JSON.stringify(entry.collocations) !== JSON.stringify(next)) {
@@ -84,7 +92,8 @@ function _applyResult(entry, result, originalWord, nativeLang) {
         }
     }
     if (result.base_form_verified &&
-        result.base_form_verified !== entry.base_form) {
+        result.base_form_verified !== entry.base_form &&
+        now.base_form === asked.base_form) {
         entry.base_form = result.base_form_verified;
         // The cached table was for the old base form
         entry.conj_cached = false;
@@ -113,14 +122,14 @@ const acceptBatch = (v) => {
     const items = v.filter((r) => isRecord(r) && typeof r.word === 'string');
     return items.length ? items : null;
 };
-/** Applies results to the live wordbook (re-read, so concurrent edits survive). */
-function applyAll(results, nativeLang) {
+/** Applies results to the live wordbook (re-read, so concurrent edits survive); `asked`: each word as its request saw it. */
+function applyAll(results, nativeLang, asked) {
     const wordbook = loadWordbook();
     const byWord = new Map(wordbook.map(e => [e.word, e]));
     let dirty = false;
     for (const { word, result } of results) {
         const entry = byWord.get(word);
-        if (entry && _applyResult(entry, result, word, nativeLang))
+        if (entry && _applyResult(entry, result, word, nativeLang, asked.get(word)))
             dirty = true;
     }
     if (dirty)
@@ -155,6 +164,7 @@ export async function runReanalysis(deps, options = {}) {
             stop(message);
     };
     const analyseOne = async (entry) => {
+        const asked = new Map([[entry.word, snapshot(entry)]]);
         try {
             const { data, partial } = await deps.ai.json({
                 prompt: reanalysisPrompt(entry.word, entry.base_form, lang, nativeLang, gaps(entry)),
@@ -169,7 +179,7 @@ export async function runReanalysis(deps, options = {}) {
                 return;
             }
             succeeded();
-            applyAll([{ word: entry.word, result: data }], nativeLang);
+            applyAll([{ word: entry.word, result: data }], nativeLang, asked);
         }
         catch (err) {
             if (signal.aborted)
@@ -184,6 +194,7 @@ export async function runReanalysis(deps, options = {}) {
             const batch = pool.slice(i, i + BATCH_SIZE);
             options.onProgress?.(processed, total, batch[0].word);
             let answered = new Set();
+            const asked = new Map(batch.map(e => [e.word, snapshot(e)]));
             try {
                 const { data, partial } = await deps.ai.json({
                     prompt: batchReanalysisPrompt(batch.map(e => ({ word: e.word, base_form: e.base_form, ...gaps(e) })), lang, nativeLang),
@@ -196,9 +207,8 @@ export async function runReanalysis(deps, options = {}) {
                 // A cut-off reply's last item may be half-written, and which one is last is unknown after merging
                 if (!partial) {
                     // Only the words asked about: a reply may name others (an echo slip, or text in an imported entry)
-                    const asked = new Set(batch.map(e => e.word));
                     const items = data.filter(r => asked.has(r.word));
-                    applyAll(items.map(r => ({ word: r.word, result: _sanitise(r) })), nativeLang);
+                    applyAll(items.map(r => ({ word: r.word, result: _sanitise(r) })), nativeLang, asked);
                     answered = new Set(items.map(r => r.word));
                 }
             }

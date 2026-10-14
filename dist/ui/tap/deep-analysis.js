@@ -2,6 +2,7 @@
 // chips, dependency arcs above them, grammar points and a summary.
 import { html, setHtml, raw } from '../../html.js';
 import { t } from '../../i18n.js';
+import { errorText } from '../../diagnostics.js';
 import { deepAnalysisPrompt } from '../../prompts.js';
 import { ai, getLang, getNativeLang } from '../../runtime.js';
 import { isRecord } from '../../ai/client.js';
@@ -94,8 +95,17 @@ const loadingView = html `
         <div class="pg-skeleton"></div><div class="pg-skeleton"></div><div class="pg-skeleton"></div>
         <div class="pg-skeleton"></div><div class="pg-skeleton"></div>
     </div>`;
-const acceptDeep = (v) => isRecord(v) && Array.isArray(v.tokens)
-    ? { ...v, tokens: v.tokens.filter(tok => isRecord(tok) && typeof tok.text === 'string') }
+const text = (x) => (typeof x === 'string' ? x : '');
+/** A reply's breakdown: tokens and grammar points without their text are dropped; a missing summary is ''. */
+export const acceptDeep = (v) => isRecord(v) && Array.isArray(v.tokens)
+    ? {
+        ...v,
+        tokens: v.tokens.filter(tok => isRecord(tok) && typeof tok.text === 'string'),
+        grammar: (Array.isArray(v.grammar) ? v.grammar : [])
+            .filter((g) => isRecord(g) && typeof g.point === 'string')
+            .map(g => ({ point: g.point, explanation: text(g.explanation) })),
+        summary: text(v.summary),
+    }
     : null;
 const requests = new WeakMap();
 /** Cancels a bubble's pending deep analysis (when the bubble closes). */
@@ -128,9 +138,9 @@ export async function runDeepAnalysis(sentence, bubble, button) {
         if (!request.signal.aborted)
             setHtml(area, resultView(data));
     }
-    catch {
+    catch (e) {
         if (!request.signal.aborted)
-            setHtml(area, html `<div class="pg-deep-error">${t('tap.deepFailed')}</div>`);
+            setHtml(area, html `<div class="pg-deep-error">${t('tap.deepFailed')} (${errorText(e)})</div>`);
     }
     finally {
         button.innerHTML = label;

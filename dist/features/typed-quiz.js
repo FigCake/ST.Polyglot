@@ -15,6 +15,7 @@
 //   • Questions pass through acceptTypedQuestions(); grading is gradeTyped().
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
+import { scoreView } from './quiz-score.js';
 import { typedGrammarPrompt } from '../prompts.js';
 import { cleanRawMessage } from '../study-scope.js';
 import { unionBy } from '../ai/client.js';
@@ -116,11 +117,7 @@ function showScore(container, deps, questions, wrong, signal) {
     if (!scoreEl)
         return;
     scoreEl.hidden = false;
-    setHtml(scoreEl, html `
-        <div class="pg-score-text">${questions.length - wrong.length} / ${questions.length} correct</div>
-        ${wrong.length
-        ? html `<button class="pg-btn pg-btn-secondary pg-btn-full pg-quiz-retry">${t('qz.retry', { n: wrong.length })}</button>`
-        : html `<div class="pg-score-perfect">${t('qz.allCorrect')}</div>`}`);
+    setHtml(scoreEl, scoreView(questions.length, wrong.length));
     scoreEl.querySelector('.pg-quiz-retry')?.addEventListener('click', () => {
         render(container, deps, wrong.map(i => questions[i]), startSession(container), true);
     });

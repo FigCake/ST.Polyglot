@@ -9,6 +9,7 @@
 import { html, setHtml } from '../../html.js';
 import { t } from '../../i18n.js';
 import { notify } from '../../ui.manager.js';
+import { errorText, recordProblem } from '../../diagnostics.js';
 import { readAnkiPackage, AnkiFormatError } from '../../deck-import/package.js';
 import { describeTypes, fieldText, notesToRows, splitFurigana, TARGETS } from '../../deck-import/fields.js';
 import { addRows, canStoreMedia, mediaOf, storeMedia } from '../../deck-import/import.js';
@@ -132,24 +133,36 @@ function runDialog(fileName, pkg, types) {
                 return;
             }
             busy = true;
-            wrap.querySelectorAll('input, select, [data-anki="import"]').forEach(el => { el.disabled = true; });
+            const controls = wrap.querySelectorAll('input, select, [data-anki="import"]');
+            controls.forEach(el => { el.disabled = true; });
             const progress = q('.pg-anki-progress');
-            let stored = new Map();
-            const names = q('[data-media]')?.checked ? mediaOf(rows, pkg.media) : [];
-            if (names.length && progress) {
-                progress.hidden = false;
-                const result = await storeMedia(names, pkg.readMedia, p => {
-                    progress.textContent = t('anki.progressMedia', { done: p.done, total: p.total });
-                }, abort.signal);
-                if (abort.signal.aborted)
-                    return;
-                stored = result.stored;
-                if (result.failed)
-                    notify(t('anki.mediaFailed', { n: result.failed }), 'warn', 6000);
+            try {
+                let stored = new Map();
+                const names = q('[data-media]')?.checked ? mediaOf(rows, pkg.media) : [];
+                if (names.length && progress) {
+                    progress.hidden = false;
+                    const result = await storeMedia(names, pkg.readMedia, p => {
+                        progress.textContent = t('anki.progressMedia', { done: p.done, total: p.total });
+                    }, abort.signal);
+                    if (abort.signal.aborted)
+                        return;
+                    stored = result.stored;
+                    if (result.failed)
+                        notify(t('anki.mediaFailed', { n: result.failed }), 'warn', 6000);
+                }
+                const summary = addRows(rows, fileName.replace(/\.(apkg|colpkg)$/i, ''), stored);
+                notify(t('anki.done', { added: summary.added, updated: summary.updated, sets: summary.setIds.length }), 'ok', 5000);
+                finish(summary.setIds);
             }
-            const summary = addRows(rows, fileName.replace(/\.(apkg|colpkg)$/i, ''), stored);
-            notify(t('anki.done', { added: summary.added, updated: summary.updated, sets: summary.setIds.length }), 'ok', 5000);
-            finish(summary.setIds);
+            catch (e) {
+                // The dialog comes back to life (Escape, a retry) and says why
+                recordProblem('anki', `import: ${errorText(e)}`);
+                notify(t('anki.importFailed', { msg: errorText(e) }), 'err', 8000);
+                busy = false;
+                controls.forEach(el => { el.disabled = false; });
+                if (progress)
+                    progress.hidden = true;
+            }
         };
         wrap.addEventListener('click', e => {
             const action = e.target.closest('[data-anki]')?.dataset.anki;

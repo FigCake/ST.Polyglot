@@ -73,6 +73,8 @@ export function openLearningPanel(initialTab = 'learn', wordData = null) {
         panelId: PANEL_ID,
         extra: 'pg-sidebar',
         onDismiss: () => {
+            // A lookup still running would open the panel again when its answer comes
+            cancelLookup();
             abortActiveRecognition();
             unmountWordbook();
             learnTab?.dispose();

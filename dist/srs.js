@@ -16,6 +16,7 @@
 //
 // Days begin at 4 AM local time, so a late-night session counts for the day
 // before; a review is due from the start of its day.
+import { fnv1a } from './hash.js';
 /** FSRS-6 default parameters. */
 const W = [0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666, 0.796,
     1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542];
@@ -144,11 +145,7 @@ export const isMissed = (e) => (e.srs_lapses ?? 0) >= MISSED_LAPSES && !isKnown(
 const daysSince = (at, now) => (finite(at) ? Math.max(0, studyDay(now) - studyDay(at)) : 0);
 /** A fixed 0–1 value per word and review, so the labels show the interval a rating then gives. */
 function fuzzFor(e) {
-    const seed = `${e.word}|${e.srs_reviewed_at ?? 0}`;
-    let h = 0x811c9dc5;
-    for (let i = 0; i < seed.length; i++)
-        h = Math.imul(h ^ seed.charCodeAt(i), 0x01000193);
-    return (h >>> 0) / 2 ** 32;
+    return fnv1a(`${e.word}|${e.srs_reviewed_at ?? 0}`) / 2 ** 32;
 }
 const stepsFor = (e, now) => schedule(memoryOf(e), daysSince(e.srs_reviewed_at, now), fuzzFor(e));
 /** The days until the next review each rating (Again … Easy) would give. */

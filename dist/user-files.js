@@ -7,9 +7,9 @@
 //
 // Every call reports an outcome instead of throwing, so callers can tell a
 // missing file or an old ST without the API from a passing network error.
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { getRequestHeaders } from '../../../../../script.js';
+import { getRequestHeaders } from './st.js';
 import { withTimeout } from './utils.js';
+import { recordProblem, errorText } from './diagnostics.js';
 const TIMEOUT_MS = 30_000;
 /** Slowest upload speed allowed for before giving up (≈ 50 KB/s). */
 const UPLOAD_BYTES_PER_MS = 50;
@@ -45,11 +45,14 @@ export async function readUserFile(name) {
         });
         if (res.status === 404)
             return { status: 'missing' };
-        if (!res.ok)
+        if (!res.ok) {
+            recordProblem('file', `read ${name}: HTTP ${res.status}`);
             return { status: 'error' };
+        }
         return { status: 'ok', text: await res.text() };
     }
-    catch {
+    catch (e) {
+        recordProblem('file', `read ${name}: ${errorText(e)}`);
         return { status: 'error' };
     }
 }
@@ -58,9 +61,12 @@ export async function readUserBytes(name) {
     assertName(name);
     try {
         const res = await fetch(userFileUrl(name), { cache: 'no-store', signal: AbortSignal.timeout(TIMEOUT_MS) });
+        if (!res.ok)
+            recordProblem('file', `read ${name}: HTTP ${res.status}`);
         return res.ok ? new Uint8Array(await res.arrayBuffer()) : null;
     }
-    catch {
+    catch (e) {
+        recordProblem('file', `read ${name}: ${errorText(e)}`);
         return null;
     }
 }
@@ -78,9 +84,12 @@ export async function writeUserFile(name, data, signal) {
         });
         if (res.ok)
             return 'ok';
+        recordProblem('file', `write ${name}: HTTP ${res.status}`);
         return res.status === 404 || res.status === 405 ? 'unsupported' : 'error';
     }
-    catch {
+    catch (e) {
+        if (!signal?.aborted)
+            recordProblem('file', `write ${name}: ${errorText(e)}`);
         return 'error';
     }
 }
@@ -94,9 +103,12 @@ export async function deleteUserFile(name) {
             body: JSON.stringify({ path: `user/files/${name}` }),
             signal: AbortSignal.timeout(TIMEOUT_MS),
         });
+        if (!res.ok && res.status !== 404)
+            recordProblem('file', `delete ${name}: HTTP ${res.status}`);
         return res.ok || res.status === 404;
     }
-    catch {
+    catch (e) {
+        recordProblem('file', `delete ${name}: ${errorText(e)}`);
         return false;
     }
 }

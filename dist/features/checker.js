@@ -10,6 +10,7 @@ import { checkerPrompt, CHECKER_FIELDS } from '../prompts.js';
 import { notify } from '../ui.manager.js';
 import { acceptObject, missingKeys } from '../ai/client.js';
 import { t } from '../i18n.js';
+import { errorText } from '../diagnostics.js';
 import { ST_SEL } from '../st-dom.js';
 /**
  * What goes into the input box: the grammar fix, then (when it differs) the
@@ -74,7 +75,7 @@ export async function runChecker(deps) {
         if (abort.signal.aborted)
             return;
         console.error('[Polyglot] Checker error:', e);
-        notify(t('chk.error'), 'err', 3000);
+        notify(`${t('chk.error')} (${errorText(e)})`, 'err', 6000);
     }
     finally {
         // A newer check (a second click) owns the busy state now

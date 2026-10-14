@@ -69,7 +69,10 @@ export function parseWordbookFile(text) {
     const tsv = /^#separator:tab/m.test(text) || (first.includes('\t') && !first.startsWith('"'));
     const lines = (tsv ? text.split('\n') : splitCsvLines(text)).filter(l => l.trim() && !l.startsWith('#'));
     // CSV cells are unquoted by csvCells; TSV cells may still be wrapped in quotes
-    const split = (line) => (tsv ? line.split('\t').map(c => c.replace(/^"|"$/g, '')) : csvCells(line)).map(withoutMedia);
+    // A CSV cell the export guarded against spreadsheet formulas ('=…, '-…) loses its '
+    const split = (line) => (tsv
+        ? line.split('\t').map(c => c.replace(/^"|"$/g, ''))
+        : csvCells(line).map(c => c.replace(/^'(?=[=+\-@\t])/, ''))).map(withoutMedia);
     // A flashcard TXT holds HTML (#html:true): its text cells are decoded too
     const plain = (s) => (tsv ? fieldText(s) : s);
     const header = lines.length && HEADER_ROW.test(lines[0].trim()) ? split(lines.shift()) : null;

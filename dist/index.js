@@ -2,8 +2,10 @@
 // ST events and registers slash commands. Feature logic lives elsewhere:
 //
 //   runtime.ts            settings + settings-bound helpers (ai client, getLang…)
-//   data-store.ts         the learner's data (wordbook, sets, wrong answers) in a server file
-//   speech.ts             text-to-speech and pronunciation scoring
+//   st.ts                 SillyTavern's runtime, typed (the only module that imports it)
+//   data-store.ts         the learner's data (wordbook, sets, wrong answers, corrections, study days)
+//                         in a server file; save-journal.ts keeps unsaved changes in the browser
+//   voice.ts              reading aloud (speech.ts plays, tts.ts calls voice services)
 //   ui/learning-panel.ts  the side panel and word lookup (ui/panel/* for tabs and chrome)
 //   ai/client.ts          every AI request: JSON repair, one strict retry, partial results
 //   export/pdf.ts         printable flashcard deck
@@ -23,14 +25,7 @@ import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, resto
 import { t } from './i18n.js';
 import { setupPlainCopy } from './plain-text.js';
 import { restoreFurigana, restoreFuriganaWithRetry, autoFurigana, relocateFurigana, forgetFurigana, resetFuriganaState, applyFuriganaDisplay, onFuriganaSettingChange, setupReadingEditor, } from './furigana/messages.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { eventSource, event_types } from '../../../../../script.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { SlashCommandParser } from '../../../../slash-commands/SlashCommandParser.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { SlashCommand } from '../../../../slash-commands/SlashCommand.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { ARGUMENT_TYPE, SlashCommandNamedArgument } from '../../../../slash-commands/SlashCommandArgument.js';
+import { eventSource, event_types, SlashCommandParser, SlashCommand, ARGUMENT_TYPE, SlashCommandNamedArgument } from './st.js';
 // ── Chat-UI entry points ──────────────────────────────────────────────────────
 const WAND_ICON = '<i class="fa-solid fa-earth-europe"></i>';
 const SPINNER_ICON = '<i class="fa-solid fa-spinner fa-spin"></i>';

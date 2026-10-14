@@ -21,12 +21,7 @@ import { stopSpeech, playSound, speakWithBrowser, speechLangCode, knownLangCode 
 import { ttsConfig, missingFor, listVoices, DIRECT_PROVIDERS, TtsError } from './tts.js';
 import { makeSound, keepWordSound } from './sound-maker.js';
 import { soundJob } from './word-sounds.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { getRequestHeaders } from '../../../../../script.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { SlashCommandParser } from '../../../../slash-commands/SlashCommandParser.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { extension_settings } from '../../../../extensions.js';
+import { getRequestHeaders, SlashCommandParser, extension_settings } from './st.js';
 /** Counts speak() calls: a slow answer for an earlier call is not played over a later one. */
 let turn = 0;
 /** Tells what went wrong with a voice service: a request that never got an answer points to ST's proxy. */

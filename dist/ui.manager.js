@@ -1,4 +1,4 @@
-// ── Types ─────────────────────────────────────────────────────────────────────
+import { t } from './i18n.js';
 // ── HTML escaping ─────────────────────────────────────────────────────────────
 const _esc = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
 export function escapeHtml(str) {
@@ -90,7 +90,7 @@ export function showDocument(title, body) {
             el('h3', { className: 'pg-doc-title', textContent: title }),
             Object.assign(body, { className: `${body.className} pg-doc-body`.trim() }),
             el('div', { className: 'pg-dialog-row' }, [
-                el('button', { className: 'pg-btn pg-btn-primary', textContent: '✕', onclick: close, attrs: { 'aria-label': 'Close' } }),
+                el('button', { className: 'pg-btn pg-btn-primary', textContent: '✕', onclick: close, attrs: { 'aria-label': t('close') } }),
             ]),
         ]),
     ]);
@@ -104,7 +104,7 @@ export function showDocument(title, body) {
     document.body.appendChild(wrap);
     wrap.querySelector('.pg-btn-primary')?.focus();
 }
-export async function askConfirm(question, { yes = 'Confirm', no = 'Cancel' } = {}) {
+export async function askConfirm(question, { yes = t('confirmYes'), no = t('confirmNo') } = {}) {
     return (await askChoice(question, [
         { value: 'no', label: no },
         { value: 'yes', label: yes, primary: true },
@@ -129,8 +129,8 @@ export function askInput(question, { initial = '', hint = '' } = {}) {
                 el('label', { className: 'pg-field-lbl', textContent: question }),
                 field,
                 el('div', { className: 'pg-dialog-row' }, [
-                    el('button', { className: 'pg-btn pg-btn-secondary', textContent: 'Cancel', onclick: () => finish(null) }),
-                    el('button', { className: 'pg-btn pg-btn-primary', textContent: 'OK', onclick: () => finish(field.value) }),
+                    el('button', { className: 'pg-btn pg-btn-secondary', textContent: t('confirmNo'), onclick: () => finish(null) }),
+                    el('button', { className: 'pg-btn pg-btn-primary', textContent: t('confirmYes'), onclick: () => finish(field.value) }),
                 ]),
             ]),
         ]);
@@ -184,7 +184,7 @@ export class PgPanel {
         const closeBtn = el('button', {
             className: hasHeading ? 'pg-box-x' : 'pg-box-x pg-box-x-float',
             innerHTML: '&times;',
-            attrs: { 'aria-label': 'Close' },
+            attrs: { 'aria-label': t('close') },
             onclick: () => this.dismiss(),
         });
         this.body = el('div', { className: 'pg-box-main' });

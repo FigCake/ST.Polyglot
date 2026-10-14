@@ -12,6 +12,7 @@
 import { findWord, UNSPACED } from './utils.js';
 import { isNew } from './srs.js';
 import { gradeTyped } from './features/writing-model.js';
+import { fnv1a } from './hash.js';
 /** Phrases longer than this many words are not asked to be typed. */
 const TYPING_MAX_WORDS = 4;
 /** Shortest base form whose stem is looked for ("parlare" → "parlo"). */
@@ -74,13 +75,8 @@ export function clozeOf(w) {
     }
     return best && cut(text, lower, best.token, best.token.length);
 }
-/** FNV-1a: a stable pick from a string. */
-function hash(s) {
-    let h = 0x811c9dc5;
-    for (let i = 0; i < s.length; i++)
-        h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
-    return h >>> 0;
-}
+/** A stable pick from a string. */
+const hash = fnv1a;
 /** How today's review asks for `w`. */
 export function cardKind(w) {
     if (isNew(w))

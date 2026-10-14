@@ -1,9 +1,10 @@
 // Buttons for backup.ts: save a backup, and restore one (merge or replace)
 // from a .json file or a .zip with media.
-import { downloadBackup, parseBackup, restoreBackup, openBackupZip, withoutMedia, } from '../backup.js';
+import { downloadBackup, parseBackup, restoreBackup, openBackupZip, withoutMedia, newAddresses, withoutAddresses, } from '../backup.js';
 import { storeMode } from '../data-store.js';
-import { askChoice, notify } from '../ui.manager.js';
+import { askChoice, askConfirm, notify } from '../ui.manager.js';
 import { t, currentLang } from '../i18n.js';
+import { getSettings } from '../runtime.js';
 /**
  * Downloads a backup; false (after telling the user) when it could not be
  * made, or — with `complete` — when some media files could not be read into it.
@@ -14,6 +15,9 @@ export async function saveBackup(complete = false) {
         notify(media ? t('pnl.set.backupDoneMedia', { n: words, m: media }) : t('pnl.set.backupDone', { n: words }), 'ok', 3000);
         if (missing)
             notify(t('pnl.set.backupMissing', { n: missing }), 'warn', 8000);
+        // Words live in each chat's file here: only the open chat's are in the backup
+        if (storeMode() === 'chat')
+            notify(t('pnl.set.backupChatOnly'), 'warn', 10000);
         return !(complete && missing);
     }
     catch (err) {
@@ -53,6 +57,15 @@ async function restore(text, archive) {
     ]);
     if (!mode || mode === 'cancel')
         return false;
+    const addresses = mode === 'replace' ? newAddresses(backup, getSettings()) : [];
+    if (addresses.length) {
+        const keep = await askChoice(t('pnl.set.restoreAddresses', { list: addresses.join('\n') }), [
+            { value: 'keep', label: t('pnl.set.restoreAddrKeep') },
+            { value: 'skip', label: t('pnl.set.restoreAddrSkip'), primary: true },
+        ]);
+        if (keep !== 'keep')
+            backup = withoutAddresses(backup);
+    }
     if (mode === 'replace') {
         // Nothing replaced can be brought back otherwise (its media files are deleted too),
         // so the safety backup must hold everything
@@ -60,12 +73,18 @@ async function restore(text, archive) {
             notify(t('pnl.set.restoreNoSafety'), 'err', 8000);
             return false;
         }
+        // The download was only started: a cancelled save dialog or a blocked download goes unnoticed
+        if (!await askConfirm(t('pnl.set.restoreSafetySaved'), { yes: t('pnl.set.restoreReplace'), no: t('confirmNo') }))
+            return false;
     }
     // Media first, so no word points at a file that is not there yet
     if (storeMode() !== 'file')
         backup = withoutMedia(backup);
     else if (archive) {
         const failed = await archive.restoreMedia(backup.wordbook);
+        if (failed && mode === 'replace'
+            && !await askConfirm(t('pnl.set.restoreMediaAsk', { n: failed }), { yes: t('pnl.set.restoreReplace'), no: t('confirmNo') }))
+            return false;
         if (failed)
             notify(t('anki.mediaFailed', { n: failed }), 'warn', 6000);
     }

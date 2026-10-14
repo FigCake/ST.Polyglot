@@ -22,8 +22,7 @@ import { loadWordbook, saveWordbook } from './wordbook.js';
 import { knownLangCode } from './speech.js';
 import { ttsConfig, missingFor, synthesize, cacheKey, soundFormat, DIRECT_PROVIDERS, TtsError } from './tts.js';
 import { withSound, jobFits } from './word-sounds.js';
-// @ts-expect-error — ST runtime module; types provided via tsconfig paths → st-stubs.d.ts
-import { getRequestHeaders } from '../../../../../script.js';
+import { getRequestHeaders } from './st.js';
 export function soundsBlocked() {
     const c = ttsConfig(getSettings());
     if (!DIRECT_PROVIDERS.includes(c.provider))

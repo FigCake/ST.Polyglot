@@ -21,7 +21,9 @@ import { applyPanelTheme, findPanelEl, setFloating } from './chrome.js';
 import { mountChatsSection } from './chats-section.js';
 import { voiceSection, bindVoiceSettings } from './voice-settings.js';
 import { showLicenses } from '../licenses.js';
+import { copyDiagnostics } from '../diagnostics-ui.js';
 import { storeMode } from '../../data-store.js';
+import { SRS_FIELDS } from '../../wordbook-model.js';
 import { furiganaEnabled, applyFuriganaDisplay, warnIfFontClamped } from '../../furigana/messages.js';
 // ── Markup ────────────────────────────────────────────────────────────────────
 // Labels are i18n keys (resolved at render time, so a language switch applies on reopen)
@@ -140,6 +142,7 @@ function render(s) {
 
         <footer class="pg-pset-footer">
             <button class="pg-link-btn" data-action="licenses">${t('lic.link')}</button>
+            <button class="pg-link-btn" data-action="diagnostics">${t('diag.link')}</button>
         </footer>
     </div>`;
 }
@@ -160,14 +163,17 @@ async function withBusy(btn, fn) {
     try {
         await fn();
     }
+    catch (err) {
+        // An export that fails (too many files for one zip, a picture that cannot be read…) says why
+        console.error('[Polyglot] export failed', err);
+        notify(t('pnl.set.exportFailed', { err: err instanceof Error ? err.message : String(err) }), 'err', 8000);
+    }
     finally {
         btn.disabled = false;
         btn.removeAttribute('aria-busy');
         btn.innerHTML = idle;
     }
 }
-const SRS_KEYS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
-    'srs_interval', 'srs_ease', 'srs_streak'];
 /** Resets review progress of the words in the current scope: they are new again (a "known" mark goes too). */
 function resetSrs() {
     const inView = new Set(scopedWordbook().map(w => w.word));
@@ -175,18 +181,24 @@ function resetSrs() {
     for (const w of wordbook) {
         if (!inView.has(w.word))
             continue;
-        for (const k of SRS_KEYS)
+        for (const k of SRS_FIELDS)
             delete w[k];
         delete w.known;
+        // A review made elsewhere before now must not bring the old progress back at a merge
+        w.srs_reset_at = Date.now();
     }
     saveWordbook(wordbook);
 }
+/** A printable deck longer than this is confirmed first: the print preview of thousands of pages can stall the browser. */
+const PDF_CONFIRM_WORDS = 1000;
 async function exportPdf(btn) {
     const wordbook = scopedWordbook();
     if (!wordbook.length) {
         notify(t('wb.noExport'), 'warn');
         return;
     }
+    if (wordbook.length > PDF_CONFIRM_WORDS && !await askConfirm(t('pnl.set.pdfLarge', { n: wordbook.length, pages: wordbook.length * 2 })))
+        return;
     await withBusy(btn, async () => exportToPDF(wordbook, await getAllConjEntries(getLang())));
 }
 async function exportApkg(btn) {
@@ -216,6 +228,7 @@ const ACTIONS = {
     'apkg': (_, btn) => exportApkg(btn),
     'reanalyse': reanalyse,
     'licenses': () => showLicenses(),
+    'diagnostics': () => copyDiagnostics(),
     'reset-srs': () => confirmed(t('pnl.set.resetSrsConfirm'), t('pnl.set.resetSrs'), resetSrs),
     'clear-conj': () => confirmed(t('pnl.set.clearConjConfirm'), t('pnl.set.clearConj'), clearAllConjCache),
     'clear-chat': () => confirmed(t('pnl.set.clearChatConfirm'), t('pnl.set.clearChat'), clearCurrentChatAnnotations),

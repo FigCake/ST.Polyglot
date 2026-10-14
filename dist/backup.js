@@ -25,7 +25,7 @@ import { downloadText, downloadBlob } from './export/download.js';
 import { buildZip, readZip, readEntry } from './zip.js';
 import { mediaIn, existingMedia, inParallel, isMediaName, keepableMedia, noteUploaded, notePending } from './media-files.js';
 import { readUserBytes, writeUserFile } from './user-files.js';
-import { getSettings, saveSettings, DEFAULT_SETTINGS } from './runtime.js';
+import { getSettings, saveSettings, prepareSettings, DEFAULT_SETTINGS } from './runtime.js';
 import { listConjCache, setConjCache, clearConjCacheStore } from './conj-cache.js';
 import { userData, replaceUserData, storeMode } from './data-store.js';
 import { cleanData, mergeUserData, list, num } from './user-data.js';
@@ -108,13 +108,16 @@ export async function downloadBackup() {
     }
     const files = [{ name: BACKUP_JSON, data: new TextEncoder().encode(json) }];
     const unread = [];
-    for (const file of media) {
-        const data = await readUserBytes(file);
+    // Six reads at a time (one by one took minutes for thousands of files); the zip keeps the list's order
+    const read = [];
+    await inParallel(media.map((_, i) => i), 6, async (i) => { read[i] = await readUserBytes(media[i]); });
+    media.forEach((file, i) => {
+        const data = read[i];
         if (data)
             files.push({ name: MEDIA_DIR + file, data });
         else
             unread.push(file);
-    }
+    });
     downloadBlob(buildZip(files), `${name}.zip`);
     // A file already gone from the server is no loss; one that is there but could not be read is
     const missing = (await existingMedia(unread)).size;
@@ -157,6 +160,22 @@ export async function openBackupZip(file) {
         },
     };
 }
+/** Settings that make the browser contact an address of the backup's choosing (a background image, a dictionary). */
+const ADDRESS_KEYS = ['panel_bg_image', 'dict_url_custom'];
+/** The addresses a replace would set that differ from the current ones (a backup from someone else may bring them). */
+export function newAddresses(backup, current) {
+    return ADDRESS_KEYS.flatMap(k => {
+        const v = backup.settings[k];
+        return typeof v === 'string' && v.trim() && v !== current[k] ? [v] : [];
+    });
+}
+/** The backup without its address settings: the current ones stay. */
+export function withoutAddresses(backup) {
+    const settings = { ...backup.settings };
+    for (const k of ADDRESS_KEYS)
+        delete settings[k];
+    return { ...backup, settings };
+}
 /** Without file storage there is nowhere to keep media: words lose their links to it. */
 export function withoutMedia(backup) {
     return { ...backup, wordbook: backup.wordbook.map(({ audio: _a, example_audio: _e, image: _i, made_sounds: _m, ...w }) => w) };
@@ -172,6 +191,7 @@ export async function restoreBackup(backup, mode) {
     if (mode === 'replace') {
         const s = getSettings();
         Object.assign(s, backup.settings, { ext_api_key: s.ext_api_key });
+        prepareSettings(s); // an old backup's values (say, a furigana size no longer offered)
         saveSettings();
         replaceUserData({
             wordbook: backup.wordbook, sets: backup.sets, wrongAnswers: backup.wrongAnswers, checks: backup.checks, days: backup.days,

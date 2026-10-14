@@ -4,14 +4,18 @@
 //   wordbook      every chat's words (with SRS progress, notes, chat tags)
 //   sets          word sets
 //   wrongAnswers  saved wrong quiz answers
+//   wrongAnswers  quiz questions answered wrong, to practise again (the newest WRONG_KEPT)
 //   checks        messages the input checker corrected (the newest CHECKS_KEPT)
 //   days          study totals per day (new words, reviews, forgotten)
 //
 // Pure — validation, merging and the file format. No DOM, no I/O.
-import { mergeWordbooks, mergeEntries, rebaseEntry, keptAfterDeletion } from './wordbook-model.js';
+import { mergeWordbooks, mergeEntries, rebaseEntry, keptAfterDeletion, SRS_FIELDS } from './wordbook-model.js';
 import { isRecord } from './ai/client.js';
 /** How many corrected messages the archive keeps. */
 export const CHECKS_KEPT = 100;
+export const WRONG_KEPT = 500;
+/** The newest WRONG_KEPT wrong answers, in the order they were saved. */
+export const recentWrongAnswers = (list) => list.length <= WRONG_KEPT ? list : [...list].sort((a, b) => (a.savedAt ?? 0) - (b.savedAt ?? 0)).slice(-WRONG_KEPT);
 /** The newest CHECKS_KEPT checks, newest first. */
 export const recentChecks = (list) => [...list].sort((a, b) => b.at - a.at).slice(0, CHECKS_KEPT);
 export const DATA_FORMAT = 'polyglot-data';
@@ -19,6 +23,11 @@ export const DATA_FORMAT = 'polyglot-data';
  * 2: the correction archive and study days. Older versions write back only
  * the fields they know, so a tab still running one would drop them; a newer
  * version number makes it refuse the file instead (parseData: 'newer').
+ *
+ * Adding a field: a new field on wordbook entries (or sets, wrong answers)
+ * survives older versions, which keep fields they do not know there. A new
+ * field on corrections or days, or a new top-level list, is dropped by them:
+ * raise this number with it.
  */
 const DATA_VERSION = 2;
 export const emptyData = () => ({ wordbook: [], sets: [], wrongAnswers: [], checks: [], days: [] });
@@ -29,8 +38,6 @@ export const num = (v, fallback) => (typeof v === 'number' && Number.isFinite(v)
 /** Optional fields that must be text when present (anything else would break the views that read them). */
 const TEXT_FIELDS = ['meaning_lang', 'pos_info', 'pos', 'ipa', 'reading', 'notes', 'original_form', 'context_meaning',
     'example', 'example_translation', 'example_form', 'example_audio', 'audio', 'image', 'dateAdded'];
-const SRS_NUMBERS = ['srs_stability', 'srs_difficulty', 'srs_due', 'srs_reviewed_at', 'srs_lapses',
-    'srs_interval', 'srs_ease', 'srs_streak'];
 /** The entry without optional fields of the wrong type (a backup or chat metadata may hold anything). */
 function typedFields(v) {
     const out = { ...v };
@@ -45,7 +52,7 @@ function typedFields(v) {
         else
             delete out[k];
     }
-    for (const k of SRS_NUMBERS)
+    for (const k of SRS_FIELDS)
         if (k in out && !Number.isFinite(out[k]))
             delete out[k];
     // A word never reviewed is new: the SM-2 defaults older versions gave it are dropped
@@ -110,7 +117,7 @@ export function cleanData(raw) {
     return {
         wordbook: (Array.isArray(raw.wordbook) ? raw.wordbook : []).map(cleanEntry).filter((e) => e !== null),
         sets: list(raw.sets, isSet),
-        wrongAnswers: list(raw.wrongAnswers, isWrong),
+        wrongAnswers: recentWrongAnswers(list(raw.wrongAnswers, isWrong)),
         checks: recentChecks((Array.isArray(raw.checks) ? raw.checks : []).map(cleanCheck).filter((c) => c !== null)),
         days: cleanDays(raw.days),
     };

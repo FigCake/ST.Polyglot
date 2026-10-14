@@ -10,7 +10,8 @@
 //   • ST connection profiles are read again when their list is opened, so a
 //     profile made in ST after the drawer was drawn shows up.
 import { CEFR_LEVELS } from '../constants.js';
-import { PROVIDER_MODELS, ROUTE_MODEL_KEY } from '../api.js';
+import { ROUTE_MODEL_KEY } from '../api.js';
+import { PROVIDERS as AI_PROVIDERS, providerById } from '../ai/providers.js';
 import { connectionProfiles, profileLabel } from '../ai/st-profiles.js';
 import { html, setHtml } from '../html.js';
 import { t } from '../i18n.js';
@@ -32,8 +33,8 @@ const NATIVE_LANGUAGES = [
 ];
 const PROVIDERS = [
     ['st', ''], ['profile', ''], // labels from i18n
-    ['openai', 'OpenAI'], ['claude', 'Claude (Anthropic)'], ['google', 'Google Gemini (AI Studio)'],
-    ['vertexai', 'Google Vertex AI'], ['openrouter', 'OpenRouter'], ['deepseek', 'DeepSeek'], ['custom', '⚙️ Custom'],
+    ...AI_PROVIDERS.map(p => [p.id, p.label]),
+    ['custom', '⚙️ Custom'],
 ];
 // ── Markup helpers ────────────────────────────────────────────────────────────
 const options = (list, selected) => html `${list.map(([value, label]) => html `<option value="${value}" ${value === selected && html `selected`}>${label}</option>`)}`;
@@ -119,7 +120,7 @@ function refreshProfiles(select) {
     setHtml(select, profileOptions(getSettings().profile_id));
 }
 function knownProviderRows(s) {
-    const models = PROVIDER_MODELS[s.provider] ?? [];
+    const models = providerById(s.provider)?.models ?? [];
     const manual = !!s.model && !models.includes(s.model);
     return html `
         ${field('Model', html `
@@ -144,7 +145,7 @@ function providerRows(s) {
         return profileRows(s);
     if (s.provider === 'custom')
         return customProviderRows(s);
-    if (s.provider in PROVIDER_MODELS)
+    if (providerById(s.provider))
         return knownProviderRows(s);
     return html ``;
 }
@@ -265,7 +266,7 @@ const SETTING_EFFECTS = {
     route_model: root => renderLiveConnection(root),
 };
 function rememberModel(s) {
-    if (s.provider in PROVIDER_MODELS)
+    if (providerById(s.provider))
         s._model_history[s.provider] = s.model;
 }
 function onSettingInput(root, el) {
@@ -283,11 +284,12 @@ function onSettingInput(root, el) {
 }
 function onProviderChange(root, provider) {
     const s = getSettings();
-    if (s.provider in PROVIDER_MODELS && s.model)
+    if (providerById(s.provider) && s.model)
         s._model_history[s.provider] = s.model;
     s.provider = provider;
-    if (provider in PROVIDER_MODELS) {
-        s.model = s._model_history[provider] || PROVIDER_MODELS[provider][0] || '';
+    const known = providerById(provider);
+    if (known) {
+        s.model = s._model_history[provider] || known.defaultModel;
         rememberModel(s);
     }
     saveSettings();

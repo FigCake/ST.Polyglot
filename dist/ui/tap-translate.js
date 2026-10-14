@@ -70,8 +70,17 @@ function targetAt({ node, offset }) {
     return { textEl, anchorEl: anchor instanceof HTMLElement ? anchor : null, sentence };
 }
 // ── Translate ─────────────────────────────────────────────────────────────────
-const acceptTranslation = (v) => isRecord(v) && typeof v.translation === 'string'
-    ? { ...v, key_verbs: Array.isArray(v.key_verbs) ? v.key_verbs : [] }
+const text = (x) => (typeof x === 'string' ? x : '');
+/** The verb chips a reply gives: items without a form (a string, null, …) are dropped, other fields default to ''. */
+const verbChips = (v) => (Array.isArray(v) ? v : [])
+    .filter((c) => isRecord(c) && typeof c.form === 'string' && !!c.form.trim())
+    .map(c => ({
+    form: c.form, base: text(c.base) || c.form, meaning: text(c.meaning),
+    ...(typeof c.level === 'string' && { level: c.level }),
+    ...(typeof c.reading === 'string' && { reading: c.reading }),
+}));
+export const acceptTranslation = (v) => isRecord(v) && typeof v.translation === 'string'
+    ? { translation: v.translation, ...(typeof v.literal === 'string' && { literal: v.literal }), key_verbs: verbChips(v.key_verbs) }
     : null;
 /** Translations already made this session, by language + sentence: asking again costs nothing. */
 const translated = new Map();

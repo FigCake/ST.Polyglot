@@ -308,8 +308,7 @@ function save() {
         const caught = await catchUp();
         if (caught === 'newer') {
             dirty = true;
-            notify(t('data.newerFile'), 'err', 10000);
-            goOffline();
+            stopForNewer();
             return;
         }
         const revs = [newRev(), ...(lastRevs ?? [])].slice(0, REVS_KEPT);
@@ -413,6 +412,24 @@ function goOffline() {
     clearTimeout(retryTimer);
     retryTimer = setTimeout(() => { void load(); }, RETRY_DELAYS_MS.at(-1));
 }
+/** A newer Polyglot wrote the file was already said (once per session, not at every retry). */
+let newerFile = false;
+/** How often the file is looked at again while a newer Polyglot's file stands (only an update can help). */
+const NEWER_RETRY_MS = 5 * 60_000;
+/**
+ * The file was written by a newer Polyglot: this version must never write it.
+ * Said once; changes stay in memory and in the browser (save-journal.ts), and
+ * the file is looked at again quietly now and then.
+ */
+function stopForNewer() {
+    if (!newerFile)
+        notify(t('data.newerFile'), 'err', 15000);
+    newerFile = true;
+    mode = 'offline';
+    cancelSave();
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => { void load(); }, NEWER_RETRY_MS);
+}
 let loading = null;
 /** Loads the data file, migrating settings data into it. Safe to call again (retries). */
 export function initDataStore() {
@@ -438,9 +455,7 @@ async function load() {
             serverRevs = parsed.revs;
         }
         else if (parsed.reason === 'newer') {
-            // Written by a newer Polyglot: never overwrite it with less
-            notify(t('data.newerFile'), 'err', 10000);
-            goOffline();
+            stopForNewer();
             return;
         }
         else if (!await keepUnreadable(res.text)) {
