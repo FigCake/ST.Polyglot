@@ -1148,33 +1148,46 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .pg-saved-mark:hover,
 .pg-clickable-word.pg-saved-word:hover { text-decoration-color: currentColor; filter: none; }
 
-/* ▶ after a line of dialogue (ui/line-voice.ts): small and quiet until pointed at */
+/* ▶ after a line of dialogue (ui/line-voice.ts): a small glyph in the text — no border, no fill;
+   pointed at, only its colour changes (to the theme's quote colour). The !important resets keep
+   ST themes and custom CSS from dressing it as a button. */
 .mes_text .pg-line-play {
     display: inline-block;
-    vertical-align: 0.1em;
-    margin: 0 0.15em 0 0.3em;
-    padding: 0.15em 0.25em;
-    border: 0;
-    background: none;
+    vertical-align: 0.12em;
+    margin: 0 0.1em 0 0.25em !important;
+    padding: 0.1em 0.15em !important;
+    border: none !important;
+    outline: none;
+    box-shadow: none !important;
+    background: none !important;
     color: inherit;
-    font-size: 0.6em;
+    font-size: 0.5em;
     line-height: 1;
-    opacity: 0.35;
+    opacity: 0.4;
     cursor: pointer;
-    transition: opacity 0.15s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.15s, opacity 0.15s;
 }
 .mes_text .pg-line-play:hover,
-.mes_text .pg-line-play:focus-visible { opacity: 0.9; }
-/* Reading now: full strength (pressed again, it stops) */
-.mes_text .pg-line-play.pg-playing { opacity: 1; }
+.mes_text .pg-line-play:focus-visible,
+.mes_text .pg-line-play:active {
+    color: var(--SmartThemeQuoteColor, currentColor);
+    opacity: 1;
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+/* Reading now (pressed again, it stops) */
+.mes_text .pg-line-play.pg-playing { color: var(--SmartThemeQuoteColor, currentColor); opacity: 1; }
+/* Touch screens: a finger-sized target (invisible), the line spacing kept */
+@media (pointer: coarse) {
+    .mes_text .pg-line-play { padding: 0.7em 0.6em !important; margin: -0.6em -0.35em -0.6em 0 !important; opacity: 0.5; }
+}
 /* 🎧 reads all of a message's lines; lit while it does */
 .mes_button.pg-lines-play-btn.pg-playing {
     color: var(--pg-t1) !important;
     opacity: 1 !important;
-}
-/* Touch screens: a finger-sized target, the line spacing kept */
-@media (pointer: coarse) {
-    .mes_text .pg-line-play { padding: 0.6em 0.5em; margin: -0.45em -0.2em -0.45em 0.05em; opacity: 0.45; }
 }
 
 

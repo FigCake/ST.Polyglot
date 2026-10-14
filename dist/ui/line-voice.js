@@ -48,10 +48,15 @@ function showPlaying(btn) {
     btn?.classList.remove('fa-play');
     btn?.classList.add(PLAYING, 'fa-stop');
 }
+/**
+ * A bare icon, not a <button>: ST themes, custom CSS and phones style buttons
+ * (border, fill on hover, size), and this should look like a glyph in the text.
+ */
 function playButton(text) {
-    const btn = document.createElement('button');
-    btn.type = 'button';
+    const btn = document.createElement('span');
     btn.className = `${BUTTON_CLASS} ${DECOR_CLASS} fa-solid fa-play`;
+    btn.setAttribute('role', 'button');
+    btn.tabIndex = 0;
     btn.title = t('line.play');
     btn.setAttribute('aria-label', `${t('line.play')}: ${text}`);
     btn.addEventListener('click', e => {
@@ -64,6 +69,12 @@ function playButton(text) {
         showPlaying(btn);
         void speak(text, getLang(), { speaker: speakerOf(btn) }).finally(() => { if (playing === btn)
             showPlaying(null); });
+    });
+    btn.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' && e.key !== ' ')
+            return;
+        e.preventDefault();
+        btn.click();
     });
     // A quick second press is not a double-click on the sentence (tap translation)
     btn.addEventListener('dblclick', e => e.stopPropagation());
