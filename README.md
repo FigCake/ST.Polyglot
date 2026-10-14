@@ -1,63 +1,34 @@
 # Polyglot
 
-> An integrated language learning extension for SillyTavern that turns your chats into an active study environment.
+A SillyTavern extension that turns your chats into language study.
 
----
+### Main features
 
-### Features
-
-- **Input Assistant** — Translate or check your input before sending (🌍 button): the grammar fix, then a more natural version under `---`, in the input box. Each check is kept in the correction archive (writing practice) with its explanation, for notes; the last 100 are kept
-- **Annotation** — Highlight vocabulary by CEFR level and grammar patterns on any AI message
-- **Words you are learning, in the chat** — Words you are learning (reviewed, not yet known) get a faint underline in character messages, found from the forms already saved with them — no AI request. Tap one for its card, which counts how often you have met it. New and known words are not marked, and known words are left out of annotation. On/off in Extensions → Polyglot
-- **Leave out of study** — Status windows and metadata (tags such as `<status>`, code blocks, folded boxes, `[bracket]` lines) are not analysed, and character, persona and group-member names are never highlighted or saved as words; JS-Slash-Runner frontends and hidden text are always left out. Set in Extensions → Polyglot, with a check of what the last message sends
-- **Tap to Translate** — Double-click a sentence (mouse), or select text and tap **Translate sentence** (touch), for an inline translation with verb forms; ask for a deeper sentence analysis from there
-- **Quick Lookup** — Select any word to get its dictionary form, POS, IPA, and meaning
-- **Wordbook + spaced review** — Save words and review them on an FSRS schedule: today's due words first, then new words up to a daily limit, with a forecast for the coming days. A word you have learnt comes back in turn as its meaning, its saved example with the word blanked out, or its meaning with the word to type. Each word is new, learning or known (recalled for three weeks, or marked known to leave the reviews), with a status filter; known words stay out of the list until you pick them in the filter or search for one (setting *Hide known words*); ignoring a word removes it and stops it being highlighted or saved again. Words you keep forgetting are marked as often missed, with a wordbook filter and a matching game of just those words. The Learn tab opens on your study record: day streak, today's work (flashcards, quiz and exam answers, rated writing, dictation and shadowing tries, matched pairs and checked messages all count), reviews left, 30-day accuracy, this month's calendar with your runs of study days, and the reviews due this week. One shared wordbook, viewable per chat or across all chats, and per study language. Merge duplicates, fill missing meanings with AI re-analysis, organise words into sets
-- **Import / Export** — Anki decks (`.apkg` / `.colpkg`, with sounds and images) in and out: the export is an `.apkg` with each word's meaning, example, note, sound and picture, tagged by level, set and status. Also CSV, and a TXT file for flashcard apps
-- **Voice** — 🔊 reads words, examples and sentences with your browser's voice (free), SillyTavern's TTS extension (`/speak`), or a voice service you connect directly: ElevenLabs, Google Cloud Text-to-Speech, Fish Audio, or any OpenAI-compatible speech endpoint, local servers included. A sound made by a service is kept as the word's (or its example's) sound, so each one is paid for once and goes into flashcards and the Anki export. Words and examples whose sound is kept show a dot on 🔊; a *No sound* filter, *Make sounds* for selected words (only the missing ones, or remake the generated ones with a new voice — Anki recordings are kept) and Play / Make again / Remove in a word's edit form. Each word is read in its own language. Slower speeds for learning; services that refuse browser requests can go through SillyTavern's CORS proxy (`enableCorsProxy: true` in `config.yaml`) — not together with SillyTavern's login (`basicAuthMode`)
-- **Listen to dialogue** — A small ▶ after each line of dialogue in character messages (and after each sentence saved in the wordbook) reads it aloud with your voice setting, in the study language (press again to stop); 🎧 in a message's buttons reads all its lines in turn. Each character can have a voice of their own (Settings tab → Voice → Character voices; with SillyTavern's TTS, its own voice map is used). The quotation marks of each language are recognised (“…” ‘…’ „…“ «…» »…« 「…」 『…』 and straight quotes, with apostrophes told apart from single quotes: *l'amico*, *don't*), and dash dialogue as in Spanish or Russian novels (*—Hola —dijo ella—. ¿Qué tal?*). On/off in Extensions → Polyglot
-- **Furigana (Japanese)** — Readings over kanji with message analysis (📖) and on word cards, flashcards and the PDF deck; click a reading to correct it
-- **Study Modes** — Flashcards, quiz, cloze, typed grammar gaps, reading exam, a weak-points exam built from saved wrong answers, conjugation drill, match, speaking. Only the quick and full quizzes (and the chat-scene writing task) send recent chat; the cloze quiz is built on 10–20 random words you are learning, the typed grammar gaps on the grammar patterns you saved (and grammar easily confused with them), the conjugation drill on verbs you are learning — with general questions at your level when the wordbook has too little. Words you miss in a quiz come back in today's reviews. Speaking drills words or saved sentences: save a line of dialogue with the bookmark beside its ▶, hear it again in the wordbook (in the voice of the character who said it), and say it after the voice
-- **Writing practice** — Exam-style tasks at your CEFR level (letter or email, opinion text, a scene from your chat), rated on task, organisation, accuracy and range, with corrections and a model answer
-- **PDF Export** — Print-ready A5 flashcard deck, with the conjugation tables you have opened at the end
-- **Slash commands** — `/pg-check <text>` (or the input box's text, from Quick Replies and scripts), `/pg-annotate`, `/pg-lookup <word>`, `/pg-panel`
-- **Themes** — Dark, light, breeze and milk; docked or floating panel
-
----
+- **Annotation** — Highlight vocabulary by CEFR level and grammar in any character message
+- **Translate & look up** — Double-click a sentence to translate it; select a word for its meaning
+- **Input assistant** — Fix or translate what you type before sending (🌍)
+- **Wordbook & reviews** — Save words, review them on a spaced schedule; words you are learning are underlined in chat
+- **Listen to dialogue** — ▶ after each line reads it aloud, in each character's voice; save lines to say after the voice
+- **Study modes** — Flashcards, quizzes, writing practice, matching, dictation and shadowing
+- **Anki** — Import and export `.apkg` decks with sounds and pictures
+- **Furigana** — Readings over kanji (Japanese)
 
 ### Setup
 
-1. In SillyTavern, open Extensions → **Install extension** and enter `https://github.com/FigCake/ST.Polyglot`
-2. In SillyTavern → Extensions → **Polyglot**, set your target language, CEFR level, and AI provider
-3. Open the Polyglot panel (🌍 on a message, or the 🧩 menu next to the input) for study, the wordbook, and display settings
+1. Extensions → **Install extension** → `https://github.com/FigCake/ST.Polyglot`
+2. Extensions → **Polyglot**: set your study language, level and AI connection
+3. Open the panel from 🌍 on a message or the 🧩 menu
 
-Supports SillyTavern's default connection, a SillyTavern connection profile (Connection Manager; its preset is left out), or external APIs — OpenAI, Claude, Gemini, Vertex AI, DeepSeek, OpenRouter, and any OpenAI-compatible endpoint.
-
----
+Works with SillyTavern's own connection, a connection profile, or OpenAI, Claude, Gemini, DeepSeek, OpenRouter and other OpenAI-compatible APIs.
 
 ### Your data
 
-- **Storage** — Your words live in `polyglot-data.json` in your SillyTavern user files (not in settings), so they follow you to every device that opens the same SillyTavern. Changes saved from two devices are combined, not overwritten. Changes not saved yet (a closed tab, a server that was down) are kept in the browser and saved at the next load. If your SillyTavern cannot store user files, words are kept in each chat instead, and the all-chats view and sounds/images are unavailable.
-- **Backup** — Settings → Back up saves words, review progress, sets, saved wrong answers, settings and cached conjugation tables as one JSON file, or a `.zip` when words have sounds or images. API keys, the AI connection (provider, model, connection profile, Custom base URL) and where voice requests go (voice service, OpenAI-compatible URL, proxy) are never included.
-- **Restore** — *Merge* adds a backup to your data; *Replace* swaps everything for it, after first downloading a backup of what you have now.
-
----
+Words are saved in `polyglot-data.json` in your SillyTavern user files and shared by every device that opens it. **Settings → Back up** saves everything to one file; API keys are never included.
 
 ### Requirements
 
-- SillyTavern 1.12.9 or newer (tested on 1.19.0). Connection profiles need 1.13.0 or newer
-- AI provider with 8k+ context window recommended
-- Chrome or Edge for pronunciation features (Web Speech API)
+SillyTavern 1.12.9 or newer (tested on 1.19.0). Chrome or Edge for pronunciation practice.
 
----
+### Notices
 
-### Third-party notices
-
-Open-source software used by Polyglot and its licenses are listed in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — also available in the panel
-under **Settings → Open-source licenses**.
-
-Anki and SillyTavern are names of their own projects. Polyglot is not affiliated
-with or endorsed by either. The Anki import reads the `.apkg` / `.colpkg` file
-format with Polyglot's own code, and the Anki export writes it (and the SQLite file
-inside) the same way; no Anki code is included.
+Open-source licenses: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Polyglot is not affiliated with Anki or SillyTavern, and includes no Anki code.

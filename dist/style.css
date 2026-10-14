@@ -3120,6 +3120,17 @@ mark.pg-wb-hl {
     font-size: 0.9em;
     vertical-align: middle;
 }
+/* Shadowing a sentence: the sentence, the words not heard underlined (tap one to hear it) */
+.pg-pronun-words { display: block; margin-top: 4px; font-size: 0.95em; color: var(--pg-t1); }
+.pg-pronun-missed {
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-decoration-color: var(--pg-err);
+    text-underline-offset: 0.2em;
+    outline: none;
+}
+.pg-pronun-missed:hover,
+.pg-pronun-missed:focus-visible { color: var(--pg-err); }
 .pg-flash-hint {
     text-align: center;
     font-size: max(12px, 0.73em);

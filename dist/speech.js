@@ -9,6 +9,7 @@
 //   • Only one recognition session is tracked at a time so closing the panel
 //     can stop the microphone (abortActiveRecognition).
 import { similarityScore } from './utils.js';
+import { missedWords } from './missed-words.js';
 import { notify } from './ui.manager.js';
 import { html, setHtml } from './html.js';
 import { t } from './i18n.js';
@@ -233,13 +234,24 @@ function setResult(el, state, text = '') {
     el.className = state === 'idle' ? 'pg-pronun-result' : `pg-pronun-result pg-pronun-${state}`;
     el.textContent = text;
 }
-function showScore(el, score, heard) {
+/**
+ * The score, and what was heard. For a sentence, the sentence itself with the
+ * words not heard marked (missed-words.ts); a marked word, tapped, is read
+ * alone where the drill handles data-action "say-word".
+ */
+function showScore(el, score, heard, target, code) {
     const { grade, label } = gradeFor(score);
+    const parts = missedWords(target, heard, code);
+    const sentence = parts.filter(p => p.word).length > 1;
     el.className = `pg-pronun-result pg-pronun-${grade}`;
     setHtml(el, html `
         <span class="pg-pronun-score">${score}</span>
         <span class="pg-pronun-label">${t(label)}</span>
-        <span class="pg-pronun-heard">"${heard}"</span>`);
+        ${sentence
+        ? html `<span class="pg-pronun-words" title="${heard}">${parts.map(p => p.missed
+            ? html `<span class="pg-pronun-missed" role="button" tabindex="0" data-action="say-word" data-word="${p.text}" title="${t('speak.missed')}">${p.text}</span>`
+            : p.text)}</span>`
+        : html `<span class="pg-pronun-heard">"${heard}"</span>`}`);
 }
 function setMicState(btn, listening) {
     btn.dataset.active = String(listening);
@@ -283,7 +295,7 @@ export function runPronunciationCheck(target, lang, micBtn, resultEl, onSettled)
         if (!alive() || !settle())
             return;
         const heard = bestTranscript(ev);
-        showScore(resultEl, pronunciationScore(target, heard), heard.trim());
+        showScore(resultEl, pronunciationScore(target, heard), heard.trim(), target, recognition.lang);
         onSettled?.();
     };
     recognition.onerror = (ev) => {

@@ -100,6 +100,14 @@ class SpeakingSession {
             <div class="pg-speak-card-area"></div>`);
         this.area = root.querySelector('.pg-speak-card-area');
         root.addEventListener('click', e => this.onClick(e));
+        // Words acting as buttons (a missed word) are pressed with Enter or Space too
+        root.addEventListener('keydown', e => {
+            const el = e.target;
+            if ((e.key === 'Enter' || e.key === ' ') && el.matches('[role="button"][data-action]')) {
+                e.preventDefault();
+                el.click();
+            }
+        });
         this.restart();
     }
     get entry() { return this.pool[this.index]; }
@@ -185,6 +193,11 @@ class SpeakingSession {
                 break;
             case 'check':
                 this.check(el);
+                break;
+            // A word the recognition missed in a sentence, read alone
+            case 'say-word':
+                if (el.dataset.word)
+                    this.deps.speak(el.dataset.word, this.deps.getLang());
                 break;
             case 'mic':
                 this.listen(el);
