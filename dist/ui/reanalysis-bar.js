@@ -28,15 +28,17 @@ export async function toggleReanalysis({ bar, words, confirm, onBusy, onDone }) 
         onProgress(done, all, word) {
             progress.update(t('wb.reanalyseProgress', { done, total: all, word }), done, all);
         },
-        onDone(processed, all, aborted, error) {
+        onDone(processed, all, aborted, error, failed) {
             progress.close();
             onBusy?.(false);
             if (error)
                 notify(t('wb.reanalyseFailed', { done: processed, total: all, msg: error }), 'err', 6000);
+            else if (aborted)
+                notify(t('wb.reanalyseStopped', { done: processed, total: all }), 'warn', 3000);
+            else if (failed)
+                notify(t('wb.reanalyseSome', { n: processed - failed, failed }), 'warn', 6000);
             else
-                notify(aborted
-                    ? t('wb.reanalyseStopped', { done: processed, total: all })
-                    : t('wb.reanalyseDone', { n: processed }), aborted ? 'warn' : 'ok', 3000);
+                notify(t('wb.reanalyseDone', { n: processed }), 'ok', 3000);
             onDone?.();
         },
     });

@@ -187,11 +187,17 @@ revive = l => l) {
     return [...out.values()];
 }
 // ── File format ───────────────────────────────────────────────────────────────
-export function serializeData(data, now = new Date()) {
+/**
+ * The file's text. `revs` is the save history: this save's id first, then the
+ * ids of the saves it grew from, newest first (data-store.ts uses it to tell
+ * whether the file still holds a save, or another device wrote over it).
+ */
+export function serializeData(data, now = new Date(), revs) {
     return JSON.stringify({
         format: DATA_FORMAT,
         version: DATA_VERSION,
         savedAt: now.toISOString(),
+        ...(revs?.length && { revs }),
         wordbook: data.wordbook,
         sets: data.sets,
         wrongAnswers: data.wrongAnswers,
@@ -212,5 +218,6 @@ export function parseData(text) {
         return { ok: false, reason: 'invalid' };
     if (num(raw.version, 0) > DATA_VERSION)
         return { ok: false, reason: 'newer' };
-    return { ok: true, data: cleanData(raw) };
+    const revs = Array.isArray(raw.revs) && raw.revs.length && raw.revs.every(r => typeof r === 'string') ? raw.revs : null;
+    return { ok: true, data: cleanData(raw), revs };
 }

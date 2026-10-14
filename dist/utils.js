@@ -162,3 +162,18 @@ export function relocateEntries(saved, shown, length) {
 }
 /** How a study language is stored on entries ("Italian" and " italian" are one language). */
 export const langKey = (lang) => lang.trim().toLowerCase();
+/** `signal` (when given) and a timeout of `ms` as one signal — without AbortSignal.any, which older Safari lacks. */
+export function withTimeout(signal, ms) {
+    const timeout = AbortSignal.timeout(ms);
+    if (!signal)
+        return timeout;
+    const both = new AbortController();
+    const abort = () => both.abort(signal.aborted ? signal.reason : timeout.reason);
+    for (const s of [signal, timeout]) {
+        if (s.aborted)
+            abort();
+        else
+            s.addEventListener('abort', abort, { once: true });
+    }
+    return both.signal;
+}

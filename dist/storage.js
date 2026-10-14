@@ -15,17 +15,9 @@ import { getContext, saveMetadataDebounced } from '../../../../extensions.js';
 export function chatMetadata() {
     return getContext()?.chatMetadata ?? null;
 }
-/** Schedules a metadata save. Older ST builds expose it only on the context. */
+/** Schedules a metadata save (debounced by ST; every supported ST exports it). */
 export function saveChatMetadata() {
-    if (typeof saveMetadataDebounced === 'function') {
-        saveMetadataDebounced();
-        return;
-    }
-    const ctx = getContext();
-    if (typeof ctx?.saveMetadata === 'function')
-        ctx.saveMetadata();
-    else if (typeof ctx?.saveMetadataDebounced === 'function')
-        ctx.saveMetadataDebounced();
+    saveMetadataDebounced();
 }
 export function chatValue(key) {
     return {

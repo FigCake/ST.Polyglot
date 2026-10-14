@@ -550,6 +550,7 @@ const EN = {
     'wb.reanalyseStart': 'Start',
     'wb.reanalyseProgress': 'Analysing… ({done} / {total})',
     'wb.reanalyseDone': '✓ Re-analysis complete ({n} words updated).',
+    'wb.reanalyseSome': 'Re-analysed {n} word(s); {failed} could not be analysed (the AI reply was unusable).',
     'wb.reanalyseStopped': 'Stopped after {done} / {total} words.',
     'wb.filterByPos': 'Filter by this part of speech',
     // ── Notes ─────────────────────────────────────────────────────────────────
@@ -1096,6 +1097,7 @@ const KO = {
     'wb.reanalyseStart': '시작',
     'wb.reanalyseProgress': '분석 중… ({done} / {total})',
     'wb.reanalyseDone': '✓ 재분석 완료 ({n}개 업데이트).',
+    'wb.reanalyseSome': '{n}개 단어를 재분석했고, {failed}개는 분석하지 못했습니다 (AI 응답을 쓸 수 없음).',
     'wb.reanalyseStopped': '{done} / {total}개 처리 후 중단됨.',
     'wb.filterByPos': '이 품사로 필터링',
     // ── Notes ─────────────────────────────────────────────────────────────────
@@ -1641,6 +1643,7 @@ const IT = {
     'wb.reanalyseStart': 'Avvia',
     'wb.reanalyseProgress': 'Analisi… ({done} / {total})',
     'wb.reanalyseDone': '✓ Rianalisi completata ({n} parole aggiornate).',
+    'wb.reanalyseSome': 'Rianalizzate {n} parole; {failed} non si sono potute analizzare (risposta dell\'AI inutilizzabile).',
     'wb.reanalyseStopped': 'Interrotto dopo {done} / {total} parole.',
     'wb.filterByPos': 'Filtra per questa parte del discorso',
     // ── Notes ─────────────────────────────────────────────────────────────────
@@ -2186,6 +2189,7 @@ const ES = {
     'wb.reanalyseStart': 'Iniciar',
     'wb.reanalyseProgress': 'Analizando… ({done} / {total})',
     'wb.reanalyseDone': '✓ Reanálisis completado ({n} palabras actualizadas).',
+    'wb.reanalyseSome': 'Reanalizadas {n} palabras; {failed} no se pudieron analizar (la respuesta de la IA no servía).',
     'wb.reanalyseStopped': 'Detenido tras {done} / {total} palabras.',
     'wb.filterByPos': 'Filtrar por esta categoría gramatical',
     // ── Notes ─────────────────────────────────────────────────────────────────

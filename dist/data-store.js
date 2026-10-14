@@ -11,14 +11,28 @@
 // Reads are synchronous: the data is held in memory and the arrays handed out
 // are live (mutate, then commit()). Saves are debounced, serialised, verified
 // on the first write and retried with back-off; the user is warned while a
-// save keeps failing and when they try to leave with unsaved changes.
+// save keeps failing and when they try to leave with unsaved changes. Unsaved
+// changes are also kept in the browser (save-journal.ts) and taken in by the
+// next load, so a tab closed before its save went through loses nothing.
 //
 // Older versions kept the data in settings.json (_wordbook, _sets,
 // saved_wrong_answers). The first load moves it into the file and removes it
 // from settings only after the file has been read back intact.
 //
-// Unused media files (words' sounds and pictures) are deleted once a save
-// no longer refers to them; files a closed page uploaded, at a later load.
+// Media files (words' sounds and pictures) a save no longer refers to, and
+// files a closed page uploaded, are listed and deleted at a load a day later
+// if still unused (media-files.ts).
+//
+// Several tabs or devices can save the same file, and ST writes it whole with
+// no check of what it overwrites. Each save therefore records its id and the
+// ids it grew from (user-data `revs`):
+//   • a file grown from this session's last save: merged three-way, so what
+//     another device deleted stays deleted
+//   • a file that does not hold this session's last save (another device read
+//     the file before that save landed and wrote over it): both copies are
+//     merged with nothing deleted — which side deleted what cannot be told
+//   • a little after each save the file is read back once; if it was written
+//     over, the save is made again, merged with what is there now
 import { KEY } from './constants.js';
 import { getSettings, saveSettings } from './runtime.js';
 import { chatMetadata, saveChatMetadata } from './storage.js';
@@ -26,6 +40,7 @@ import { notify } from './ui.manager.js';
 import { t } from './i18n.js';
 import { readUserFile, writeUserFile } from './user-files.js';
 import { mediaIn, releaseMedia, sweepPending } from './media-files.js';
+import { journal, journalNow, clearJournal, readJournals, dropJournals } from './save-journal.js';
 import { emptyData, hasData, mergeUserData, parseData, rebaseUserData, serializeData, } from './user-data.js';
 const DATA_FILE = 'polyglot-data.json';
 /** One-time copy of the settings data, written before the first migration. */
@@ -34,6 +49,10 @@ const SAVE_DELAY_MS = 800;
 /** A burst of small changes (a run making sounds) is saved at most this often, not after each one. */
 const BURST_SAVE_MS = 8000;
 const RETRY_DELAYS_MS = [2_000, 5_000, 15_000, 30_000, 60_000];
+/** Save ids a file keeps (its own first). */
+const REVS_KEPT = 64;
+/** A save is read back this long after it was written (one upload by another device can land in between). */
+const CONFIRM_DELAY_MS = 15_000;
 let mode = 'loading';
 let data = emptyData();
 /** Changes not yet written to the file (or, while loading/offline, not yet merged into it). */
@@ -44,9 +63,16 @@ let saveTimer;
 let burstOnly = false;
 let retryTimer;
 let failures = 0;
-/** The file text as last read or written, to skip no-op reloads. */
+/** The file text as last read or written: the base the next save's changes are measured from. */
 let lastText = '';
-/** Media files the saved data refers to (unused ones are deleted after a save). */
+/** lastText's save history, its own id first (null: a file from before histories were kept). */
+let lastRevs = null;
+/** lastText (or a save grown from it) was read back from the server after it was written. */
+let lastConfirmed = true;
+/** A write whose request failed: the server may have stored it all the same (a reply lost on the way). */
+let attempted = null;
+let confirmTimer;
+/** Media files the saved data refers to (unused ones are listed for deletion after a save). */
 let savedMedia = new Set();
 /** The unreadable file text last copied aside, so retries do not copy it again. */
 let keptUnreadable = '';
@@ -110,6 +136,11 @@ export function onDataReplaced(listener) {
 }
 const emitReplaced = () => listeners.forEach(l => l());
 // ── Writing ──────────────────────────────────────────────────────────────────
+/** A new save id (random; crypto.randomUUID needs https, which a LAN ST may not have). */
+function newRev() {
+    const bytes = crypto.getRandomValues(new Uint8Array(6));
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
 /** Replaces any part of the data and saves it (`burst`: one of many changes in a row, see commit). */
 export function replaceUserData(patch, burst = false) {
     if (mode === 'chat') {
@@ -150,6 +181,7 @@ export function commit(burst = false) {
     // Only burst changes waiting: the next save may wait a few seconds
     burstOnly = burst && (burstOnly || !dirty);
     dirty = true;
+    journal(() => ({ data, baseText: lastText, at: Date.now() }));
     // While a save keeps failing, its back-off timer stays in charge
     if (mode !== 'file' || failures > 0)
         return;
@@ -178,6 +210,11 @@ async function catchUp() {
         return 'retry';
     if (res.status === 'missing' || res.text === lastText)
         return 'ok';
+    if (attempted && res.text === attempted.text) {
+        // The write that looked failed reached the server, and nothing came after it
+        setBase(attempted.text, attempted.revs, attempted.media);
+        return 'ok';
+    }
     const server = parseData(res.text);
     if (!server.ok) {
         if (server.reason === 'newer')
@@ -185,10 +222,77 @@ async function catchUp() {
         // Unreadable: keep a copy before it is replaced, as on load
         return await keepUnreadable(res.text) ? 'ok' : 'retry';
     }
-    const base = parseData(lastText);
-    data = rebaseUserData(base.ok ? base.data : emptyData(), data, server.data);
+    const baseText = grownFrom(server.revs);
+    if (baseText !== null) {
+        const base = parseData(baseText);
+        data = rebaseUserData(base.ok ? base.data : emptyData(), data, server.data);
+    }
+    else {
+        // Written over a save of this session by a device that had not read it: which side
+        // deleted what cannot be told, so both copies are kept (nothing is lost; a word
+        // deleted meanwhile may come back)
+        console.warn('[Polyglot] the data file was written over by another device; merging both copies');
+        const { added: _a, merged: _m, ...merged } = mergeUserData(server.data, data);
+        data = merged;
+    }
+    // What the file holds now is the next save's base, whether or not this save's write succeeds
+    setBase(res.text, server.revs, mediaIn(server.data.wordbook));
     emitReplaced();
     return 'ok';
+}
+/**
+ * The text this session's changes are measured from when the file holds
+ * `revs`: its last save (or a write that looked failed) when the file grew
+ * from it; null when the file does not hold it — written over by a device
+ * that never read it.
+ */
+function grownFrom(revs) {
+    if (attempted && revs?.includes(attempted.revs[0]))
+        return attempted.text;
+    // A file written by an older Polyglot has no history to check: as before
+    if (!revs || !lastRevs)
+        return lastText;
+    if (revs.includes(lastRevs[0]))
+        return lastText;
+    // A save confirmed on the server, followed by more saves than a file keeps ids of
+    if (lastConfirmed && revs.length >= REVS_KEPT)
+        return lastText;
+    return null;
+}
+/** The file read or written now becomes the base of the next save. */
+function setBase(text, revs, media) {
+    lastText = text;
+    lastRevs = revs;
+    lastConfirmed = true;
+    attempted = null;
+    // Media the file refers to joins what this session saved: files only one of them used are released after the next save
+    savedMedia = new Set([...savedMedia, ...media]);
+}
+/** A little after a save, reads the file back: a device that read it before the save landed may have written over it. */
+function scheduleConfirm() {
+    clearTimeout(confirmTimer);
+    confirmTimer = setTimeout(() => { void confirmSave(); }, CONFIRM_DELAY_MS);
+}
+async function confirmSave() {
+    if (mode !== 'file' || saving || dirty || lastConfirmed)
+        return;
+    const res = await readUserFile(DATA_FILE);
+    if (res.status !== 'ok' || mode !== 'file' || saving || dirty)
+        return;
+    if (res.text === lastText) {
+        lastConfirmed = true;
+        return;
+    }
+    const parsed = parseData(res.text);
+    if (!parsed.ok)
+        return;
+    if (grownFrom(parsed.revs) !== null) {
+        lastConfirmed = true;
+        return;
+    }
+    // Written over: save again, merged with what the file holds now
+    dirty = true;
+    void save();
 }
 /** Writes the file once; a save requested meanwhile runs right after. */
 function save() {
@@ -208,18 +312,28 @@ function save() {
             goOffline();
             return;
         }
-        const text = serializeData(data);
+        const revs = [newRev(), ...(lastRevs ?? [])].slice(0, REVS_KEPT);
+        const text = serializeData(data, new Date(), revs);
         const media = mediaIn(data.wordbook);
         const result = caught === 'ok' ? await writeUserFile(DATA_FILE, text) : 'error';
         if (result === 'ok') {
             lastText = text;
+            lastRevs = revs;
+            lastConfirmed = false;
+            attempted = null;
             releaseMedia(savedMedia, media, mediaIn(data.wordbook));
             savedMedia = media;
+            if (!dirty)
+                clearJournal();
             if (failures > 0)
                 notify(t('data.saveRecovered'), 'ok', 3000);
             failures = 0;
+            scheduleConfirm();
             return;
         }
+        // The request failed, but the server may have stored the file: the next catch-up tells
+        if (caught === 'ok' && result === 'error')
+            attempted = { text, revs, media };
         dirty = true;
         if (result === 'unsupported') {
             switchToChatMode();
@@ -281,6 +395,7 @@ function switchToChatMode() {
     mode = 'chat';
     cancelSave();
     clearTimeout(retryTimer);
+    clearJournal();
     dirty = false;
     const merged = mergeUserData(legacySettingsData(), pending);
     Object.assign(getSettings(), {
@@ -315,19 +430,23 @@ async function load() {
         return;
     }
     let server = null;
+    let serverRevs = null;
     if (res.status === 'ok') {
         const parsed = parseData(res.text);
-        if (parsed.ok)
+        if (parsed.ok) {
             server = parsed.data;
+            serverRevs = parsed.revs;
+        }
         else if (parsed.reason === 'newer') {
             // Written by a newer Polyglot: never overwrite it with less
             notify(t('data.newerFile'), 'err', 10000);
             goOffline();
             return;
         }
-        else {
-            // Unreadable: keep a copy before it is replaced
-            await keepUnreadable(res.text);
+        else if (!await keepUnreadable(res.text)) {
+            // Unreadable, and its copy could not be kept: it must not be replaced yet
+            goOffline();
+            return;
         }
     }
     const legacy = legacySettingsData();
@@ -335,16 +454,23 @@ async function load() {
     const firstWrite = !server;
     if (migrating)
         await writeUserFile(MIGRATION_COPY, serializeData(legacy));
-    // Words added in this session before the file loaded, and settings data, join the file's
+    // Changes a closed tab never saved, words added in this session before the file loaded,
+    // and settings data join the file's
     let next = server ?? emptyData();
+    const journals = await readJournals();
+    for (const [, entry] of journals)
+        next = takeInJournal(next, serverRevs, entry);
+    if (journals.length)
+        console.info(`[Polyglot] took in unsaved changes kept by ${journals.length} tab(s)`);
     if (dirty || migrating) {
         const { added: _a, merged: _m, ...merged } = mergeUserData(next, data);
         next = merged;
     }
     data = next;
-    if (dirty || migrating || firstWrite) {
+    if (dirty || migrating || firstWrite || journals.length) {
         dirty = false; // changes made while writing set it again
-        const text = serializeData(data);
+        const revs = [newRev(), ...(serverRevs ?? [])].slice(0, REVS_KEPT);
+        const text = serializeData(data, new Date(), revs);
         const result = await writeVerified(DATA_FILE, text);
         if (result === 'unsupported') {
             switchToChatMode();
@@ -356,6 +482,10 @@ async function load() {
             return;
         }
         lastText = text;
+        lastRevs = revs;
+        dropJournals(journals);
+        if (!dirty)
+            clearJournal();
         if (migrating) {
             dropLegacySettings();
             notify(t('data.migrated', { n: legacy.wordbook.length }), 'ok', 5000);
@@ -363,7 +493,10 @@ async function load() {
     }
     else {
         lastText = res.status === 'ok' ? res.text : '';
+        lastRevs = serverRevs;
     }
+    lastConfirmed = true;
+    attempted = null;
     savedMedia = mediaIn(data.wordbook);
     sweepPending(savedMedia);
     const wasOffline = mode === 'offline';
@@ -376,6 +509,29 @@ async function load() {
         scheduleSave(SAVE_DELAY_MS);
     emitReplaced();
 }
+/**
+ * A journal entry's data joined with the file's: three-way when the file grew
+ * from the text the entry was based on (what that tab deleted stays deleted),
+ * otherwise with nothing deleted. An entry that is not valid data is skipped.
+ */
+function takeInJournal(server, serverRevs, entry) {
+    let local;
+    try {
+        const parsed = parseData(serializeData(entry.data));
+        if (!parsed.ok)
+            return server;
+        local = parsed.data;
+    }
+    catch {
+        return server;
+    }
+    const base = entry.baseText ? parseData(entry.baseText) : null;
+    const baseRev = base?.ok ? base.revs?.[0] : undefined;
+    if (base?.ok && baseRev && serverRevs?.includes(baseRev))
+        return rebaseUserData(base.data, local, server);
+    const { added: _a, merged: _m, ...merged } = mergeUserData(server, local);
+    return merged;
+}
 /** Picks up changes saved from another device (on returning to the tab). */
 async function reloadIfChanged() {
     if (mode !== 'file' || dirty || saving)
@@ -386,8 +542,16 @@ async function reloadIfChanged() {
     const parsed = parseData(res.text);
     if (!parsed.ok)
         return;
+    if (grownFrom(parsed.revs) === null) {
+        // Written over a save of this session: save again, merged with it, rather than adopt it
+        dirty = true;
+        void save();
+        return;
+    }
     data = parsed.data;
     lastText = res.text;
+    lastRevs = parsed.revs;
+    lastConfirmed = true;
     savedMedia = mediaIn(data.wordbook);
     emitReplaced();
 }
@@ -397,13 +561,19 @@ if (typeof window !== 'undefined') {
     window.addEventListener('beforeunload', e => {
         if (!hasUnsaved())
             return;
+        journalNow();
         void save();
         e.preventDefault();
     });
+    // A hidden tab may be closed or killed without another event (mobile)
+    window.addEventListener('pagehide', journalNow);
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible')
             void reloadIfChanged();
-        else if (dirty)
-            void save();
+        else {
+            journalNow();
+            if (dirty)
+                void save();
+        }
     });
 }

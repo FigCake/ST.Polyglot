@@ -360,8 +360,9 @@ class FlashcardSession {
         if (!entry)
             return;
         const { requeue, wasNew } = srsRate(entry, rating);
-        saveWordbook(wordbook);
-        logReview({ wasNew, forgot: rating === 0 });
+        // A rating is one of many in a row: saved every few seconds, not on every card
+        saveWordbook(wordbook, true);
+        logReview({ wasNew, forgot: rating === 0 }, true);
         this.deck.splice(this.index, 1);
         if (requeue)
             this.deck.push(entry);

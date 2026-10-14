@@ -17,6 +17,9 @@ export const KEY = {
     conjDB: 'pg_conj_cache',
     conjStore: 'tables',
     conjDBVersion: 1,
+    // IndexedDB — changes not yet saved to the data file (save-journal.ts)
+    journalDB: 'pg_save_journal',
+    journalStore: 'pending',
 };
 // ── Timing (milliseconds) ─────────────────────────────────────────────────────
 export const DELAY = {

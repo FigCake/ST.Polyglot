@@ -2,8 +2,11 @@
 import { daysData, replaceUserData } from './data-store.js';
 import { dayKey, studyDay } from './srs.js';
 const today = (now) => dayKey(studyDay(now));
-/** Counts one review: a new word's first, or a learnt word's; and whether it was forgotten. */
-export function logReview(review, now = Date.now()) {
+/**
+ * Counts one review: a new word's first, or a learnt word's; and whether it was
+ * forgotten. `burst`: one of a review session's, saved with the others (data-store commit).
+ */
+export function logReview(review, burst = false, now = Date.now()) {
     const d = today(now);
     const days = daysData();
     const day = days.find(x => x.d === d) ?? { d, n: 0, r: 0, a: 0 };
@@ -13,7 +16,7 @@ export function logReview(review, now = Date.now()) {
         r: day.r + (review.wasNew ? 0 : 1),
         a: day.a + (review.forgot ? 1 : 0),
     };
-    replaceUserData({ days: [...days.filter(x => x.d !== d), next] });
+    replaceUserData({ days: [...days.filter(x => x.d !== d), next] }, burst);
 }
 /** New words started today. */
 export const newWordsToday = (now = Date.now()) => daysData().find(x => x.d === today(now))?.n ?? 0;

@@ -36,7 +36,7 @@ export function withSound(e, field, name, made) {
     const others = (e.made_sounds ?? []).filter(n => n !== name);
     return withMadeList(next, made ? [...others, name] : others);
 }
-/** The entry without that sound (its file is deleted at the next save when no word uses it). */
+/** The entry without that sound (its file is listed for deletion at the next save when no word uses it). */
 export function withoutSound(e, field) {
     const next = { ...e };
     delete next[field];

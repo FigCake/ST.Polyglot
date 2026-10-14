@@ -13,8 +13,11 @@
 // Polyglot's own code. They go from the browser; voice_proxy sends them through
 // ST's CORS proxy instead (enableCorsProxy in config.yaml) for a service that
 // does not answer browsers.
+import { withTimeout } from './utils.js';
 /** Services Polyglot calls itself (their sound can be kept). */
 export const DIRECT_PROVIDERS = ['elevenlabs', 'google', 'openai', 'fish'];
+/** A voice request (answer included) gives up after this long. */
+const VOICE_TIMEOUT_MS = 60_000;
 export const DEFAULTS = {
     elevenlabsModel: 'eleven_multilingual_v2',
     openaiUrl: 'https://api.openai.com/v1',
@@ -149,12 +152,16 @@ const fromBase64 = (b64) => Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
  */
 async function ttsFetch(c, url, init, stHeaders) {
     let res;
+    // Also bounds reading the answer: a server that never finishes must not hold 🔊 (or a run) forever
+    const signal = withTimeout(init.signal, VOICE_TIMEOUT_MS);
     try {
-        res = await fetch(c.proxy ? `/proxy/${url}` : url, { ...init, headers: c.proxy ? { ...stHeaders, ...init.headers } : init.headers });
+        res = await fetch(c.proxy ? `/proxy/${url}` : url, { ...init, signal, headers: c.proxy ? { ...stHeaders, ...init.headers } : init.headers });
     }
     catch (e) {
         if (init.signal?.aborted)
             throw e;
+        if (signal.aborted)
+            throw new TtsError(`no answer within ${VOICE_TIMEOUT_MS / 1000} s`);
         throw new TtsError(String(e.message ?? e), true);
     }
     if (!res.ok)

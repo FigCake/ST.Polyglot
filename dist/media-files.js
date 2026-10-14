@@ -3,17 +3,23 @@
 //
 //   mediaIn(words)        the files a wordbook refers to
 //   noteUploaded(names)   files this session just stored (Anki import, restore, made sounds)
-//   releaseMedia(a, b)    deletes the files `a` used — or this session stored —
-//                         that `b` does not use (nor the data in memory now);
-//                         called by data-store.ts once `b` is safely saved
+//   releaseMedia(a, b)    lists for deletion the files `a` used — or this session
+//                         stored — that `b` does not use (nor the data in memory
+//                         now); called by data-store.ts once `b` is safely saved
 //   notePending(names)    files about to be uploaded, listed in the browser
-//   sweepPending(inUse)   on load: deletes listed files a closed page left behind
+//   sweepPending(inUse)   on load: deletes listed files a day old that no word uses
+//
+// Nothing is deleted when a save stops using a file. Files are named by their
+// content, so another tab or device may have just found the same file present
+// and put it on a word it has not saved yet (an Anki import, a made sound, a
+// restore). The file is listed instead, and a load at least a day later
+// deletes it if the data saved by then still does not use it.
 //
 // Uploaded files are noted right before the words that use them are added
 // (no save can run in between), so a word deleted before its first save, or
 // an import cancelled half-way, leaves no file behind. A page closed during
-// an import never gets that far: what it uploaded stays listed in the browser
-// until a save keeps or deletes it, and a later load deletes what no word uses.
+// an import never gets that far: what it uploaded is listed in the browser
+// before the upload, so the same later load deletes what no word uses.
 //
 // Only names of that exact shape are ever deleted.
 import { deleteUserFile, userFileUrl } from './user-files.js';
@@ -56,10 +62,12 @@ export function mediaIn(words) {
     }
     return names;
 }
+/** A file check that gets no answer for this long counts as no answer. */
+const CHECK_TIMEOUT_MS = 30_000;
 /** Whether a file is already in the user's files. */
 async function mediaExists(name) {
     try {
-        return (await fetch(userFileUrl(name), { method: 'HEAD', cache: 'no-store' })).ok;
+        return (await fetch(userFileUrl(name), { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })).ok;
     }
     catch {
         return false;
@@ -73,7 +81,7 @@ async function mediaExists(name) {
 export async function mediaGone(name) {
     const url = `user/files/${name}`;
     try {
-        const res = await fetch('/api/files/verify', { method: 'POST', headers: getRequestHeaders(), body: JSON.stringify({ urls: [url] }) });
+        const res = await fetch('/api/files/verify', { method: 'POST', headers: getRequestHeaders(), body: JSON.stringify({ urls: [url] }), signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) });
         if (res.ok) {
             const verified = await res.json();
             if (typeof verified[url] === 'boolean')
@@ -82,7 +90,7 @@ export async function mediaGone(name) {
     }
     catch { /* ask the file itself */ }
     try {
-        return (await fetch(userFileUrl(name), { method: 'HEAD', cache: 'no-store' })).status === 404;
+        return (await fetch(userFileUrl(name), { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })).status === 404;
     }
     catch {
         return false;
@@ -111,7 +119,7 @@ export async function existingMedia(names) {
         let verified = null;
         try {
             const res = await fetch('/api/files/verify', {
-                method: 'POST', headers: getRequestHeaders(), body: JSON.stringify({ urls }),
+                method: 'POST', headers: getRequestHeaders(), body: JSON.stringify({ urls }), signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
             });
             if (res.ok)
                 verified = await res.json();
@@ -143,14 +151,14 @@ export function noteUploaded(names) {
         if (isMediaName(n))
             uploaded.add(n);
 }
-// ── Uploads a closed page left behind ─────────────────────────────────────────
+// ── Files listed for deletion: unused ones, and uploads a closed page left behind ──
 /**
- * How old a listed upload must be before a load deletes it: younger ones may
- * belong to an import still running in another tab, or to one whose save
- * has not gone through yet.
+ * How old a listed file must be before a load deletes it: younger ones may
+ * belong to an import still running in another tab, to one whose save has
+ * not gone through yet, or to a word another device has not saved yet.
  */
 const PENDING_STALE_MS = 24 * 3600_000;
-/** Listed uploads: file name → when it was listed. */
+/** Listed files: file name → when it was listed. */
 function readPending() {
     try {
         const v = JSON.parse(localStorage.getItem(KEY.mediaPending) ?? '{}');
@@ -171,18 +179,24 @@ function writePending(pending) {
 }
 /** Lists files about to be uploaded (before the upload: one that reached the server unanswered is listed too). */
 export function notePending(names, now = Date.now()) {
+    const listed = [...names].filter(isMediaName);
+    if (!listed.length)
+        return;
     const pending = readPending();
-    for (const n of names)
-        if (isMediaName(n))
-            pending[n] = now;
+    for (const n of listed)
+        pending[n] = now;
     writePending(pending);
 }
 function clearPending(names) {
-    if (!names.length)
-        return;
     const pending = readPending();
-    names.forEach(n => delete pending[n]);
-    writePending(pending);
+    let changed = false;
+    for (const n of names)
+        if (Object.hasOwn(pending, n)) {
+            delete pending[n];
+            changed = true;
+        }
+    if (changed)
+        writePending(pending);
 }
 /** Deletes the listed uploads older than a day that no word uses; called once the data has loaded. */
 export function sweepPending(inUse, now = Date.now()) {
@@ -192,19 +206,21 @@ export function sweepPending(inUse, now = Date.now()) {
     deleteInBackground(stale.filter(n => !inUse.has(n) && isMediaName(n)));
 }
 /**
- * Deletes the files that `before` used (or this session stored) and the saved
- * `after` does not — best effort, in the background. `inUse` is what the data
- * refers to right now, which can be more than was saved: words added while the
- * save was being written keep their files (they are saved next).
+ * Lists for deletion the files that `before` used (or this session stored) and
+ * the saved `after` does not; a load a day later deletes them if still unused
+ * (see the top). Listed files the saved words use again are unlisted. `inUse`
+ * is what the data refers to right now, which can be more than was saved:
+ * words added while the save was being written keep their files (they are
+ * saved next).
  */
-export function releaseMedia(before, after, inUse = after) {
+export function releaseMedia(before, after, inUse = after, now = Date.now()) {
     const gone = [...new Set([...before, ...uploaded])].filter(n => !after.has(n) && !inUse.has(n) && isMediaName(n));
-    // Stored files not saved yet stay noted, so a later save can still let them go
-    clearPending([...uploaded].filter(n => after.has(n)));
+    clearPending(after);
+    // Stored files not saved yet stay noted, so a later save can still list them
     for (const n of [...uploaded])
         if (after.has(n) || !inUse.has(n))
             uploaded.delete(n);
-    deleteInBackground(gone);
+    notePending(gone, now);
 }
 /** Deletes the files one at a time, in the background; a file is unlisted once it is gone. */
 function deleteInBackground(gone) {

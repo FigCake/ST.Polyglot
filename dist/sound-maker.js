@@ -80,8 +80,8 @@ const fits = (job) => jobFits(loadWordbook().find(e => e.word === job.word), job
  * be deleted) is reused, and kept off the deletion queue.
  *
  * The file is listed in the browser (notePending) but not yet noted as this
- * session's upload: a save that runs before setSounds would delete a noted
- * file no word uses yet. setSounds notes it, right before the words get it.
+ * session's upload: a save that runs before setSounds would list a noted
+ * file no word uses yet for deletion. setSounds notes it, right before the words get it.
  */
 async function upload(bytes) {
     const name = mediaFileName(bytes, `voice.${soundFormat(bytes) ?? 'mp3'}`);

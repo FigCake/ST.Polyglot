@@ -17,6 +17,9 @@
 //     last value may be half-written): the batch's words go one by one.
 //   • AbortController allows the user to stop mid-batch at any time.
 //   • On abort or error the wordbook is saved with whatever was completed.
+//   • Failures in a row stop the run, so a provider that is down, or a model
+//     that never answers in JSON, does not cost a request per word; words that
+//     could not be analysed are counted and reported.
 import { POS_TAGS, CEFR_LEVELS } from '../constants.js';
 import { reanalysisPrompt, batchReanalysisPrompt } from '../prompts.js';
 import { loadWordbook, saveWordbook } from '../wordbook.js';
@@ -95,6 +98,12 @@ const gaps = (e) => ({ needsMeaning: !e.meaning?.trim(), needsLevel: !e.level })
 const BATCH_SIZE = 10;
 /** Requests failing at the transport level (HTTP / network) this many times in a row stop the run. */
 const MAX_REQUEST_FAILURES = 3;
+/**
+ * Replies unusable even after the client's retry (not JSON, refused, cut off) this many
+ * times in a row stop the run: each one cost two paid requests, and a model or preset that
+ * never answers in JSON would otherwise be asked about every word.
+ */
+const MAX_BAD_REPLIES = 4;
 /** A bad reply is worth retrying word by word; a failed request (rate limit, auth, offline) is not. */
 const isRequestFailure = (err) => !(err instanceof AiResponseError);
 const acceptResult = (v) => (isRecord(v) ? _sanitise(v) : null);
@@ -129,17 +138,21 @@ export async function runReanalysis(deps, options = {}) {
     const pool = loadWordbook().filter(e => (wanted ? wanted.has(e.word) : e.level !== 'grammar' && e.level !== 'sentence'));
     const total = pool.length;
     let processed = 0;
+    let failed = 0;
     const advance = (word, n = 1) => { processed += n; options.onProgress?.(processed, total, word); };
-    // Stop instead of firing hundreds of doomed requests when the provider is down or rate-limiting
-    let failures = 0;
+    // Stop instead of firing hundreds of doomed requests when the provider is down or rate-limiting,
+    // or the model keeps answering with something that is not the JSON asked for
+    let requestFailures = 0;
+    let badReplies = 0;
     let fatal;
+    const succeeded = () => { requestFailures = 0; badReplies = 0; };
+    const stop = (message) => { fatal = message; abort.abort(); };
     const recordFailure = (err) => {
-        if (signal.aborted || !isRequestFailure(err))
+        if (signal.aborted)
             return;
-        if (++failures >= MAX_REQUEST_FAILURES) {
-            fatal = err instanceof Error ? err.message : String(err);
-            abort.abort();
-        }
+        const message = err instanceof Error ? err.message : String(err);
+        if (isRequestFailure(err) ? ++requestFailures >= MAX_REQUEST_FAILURES : ++badReplies >= MAX_BAD_REPLIES)
+            stop(message);
     };
     const analyseOne = async (entry) => {
         try {
@@ -148,15 +161,21 @@ export async function runReanalysis(deps, options = {}) {
                 signal,
                 accept: acceptResult,
             });
-            failures = 0;
-            if (partial)
+            if (partial) {
                 console.warn('[Polyglot] reanalysis reply was cut off; not applied for', entry.word);
-            else
-                applyAll([{ word: entry.word, result: data }], nativeLang);
+                failed++;
+                if (++badReplies >= MAX_BAD_REPLIES)
+                    stop('the replies were cut off (raise the max tokens)');
+                return;
+            }
+            succeeded();
+            applyAll([{ word: entry.word, result: data }], nativeLang);
         }
         catch (err) {
-            if (!signal.aborted)
-                console.warn('[Polyglot] reanalysis failed for', entry.word, err);
+            if (signal.aborted)
+                return;
+            console.warn('[Polyglot] reanalysis failed for', entry.word, err);
+            failed++;
             recordFailure(err);
         }
     };
@@ -172,7 +191,8 @@ export async function runReanalysis(deps, options = {}) {
                     accept: acceptBatch,
                     merge: unionBy(r => r.word),
                 });
-                failures = 0;
+                if (!partial)
+                    succeeded();
                 // A cut-off reply's last item may be half-written, and which one is last is unknown after merging
                 if (!partial) {
                     // Only the words asked about: a reply may name others (an echo slip, or text in an imported entry)
@@ -204,6 +224,6 @@ export async function runReanalysis(deps, options = {}) {
     finally {
         if (_reanalysisAbort === abort)
             _reanalysisAbort = null;
-        options.onDone?.(processed, total, signal.aborted, fatal);
+        options.onDone?.(processed, total, signal.aborted, fatal, failed);
     }
 }
