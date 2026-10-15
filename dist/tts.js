@@ -5,6 +5,8 @@
 //             ─▶ MP3 bytes ─▶ played, kept for the session, and (setting
 //             voice_save) stored as the word's or its example's sound file, so a
 //             word is paid for once and its sound reaches flashcards and exports
+//   host      the app's own voice service (Marinara's Text to Speech, HOST.ai):
+//             its sound comes back, so it is kept like a direct service's
 //   st        ST's own TTS extension through its /speak command (the voice
 //             service set up in ST; nothing comes back to keep)
 //   browser   the Web Speech API (speech.ts), also the fallback for both
@@ -14,8 +16,9 @@
 // ST's CORS proxy instead (enableCorsProxy in config.yaml) for a service that
 // does not answer browsers.
 import { withTimeout } from './utils.js';
+import { HOST } from './host.js';
 /** Services Polyglot calls itself (their sound can be kept). */
-export const DIRECT_PROVIDERS = ['elevenlabs', 'google', 'openai', 'fish'];
+export const DIRECT_PROVIDERS = ['host', 'elevenlabs', 'google', 'openai', 'fish'];
 /** A voice request (answer included) gives up after this long. */
 const VOICE_TIMEOUT_MS = 60_000;
 export const DEFAULTS = {
@@ -41,6 +44,7 @@ export function ttsConfig(s) {
         case 'google': return pick(s.voice_gg_key, s.voice_gg_voice);
         case 'openai': return pick(s.voice_oa_key, s.voice_oa_voice, s.voice_oa_model, s.voice_oa_url);
         case 'fish': return pick(s.voice_fish_key, s.voice_fish_voice, s.voice_fish_model);
+        case 'host': return pick('', s.voice_host_voice);
         default: return pick('', s.voice_st_voice);
     }
 }
@@ -50,7 +54,7 @@ export function ttsConfig(s) {
  * ElevenLabs voice id (it has no default voice).
  */
 export function missingFor(c) {
-    if (!DIRECT_PROVIDERS.includes(c.provider))
+    if (!DIRECT_PROVIDERS.includes(c.provider) || c.provider === 'host')
         return '';
     const custom = c.provider === 'openai' && c.baseUrl && !c.baseUrl.startsWith(DEFAULTS.openaiUrl);
     if (!c.key && !custom)
@@ -200,6 +204,14 @@ export function soundFormat(b) {
  * `stHeaders` are ST's request headers (CSRF), needed for its CORS proxy.
  */
 export async function synthesize(c, text, langCode, stHeaders = {}, signal) {
+    if (c.provider === 'host') {
+        if (!HOST.ai)
+            throw new TtsError('no voice service here');
+        const bytes = await HOST.ai.speak(text, c.voice, withTimeout(signal, VOICE_TIMEOUT_MS));
+        if (!soundFormat(bytes))
+            throw new TtsError('not a sound');
+        return bytes;
+    }
     const req = ttsRequest(c, text, langCode);
     const res = await ttsFetch(c, req.url, { method: 'POST', headers: req.headers, body: req.body, signal }, stHeaders);
     if (req.json) {
@@ -223,6 +235,8 @@ export async function synthesize(c, text, langCode, stHeaders = {}, signal) {
 // ── Voice lists ───────────────────────────────────────────────────────────────
 /** Voices a service offers (id and a label), for the voice picker; [] when it has no list to fetch. */
 export async function listVoices(c, langCode, stHeaders = {}) {
+    if (c.provider === 'host')
+        return HOST.ai?.voices() ?? [];
     const get = async (url, headers) => (await ttsFetch(c, url, { headers }, stHeaders)).json();
     if (c.provider === 'elevenlabs') {
         const data = await get('https://api.elevenlabs.io/v1/voices', { 'xi-api-key': c.key });

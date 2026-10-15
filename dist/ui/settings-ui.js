@@ -11,6 +11,7 @@
 //     profile made in ST after the drawer was drawn shows up.
 import { CEFR_LEVELS } from '../constants.js';
 import { ROUTE_MODEL_KEY } from '../api.js';
+import { HOST } from '../host.js';
 import { PROVIDERS as AI_PROVIDERS, providerById } from '../ai/providers.js';
 import { connectionProfiles, profileLabel } from '../ai/st-profiles.js';
 import { html, setHtml } from '../html.js';
@@ -31,9 +32,11 @@ const LANGUAGES = [
 const NATIVE_LANGUAGES = [
     ['en', '🇺🇸 English'], ['es', '🇪🇸 Spanish'], ['it', '🇮🇹 Italian'], ['ko', '🇰🇷 Korean'], ['custom', '✏️ Custom'],
 ];
+/** Outside SillyTavern (HOST.stConnection off) its connection, its profiles and Vertex AI are not offered. */
 const PROVIDERS = [
-    ['st', ''], ['profile', ''], // labels from i18n
-    ...AI_PROVIDERS.map(p => [p.id, p.label]),
+    ...(HOST.ai ? [['host', '']] : []),
+    ...(HOST.stConnection ? [['st', ''], ['profile', '']] : []), // labels from i18n
+    ...AI_PROVIDERS.filter(p => HOST.stConnection || p.id !== 'vertexai').map(p => [p.id, p.label]),
     ['custom', '⚙️ Custom'],
 ];
 // ── Markup helpers ────────────────────────────────────────────────────────────
@@ -115,6 +118,24 @@ function profileRows(s) {
     return html `
         ${field(t('set.profile'), html `<select class="text_pole pg-profile-select" data-setting="profile_id">${profileOptions(s.profile_id)}</select>`)}`;
 }
+/** The app's own connections (Marinara's): the open chat's first, then each by name, read when drawn. */
+function hostRows(s) {
+    return html `
+        ${field(t('set.hostConnection'), html `
+            <select class="text_pole pg-host-select" data-setting="host_connection">
+                <option value="" ${!s.host_connection && html `selected`}>${t('set.hostCurrent')}</option>
+                ${s.host_connection && html `<option value="${s.host_connection}" selected>${s.host_connection}</option>`}
+            </select>`)}`;
+}
+async function fillHostConnections(select) {
+    const list = await HOST.ai?.connections().catch(() => []) ?? [];
+    const chosen = getSettings().host_connection;
+    setHtml(select, html `
+        <option value="">${t('set.hostCurrent')}</option>
+        ${chosen && !list.some(c => c.id === chosen) && html `<option value="${chosen}">${t('set.hostGone')}</option>`}
+        ${options(list.map(c => [c.id, c.label]), chosen)}`);
+    select.value = chosen;
+}
 /** Reads the profiles again when their list is opened, keeping the select (and its focus). */
 function refreshProfiles(select) {
     setHtml(select, profileOptions(getSettings().profile_id));
@@ -123,6 +144,7 @@ function knownProviderRows(s) {
     const models = providerById(s.provider)?.models ?? [];
     const manual = !!s.model && !models.includes(s.model);
     return html `
+        ${HOST.ownKeys && field('API Key', html `<input type="password" class="text_pole pg-api-key pg-own-key" placeholder="${t('set.ownKeyPh')}" autocomplete="off">`)}
         ${field('Model', html `
             <select class="text_pole pg-model-select">
                 ${options(models.map(m => [m, m]), manual ? CUSTOM_MODEL : s.model)}
@@ -139,6 +161,8 @@ function customProviderRows(s) {
         ${field('Model', textInput('model', s.model, 'Model name'))}`;
 }
 function providerRows(s) {
+    if (s.provider === 'host')
+        return hostRows(s);
     if (s.provider === 'st')
         return stRows(s);
     if (s.provider === 'profile')
@@ -171,7 +195,10 @@ function renderProvider(root) {
     // Secrets are set as properties, never written into markup
     const key = block.querySelector('.pg-api-key');
     if (key)
-        key.value = getSettings().ext_api_key;
+        key.value = key.matches('.pg-own-key') ? getSettings().own_keys?.[getSettings().provider] ?? '' : getSettings().ext_api_key;
+    const hostSelect = block.querySelector('.pg-host-select');
+    if (hostSelect)
+        void fillHostConnections(hostSelect);
     renderLiveConnection(root);
 }
 // ── Panel markup ──────────────────────────────────────────────────────────────
@@ -214,7 +241,7 @@ function panel(s) {
 
                 <hr class="pg-set-divider">
                 ${field(t('set.aiProvider'), html `
-                    <select class="text_pole pg-provider-select">${options(PROVIDERS.map(([v, l]) => [v, l || t(v === 'profile' ? 'set.profileOption' : 'set.stDefault')]), s.provider)}</select>`)}
+                    <select class="text_pole pg-provider-select">${options(PROVIDERS.map(([v, l]) => [v, l || (v === 'host' ? t('set.hostOption', { name: HOST.ai?.name ?? '' }) : t(v === 'profile' ? 'set.profileOption' : 'set.stDefault'))]), s.provider)}</select>`)}
                 <div class="pg-provider-detail"></div>
 
                 <hr class="pg-set-divider">
@@ -321,6 +348,12 @@ function onOverrideToggle(root, on) {
     root.querySelectorAll('.pg-st-override-rows input').forEach(i => { i.value = ''; });
     renderLiveConnection(root);
 }
+/** The key for the chosen provider, kept per provider (switching back finds it again). */
+function onOwnKey(value) {
+    const s = getSettings();
+    s.own_keys = { ...s.own_keys, [s.provider]: value.trim() };
+    saveSettings();
+}
 function setTokens(root, raw) {
     const n = Math.max(TOKENS.min, Math.min(TOKENS.max, parseInt(raw, 10) || TOKENS.fallback));
     root.querySelectorAll('.pg-tokens').forEach(i => { i.value = String(n); });
@@ -339,6 +372,8 @@ function bind(root) {
             onProviderChange(root, el.value);
         else if (el.matches('.pg-model-select'))
             onModelSelect(root, el.value);
+        else if (el.matches('.pg-own-key'))
+            onOwnKey(el.value);
         else if (el.matches('.pg-st-override'))
             onOverrideToggle(root, el.checked);
     };

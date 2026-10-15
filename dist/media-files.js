@@ -22,8 +22,7 @@
 // before the upload, so the same later load deletes what no word uses.
 //
 // Only names of that exact shape are ever deleted.
-import { deleteUserFile, userFileUrl } from './user-files.js';
-import { getRequestHeaders } from './st.js';
+import { deleteUserFile, userFilesExist } from './user-files.js';
 import { KEY } from './constants.js';
 const MEDIA_NAME = /^pg-media-[0-9a-f]{16}\.[a-z0-9]{2,5}$/;
 export const isMediaName = (name) => typeof name === 'string' && MEDIA_NAME.test(name);
@@ -61,46 +60,15 @@ export function mediaIn(words) {
     }
     return names;
 }
-/** A file check that gets no answer for this long counts as no answer. */
-const CHECK_TIMEOUT_MS = 30_000;
-/** Whether a file is already in the user's files. */
-async function mediaExists(name) {
-    try {
-        return (await fetch(userFileUrl(name), { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })).ok;
-    }
-    catch {
-        return false;
-    }
-}
 /**
  * Whether a file is known to be gone from the user's files: only a clear
- * answer counts (verify says no, or the file answers 404). A server that does
- * not answer (restarting, a network blip) says nothing, so nothing is replaced.
+ * answer counts (the server says it is not there). A server that does not
+ * answer (restarting, a network blip) says nothing, so nothing is replaced.
  */
 export async function mediaGone(name) {
-    const url = `user/files/${name}`;
-    try {
-        const res = await fetch('/api/files/verify', { method: 'POST', headers: getRequestHeaders(), body: JSON.stringify({ urls: [url] }), signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) });
-        if (res.ok) {
-            const verified = await res.json();
-            if (typeof verified[url] === 'boolean')
-                return verified[url] === false;
-        }
-    }
-    catch { /* ask the file itself */ }
-    try {
-        return (await fetch(userFileUrl(name), { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })).status === 404;
-    }
-    catch {
-        return false;
-    }
+    return (await userFilesExist([name])).get(name) === false;
 }
-/** Names checked per /api/files/verify request. */
-const VERIFY_BATCH = 500;
-/**
- * Which of the files are already in the user's files: one request per 500
- * names (ST's /api/files/verify), or one HEAD per file on an ST without it.
- */
+/** Which of the files are already in the user's files. */
 export async function existingMedia(names) {
     // Asked about again (a restore, a re-import, a sound made again): files queued for
     // deletion stay, and a deletion already under way finishes first, so the answer is
@@ -111,27 +79,8 @@ export async function existingMedia(names) {
         uploaded.delete(n);
     }
     await deletingNow;
-    const found = new Set();
-    for (let i = 0; i < names.length; i += VERIFY_BATCH) {
-        const batch = names.slice(i, i + VERIFY_BATCH);
-        const urls = batch.map(n => `user/files/${n}`);
-        let verified = null;
-        try {
-            const res = await fetch('/api/files/verify', {
-                method: 'POST', headers: getRequestHeaders(), body: JSON.stringify({ urls }), signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
-            });
-            if (res.ok)
-                verified = await res.json();
-        }
-        catch { /* fall back below */ }
-        if (verified)
-            batch.forEach((n, k) => { if (verified[urls[k]] === true)
-                found.add(n); });
-        else
-            await inParallel(batch, 6, async (n) => { if (await mediaExists(n))
-                found.add(n); });
-    }
-    return found;
+    const answers = await userFilesExist(names);
+    return new Set(names.filter(n => answers.get(n) === true));
 }
 /** Runs `task` over the items, at most `limit` at a time. */
 export async function inParallel(items, limit, task) {

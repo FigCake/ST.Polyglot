@@ -4,9 +4,14 @@
 // and runtime.ts binds the live settings and wraps it in the JSON client
 // (ai/client.ts). From ST it only reads request headers, which keys are set,
 // the current chat-completion connection and its connection profiles.
+//
+// completeChat() sends a whole conversation (the web app's own chat); outside
+// SillyTavern (HOST.ownKeys) the known providers are called straight from the
+// browser with the learner's own keys (own_keys in settings).
 import { findProfile, profileSource, sendThroughProfile } from './ai/st-profiles.js';
 import { getRequestHeaders, getContext, SECRET_KEYS, secret_state } from './st.js';
 import { providerById } from './ai/providers.js';
+import { HOST } from './host.js';
 // ── Provider config tables ────────────────────────────────────────────────────
 /** ST backend source → chatCompletionSettings model-key mapping. */
 export const ROUTE_MODEL_KEY = new Map([
@@ -168,17 +173,30 @@ const ST_NETWORK_HINT = 'Network request failed. Make sure the SillyTavern serve
 // ── Public API ────────────────────────────────────────────────────────────────
 /** Sends one system + user prompt to the provider chosen in settings (runtime.ts binds `s`). */
 export function complete(s, system, user, signal = null) {
-    switch (s.provider || 'st') {
-        case 'st': return completeViaST(system, user, s, signal);
-        case 'custom': return completeViaCustom(system, user, s, signal);
-        case 'profile': return completeViaProfile(system, user, s, signal);
+    return completeChat(s, buildMessages(system, user), signal);
+}
+/**
+ * Sends a whole conversation to the provider chosen in settings; `options.temperature`
+ * replaces Polyglot's own low one (a character's replies want more variety).
+ */
+export function completeChat(s, messages, signal = null, options = {}) {
+    const extra = options.temperature === undefined ? {} : { temperature: options.temperature };
+    // Outside SillyTavern its own connection, profiles and Vertex do not exist
+    const provider = !HOST.stConnection && ['st', 'profile', 'vertexai'].includes(s.provider || 'st') ? 'custom' : s.provider || 'st';
+    switch (provider) {
+        case 'host': return HOST.ai
+            ? HOST.ai.complete(s.host_connection, messages, { temperature: options.temperature ?? TEMPERATURE, maxTokens: s.max_tokens }, signal)
+            : completeViaCustom(messages, s, signal, extra);
+        case 'st': return completeViaST(messages, s, signal, extra);
+        case 'custom': return completeViaCustom(messages, s, signal, extra);
+        case 'profile': return completeViaProfile(messages, s, signal, extra);
         // ST reads its own saved Vertex auth (Express key or service account)
-        case 'vertexai': return completeViaST(system, user, { ...s, route_chat_source: 'vertexai', route_model: s.model }, signal);
-        default: return completeViaProvider(system, user, s, signal);
+        case 'vertexai': return completeViaST(messages, { ...s, route_chat_source: 'vertexai', route_model: s.model }, signal, extra);
+        default: return HOST.ownKeys ? completeDirect(messages, s, signal, extra) : completeViaProvider(messages, s, signal, extra);
     }
 }
 /** ST's current connection (or the source/model overridden in route_* settings). */
-async function completeViaST(system, user, s, signal) {
+async function completeViaST(messages, s, signal, extra = {}) {
     const ccs = getContext().chatCompletionSettings ?? {};
     const source = s.route_chat_source || ccs.chat_completion_source || 'openai';
     const modelKey = ROUTE_MODEL_KEY.get(source) || 'model';
@@ -194,11 +212,12 @@ async function completeViaST(system, user, s, signal) {
             chat_completion_source: source,
             [modelKey]: model,
             model,
-            messages: buildMessages(system, user),
+            messages: messages,
             max_tokens: s.max_tokens,
             // Only when this is ST's own connection: its URL and proxy belong to it
             ...(!s.route_chat_source || s.route_chat_source === ccs.chat_completion_source ? connectionFields(source, ccs) : {}),
             ...sourceFields(source, model, s.max_tokens),
+            ...extra,
             ...(source === 'vertexai' && {
                 vertexai_auth_mode: ccs.vertexai_auth_mode ?? 'full',
                 vertexai_region: ccs.vertexai_region ?? 'global',
@@ -208,7 +227,7 @@ async function completeViaST(system, user, s, signal) {
     });
 }
 /** A known provider routed through ST's backend, reusing ST's stored API keys. */
-async function completeViaProvider(system, user, s, signal) {
+async function completeViaProvider(messages, s, signal, extra = {}) {
     const provider = providerById(s.provider);
     if (!provider)
         throw new Error(`Unknown provider: ${s.provider}`);
@@ -226,8 +245,9 @@ async function completeViaProvider(system, user, s, signal) {
         errorLabel: `${s.provider.toUpperCase()} API`,
         networkHint: ST_NETWORK_HINT,
         body: {
-            chat_completion_source: source, model: s.model, messages: buildMessages(system, user), max_tokens: s.max_tokens,
+            chat_completion_source: source, model: s.model, messages, max_tokens: s.max_tokens,
             ...sourceFields(source, s.model, s.max_tokens),
+            ...extra,
         },
     });
 }
@@ -235,7 +255,7 @@ async function completeViaProvider(system, user, s, signal) {
  * A SillyTavern connection profile: its API, model, key and proxy, without
  * its preset. ST checks the key and reads the answer's errors.
  */
-async function completeViaProfile(system, user, s, signal) {
+async function completeViaProfile(messages, s, signal, extra = {}) {
     if (!s.profile_id)
         throw new Error('No connection profile chosen. Choose one in Polyglot\'s settings.');
     const profile = findProfile(s.profile_id);
@@ -244,9 +264,10 @@ async function completeViaProfile(system, user, s, signal) {
     const source = profileSource(profile);
     const request = timeoutSignal(signal);
     try {
-        const data = await sendThroughProfile(profile.id, buildMessages(system, user), s.max_tokens, request.signal, {
+        const data = await sendThroughProfile(profile.id, messages, s.max_tokens, request.signal, {
             temperature: TEMPERATURE,
             ...(source && sourceFields(source, profile.model ?? '', s.max_tokens)),
+            ...extra,
         });
         return readReply(data);
     }
@@ -264,7 +285,7 @@ async function completeViaProfile(system, user, s, signal) {
     }
 }
 /** Any OpenAI-compatible endpoint with a user-supplied base URL and key. */
-async function completeViaCustom(system, user, s, signal) {
+async function completeViaCustom(messages, s, signal, extra = {}) {
     const { ext_api_key: apiKey, ext_base_url: baseUrl, model, max_tokens } = s;
     if (!baseUrl)
         throw new Error('Custom provider requires a Base URL. Check the settings.');
@@ -283,6 +304,42 @@ async function completeViaCustom(system, user, s, signal) {
         signal,
         errorLabel: 'Custom API error:',
         networkHint: `Unable to connect to custom API server. Check the Base URL: ${baseUrl}`,
-        body: { model, max_tokens, messages: buildMessages(system, user) },
+        body: { model, max_tokens, messages, ...extra },
+    });
+}
+// ── Straight from the browser (outside SillyTavern) ───────────────────────────
+/** The known providers' endpoints for requests from the browser: all OpenAI-compatible except Claude. */
+const DIRECT_URL = {
+    openai: 'https://api.openai.com/v1/chat/completions',
+    google: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+    deepseek: 'https://api.deepseek.com/v1/chat/completions',
+    claude: 'https://api.anthropic.com/v1/messages',
+};
+/** A known provider called from the browser with the learner's own key (own_keys). */
+async function completeDirect(messages, s, signal, extra = {}) {
+    const provider = providerById(s.provider);
+    const url = DIRECT_URL[s.provider];
+    if (!provider || !url)
+        throw new Error(`Unknown provider: ${s.provider}`);
+    if (!s.model)
+        throw new Error('No model selected. Please choose a model in the settings.');
+    const key = (s.own_keys ?? {})[s.provider]?.trim();
+    if (!key)
+        throw new Error(`${provider.label} API key is not set. Enter it in Polyglot's settings.`);
+    const common = { signal, errorLabel: `${provider.label} API`, networkHint: `Unable to reach ${provider.label}. Check your connection and the API key.` };
+    if (s.provider === 'claude') {
+        // Anthropic's own format: the system prompt apart, and a header allowing browser requests
+        const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n\n');
+        return postChat({
+            ...common, url,
+            headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+            body: { model: s.model, max_tokens: s.max_tokens, ...(system && { system }), messages: messages.filter(m => m.role !== 'system'), stream: undefined, ...extra },
+        });
+    }
+    return postChat({
+        ...common, url,
+        headers: { Authorization: `Bearer ${key}` },
+        body: { model: s.model, max_tokens: s.max_tokens, messages, ...sourceFields(provider.source, s.model, s.max_tokens), ...extra },
     });
 }

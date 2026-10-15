@@ -12,6 +12,7 @@ import { createAiClient } from './ai/client.js';
 import { defaultModels } from './ai/providers.js';
 import { notify } from './ui.manager.js';
 import { t } from './i18n.js';
+import { HOST } from './host.js';
 import { extension_settings, getContext, saveSettingsDebounced } from './st.js';
 // ── Defaults ──────────────────────────────────────────────────────────────────
 export const DEFAULT_SETTINGS = Object.freeze({
@@ -22,16 +23,20 @@ export const DEFAULT_SETTINGS = Object.freeze({
     native_lang: 'en', // explanation / UI language: 'ko'|'en'|'it'|'es'|'custom'
     native_lang_custom: '',
     cefr_level: 'B1',
-    // provider: 'st' | 'profile' | 'openai' | 'claude' | 'google' | 'openrouter' | 'deepseek' | 'vertexai' | 'custom'
+    // provider: 'st' | 'profile' | 'host' | 'openai' | 'claude' | 'google' | 'openrouter' | 'deepseek' | 'vertexai' | 'custom'
     provider: 'st',
     model: '', // selected model name (unused when provider is 'st')
     // last-used model per provider — restored when switching back to a provider
     _model_history: defaultModels(),
+    // API keys by provider, outside SillyTavern only (HOST.ownKeys)
+    own_keys: {},
     // ST default connection only (provider='st')
     route_chat_source: '',
     route_model: '',
     // SillyTavern connection profile only (provider='profile')
     profile_id: '',
+    // The app's own connection (provider='host'; Marinara): '' = the open chat's
+    host_connection: '',
     // Custom provider only (provider='custom')
     ext_api_key: '',
     ext_base_url: '',
@@ -47,6 +52,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     voice_save: true,
     voice_proxy: false,
     voice_st_voice: '',
+    voice_host_voice: '',
     voice_el_key: '', voice_el_voice: '', voice_el_model: '',
     voice_gg_key: '', voice_gg_voice: '',
     voice_oa_key: '', voice_oa_voice: '', voice_oa_model: '', voice_oa_url: '',
@@ -91,6 +97,24 @@ export function prepareSettings(s) {
     migrateLegacyProvider(s);
     migrateFurigana(s);
     dropRemovedTts(s);
+    leaveStOnlyChoices(s);
+}
+/**
+ * Outside SillyTavern its connection, profiles, Vertex AI and voices do not exist: the
+ * first choice that does (the app's own connections where it has them). Nor do the
+ * app's own connections anywhere else.
+ */
+function leaveStOnlyChoices(s) {
+    if (!HOST.stConnection && ['st', 'profile', 'vertexai'].includes(s.provider)) {
+        s.provider = HOST.ai ? 'host' : 'openrouter';
+        s.model = HOST.ai ? s.model : s._model_history.openrouter ?? '';
+    }
+    if (!HOST.ai && s.provider === 'host')
+        s.provider = HOST.stConnection ? 'st' : 'openrouter';
+    if (!HOST.stVoice && s.voice_provider === 'st')
+        s.voice_provider = HOST.ai ? 'host' : 'browser';
+    if (!HOST.ai && s.voice_provider === 'host')
+        s.voice_provider = 'browser';
 }
 export function saveSettings() { saveSettingsDebounced(); }
 /** Applies a partial update to the live settings and schedules a save. */

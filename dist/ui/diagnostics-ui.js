@@ -1,19 +1,17 @@
 // "Copy diagnostics" (Settings footer): diagnostics.ts's report with what only
-// the running page knows: the Polyglot version (from the manifest next to the
-// build), the connection type, where the data is kept. Copied to the
+// the running page knows: the Polyglot version (HOST.version: the manifest in
+// SillyTavern, built in elsewhere), the connection type, where the data is kept. Copied to the
 // clipboard, or shown to copy by hand where the browser refuses (a SillyTavern
 // opened over plain http on another device).
+import { HOST } from '../host.js';
 import { t } from '../i18n.js';
 import { el, notify, showDocument } from '../ui.manager.js';
 import { diagnosticsReport } from '../diagnostics.js';
 import { getSettings, getLang } from '../runtime.js';
 import { storeMode } from '../data-store.js';
-/** dist/ui/diagnostics-ui.js → the extension's manifest.json. */
-const MANIFEST_URL = new URL('../../manifest.json', import.meta.url);
 async function polyglotVersion() {
     try {
-        const manifest = await (await fetch(MANIFEST_URL, { cache: 'no-store' })).json();
-        return String(manifest.version ?? '?');
+        return await HOST.version();
     }
     catch {
         return '?';

@@ -25,6 +25,7 @@ import { mediaGone } from './media-files.js';
 import { loadWordbook } from './wordbook.js';
 import { stopSpeech, playSound, speakWithBrowser, speechLangCode, knownLangCode } from './speech.js';
 import { castVoice, stVoiceFor } from './voice-cast.js';
+import { HOST } from './host.js';
 import { ttsConfig, missingFor, listVoices, DIRECT_PROVIDERS, TtsError } from './tts.js';
 import { makeSound, keepWordSound } from './sound-maker.js';
 import { soundJob } from './word-sounds.js';
@@ -36,7 +37,7 @@ let stOffNoted = -1;
 /** Tells what went wrong with a voice service: a request that never got an answer points to ST's proxy. */
 export function notifyVoiceError(e) {
     const network = e instanceof TtsError && e.network && !getSettings().voice_proxy;
-    notify(t(network ? 'tts.blocked' : 'tts.failed', { msg: e.message }), 'err', 6000);
+    notify(t(network ? (HOST.stVoice ? 'tts.blocked' : 'tts.blockedDirect') : 'tts.failed', { msg: e.message }), 'err', 6000);
 }
 /**
  * ST's TTS extension (/speak), with the voice set up there. Each text goes in

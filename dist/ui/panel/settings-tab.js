@@ -25,6 +25,7 @@ import { copyDiagnostics } from '../diagnostics-ui.js';
 import { storeMode } from '../../data-store.js';
 import { SRS_FIELDS } from '../../wordbook-model.js';
 import { furiganaEnabled, applyFuriganaDisplay, warnIfFontClamped } from '../../furigana/messages.js';
+import { filesInBrowser } from '../../user-files.js';
 // ── Markup ────────────────────────────────────────────────────────────────────
 // Labels are i18n keys (resolved at render time, so a language switch applies on reopen)
 const EXPORT_BUTTONS = [
@@ -114,7 +115,7 @@ function render(s) {
                 ${t('pnl.set.adoptLang', { n: wordsWithoutLang(), lang: getLang() })}
             </button>`}
             ${isShared() && html `<div class="pg-pset-chats"></div>`}
-            <div class="pg-pset-hint pg-pset-store">${t('data.where')}: ${t(STORE_LABELS[storeMode()])}</div>`)}
+            <div class="pg-pset-hint pg-pset-store">${t('data.where')}: ${t(storeMode() === 'file' && filesInBrowser() ? 'data.whereBrowser' : STORE_LABELS[storeMode()])}</div>`)}
 
         ${section(t('tab.learn'), html `
             ${toggleRow('auto_save_idioms', t('pnl.set.autoIdioms'), s.auto_save_idioms !== false)}

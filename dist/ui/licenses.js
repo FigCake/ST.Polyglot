@@ -1,12 +1,12 @@
-// "Open-source licenses": shows THIRD_PARTY_NOTICES.md (copied into dist at
-// build time, next to this module's parent) in a dialog.
+// "Open-source licenses": shows THIRD_PARTY_NOTICES.md (HOST.notices: the copy
+// in dist/ in SillyTavern, built in elsewhere) in a dialog.
 //
 // The file is plain Markdown; only what it uses is rendered — headings, the
 // summary table, and everything else as preformatted text. All text goes in
 // through textContent.
+import { HOST } from '../host.js';
 import { t } from '../i18n.js';
 import { el, notify, showDocument } from '../ui.manager.js';
-const NOTICES_URL = new URL('../THIRD_PARTY_NOTICES.md', import.meta.url);
 const cells = (line) => line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
 /** Markdown (the subset the notices use) → elements. */
 function renderNotices(markdown) {
@@ -49,10 +49,7 @@ function renderNotices(markdown) {
 }
 export async function showLicenses() {
     try {
-        const res = await fetch(NOTICES_URL);
-        if (!res.ok)
-            throw new Error(`HTTP ${res.status}`);
-        showDocument(t('lic.title'), renderNotices(await res.text()));
+        showDocument(t('lic.title'), renderNotices(await HOST.notices()));
     }
     catch (e) {
         notify(t('lic.failed', { msg: e instanceof Error ? e.message : String(e) }), 'err', 4000);

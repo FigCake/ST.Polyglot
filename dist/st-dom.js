@@ -17,6 +17,14 @@ export const ST_SEL = {
     /** The Extensions settings drawer. */
     extensionsSettings: '#extensions_settings',
 };
+/** Closes the 🧩 menu after an entry in it was chosen (ST manages it with jQuery; a page without jQuery hides it). */
+export function closeExtensionsMenu() {
+    const jq = window.$;
+    if (jq)
+        jq(ST_SEL.extensionsMenu).hide();
+    else
+        document.querySelector(ST_SEL.extensionsMenu)?.setAttribute('hidden', '');
+}
 /** Selector for the message with this id. */
 export const mesSelector = (mesId) => `${ST_SEL.mes}[mesid="${CSS.escape(mesId)}"]`;
 /** The text element of the message with this id, if it is rendered. */

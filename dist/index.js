@@ -14,7 +14,7 @@ import { buildSettingsPanel } from './ui/settings-ui.js';
 import { openLearningPanel, lookUpWord, cancelLookup, PANEL_TABS } from './ui/learning-panel.js';
 import { getSettings, getLang, getNativeLang, ai, getContext } from './runtime.js';
 import { DELAY } from './constants.js';
-import { ST_SEL, mesSelector } from './st-dom.js';
+import { ST_SEL, mesSelector, closeExtensionsMenu } from './st-dom.js';
 import { runChecker } from './features/checker.js';
 import { migrateChatWordbook, studyLangKey } from './wordbook.js';
 import { archiveCheck } from './check-archive.js';
@@ -76,7 +76,7 @@ function injectExtensionsMenuEntry() {
     const label = Object.assign(document.createElement('span'), { textContent: t('ext.menuLabel') });
     item.append(icon, label);
     item.addEventListener('click', () => {
-        $(ST_SEL.extensionsMenu).hide(); // ST manages this menu via jQuery
+        closeExtensionsMenu();
         openLearningPanel();
     });
     menu.appendChild(item);

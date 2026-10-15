@@ -18,15 +18,18 @@ import { tryVoice, voiceList, notifyVoiceError } from '../../voice.js';
 import { castVoice, setCastVoice, castNames, chatCharacters } from '../../voice-cast.js';
 import { browserVoices, speechLangCode } from '../../speech.js';
 import { DEFAULTS, DIRECT_PROVIDERS, VOICE_SPEEDS, DEFAULT_VOICE_SPEED } from '../../tts.js';
+import { HOST } from '../../host.js';
 /** Services: a translated name (`key`) or a brand name (`name`). */
 const PROVIDERS = [
     { value: 'browser', key: 'tts.pBrowser' },
+    { value: 'host', key: 'tts.pHost' },
     { value: 'st', key: 'tts.pSt' },
     { value: 'elevenlabs', name: 'ElevenLabs' },
     { value: 'google', name: 'Google Cloud' },
     { value: 'openai', key: 'tts.pOpenai' },
     { value: 'fish', name: 'Fish Audio' },
-];
+    // SillyTavern's voices exist only there; an app's own voice service only in that app (Marinara)
+].filter(p => (HOST.stVoice || p.value !== 'st') && (HOST.ai || p.value !== 'host'));
 const SPEED_LABELS = { '0.75': 'tts.speedSlow', '0.9': 'tts.speedLittle', '1': 'tts.speedNormal' };
 const field = (setting, name, value, placeholder = '') => html `
     <label class="pg-pset-field">
@@ -63,6 +66,9 @@ function serviceRows(s) {
     const p = s.voice_provider ?? 'browser';
     const rows = {
         browser: html `<span class="pg-pset-hint">${t('tts.hintBrowser')}</span>`,
+        host: html `
+            ${voiceField('voice_host_voice', s.voice_host_voice ?? '', t('tts.hostVoicePh'), true)}
+            <span class="pg-pset-hint">${t('tts.hintHost', { name: HOST.ai?.name ?? '' })}</span>`,
         st: html `
             ${field('voice_st_voice', t('tts.stVoice'), s.voice_st_voice ?? '', t('tts.stVoicePh'))}
             <span class="pg-pset-hint">${t('tts.hintSt')}</span>`,
@@ -88,21 +94,21 @@ function serviceRows(s) {
     return html `
         ${rows[p] ?? rows.browser}
         ${direct && html `
-        <label class="pg-pset-row">
+        ${p !== 'host' && html `<label class="pg-pset-row">
             <span class="pg-pset-label">${t('tts.speed')}</span>
             <select class="text_pole pg-pset-select" data-setting="voice_speed">${VOICE_SPEEDS.map(v => html `
                 <option value="${v}" ${v === (s.voice_speed ?? DEFAULT_VOICE_SPEED) && html `selected`}>${t(SPEED_LABELS[v])}</option>`)}
             </select>
-        </label>
+        </label>`}
         <label class="pg-pset-row">
             <span class="pg-pset-label">${t('tts.save')}</span>
             <input type="checkbox" class="pg-pset-check" data-setting="voice_save" ${s.voice_save !== false && html `checked`}>
         </label>
-        <label class="pg-pset-row">
+        ${HOST.stVoice && html `<label class="pg-pset-row">
             <span class="pg-pset-label">${t('tts.proxy')}</span>
             <input type="checkbox" class="pg-pset-check" data-setting="voice_proxy" ${!!s.voice_proxy && html `checked`}>
         </label>
-        <span class="pg-pset-hint">${t('tts.hintProxy')}</span>`}
+        <span class="pg-pset-hint">${t('tts.hintProxy')}</span>`}`}
         <details class="pg-voice-cast">
             <summary>${t('cast.title')}</summary>
             <div class="pg-voice-cast-rows"></div>
@@ -133,7 +139,7 @@ export function voiceSection(s) {
         <label class="pg-pset-row">
             <span class="pg-pset-label">${t('tts.service')}</span>
             <select class="text_pole pg-pset-select" data-setting="voice_provider">${PROVIDERS.map(o => html `
-                <option value="${o.value}" ${o.value === (s.voice_provider ?? 'browser') && html `selected`}>${'key' in o ? t(o.key) : o.name}</option>`)}
+                <option value="${o.value}" ${o.value === (s.voice_provider ?? 'browser') && html `selected`}>${'key' in o ? t(o.key, { name: HOST.ai?.name ?? '' }) : o.name}</option>`)}
             </select>
         </label>
         <div class="pg-voice-rows">${serviceRows(s)}</div>`;

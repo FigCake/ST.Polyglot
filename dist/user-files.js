@@ -6,6 +6,10 @@
 //           version tag (ETag) of a copy the caller holds, ST answers 304 and sends nothing
 //   version HEAD /user/files/<name>                          — the ETag and size, no content
 //   delete  POST /api/files/delete  { path: 'user/files/<name>' }
+//   exists  POST /api/files/verify  { urls }                 — many at once; HEAD each on an ST without it
+//
+// This module is the only one that knows where files live: the web app and the
+// Marinara extension build swap it for one keeping files in the browser (hosts/common).
 //
 // Every call reports an outcome instead of throwing, so callers can tell a
 // missing file or an old ST without the API from a passing network error.
@@ -18,6 +22,8 @@ const UPLOAD_BYTES_PER_MS = 50;
 /** File names the upload endpoint accepts: letters, digits, `_`, `-`, `.`. */
 const SAFE_NAME = /^[A-Za-z0-9_-][A-Za-z0-9_.-]*$/;
 export const userFileUrl = (name) => `/user/files/${encodeURIComponent(name)}`;
+/** Whether the files are kept in this browser instead of on the server (never, in ST). */
+export const filesInBrowser = () => false;
 function assertName(name) {
     if (!SAFE_NAME.test(name))
         throw new Error(`Invalid user file name: ${name}`);
@@ -116,6 +122,57 @@ export async function writeUserFile(name, data, signal) {
             recordProblem('file', `write ${name}: ${errorText(e)}`);
         return 'error';
     }
+}
+/** A file check that gets no answer for this long counts as no answer. */
+const CHECK_TIMEOUT_MS = 30_000;
+/** Names checked per /api/files/verify request. */
+const VERIFY_BATCH = 500;
+/** Whether a file answers a HEAD request: true / false (404) / undefined (no clear answer). */
+async function headAnswer(name) {
+    try {
+        const res = await fetch(userFileUrl(name), { method: 'HEAD', cache: 'no-store', signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) });
+        return res.ok ? true : res.status === 404 ? false : undefined;
+    }
+    catch {
+        return undefined;
+    }
+}
+/** ST's verify endpoint for these names; null when this ST has none or does not answer. */
+async function verifyAnswer(names) {
+    try {
+        const res = await fetch('/api/files/verify', {
+            method: 'POST', headers: getRequestHeaders(), body: JSON.stringify({ urls: names.map(n => `user/files/${n}`) }),
+            signal: AbortSignal.timeout(CHECK_TIMEOUT_MS),
+        });
+        return res.ok ? await res.json() : null;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Whether each file is in the user's files: true / false, or undefined when
+ * there was no clear answer (a server restarting, a network blip). One verify
+ * request per 500 names; one HEAD per file (6 at a time) on an ST without it.
+ */
+export async function userFilesExist(names) {
+    const found = new Map();
+    for (let i = 0; i < names.length; i += VERIFY_BATCH) {
+        const batch = names.slice(i, i + VERIFY_BATCH);
+        const verified = await verifyAnswer(batch);
+        if (verified) {
+            batch.forEach(n => { const v = verified[`user/files/${n}`]; found.set(n, typeof v === 'boolean' ? v : undefined); });
+            continue;
+        }
+        let next = 0;
+        await Promise.all(Array.from({ length: Math.min(6, batch.length) }, async () => {
+            while (next < batch.length) {
+                const n = batch[next++];
+                found.set(n, await headAnswer(n));
+            }
+        }));
+    }
+    return found;
 }
 /** Deletes a file; true when it is gone (a file that was already missing too). */
 export async function deleteUserFile(name) {

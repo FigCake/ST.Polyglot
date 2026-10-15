@@ -7,7 +7,7 @@
   "js": "dist/index.js",
   "css": "dist/style.css",
   "author": "FigCake",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "minimum_client_version": "1.12.9",
   "homePage": "https://github.com/FigCake/ST.Polyglot",
   "auto_update": true

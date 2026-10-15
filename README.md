@@ -25,6 +25,13 @@ Works with SillyTavern's own connection, a connection profile, or OpenAI, Claude
 
 Words are saved in `polyglot-data.json` in your SillyTavern user files and shared by every device that opens it. **Settings → Back up** saves everything to one file; API keys are never included.
 
+### Other versions
+
+- **[Marinara Engine](https://github.com/FigCake/ME.Polyglot)** — installed with Fetchy; uses Marinara's connections and voice
+- **[Web app](https://github.com/FigCake/W.Polyglot)** — in the browser with its own chat, nothing to install
+
+A backup made in one restores in the others.
+
 ### Requirements
 
 SillyTavern 1.12.9 or newer (tested on 1.19.0). Chrome or Edge for pronunciation practice.
