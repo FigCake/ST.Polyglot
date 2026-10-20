@@ -53,11 +53,15 @@ export const DEFAULT_SETTINGS = Object.freeze({
     voice_proxy: false,
     voice_st_voice: '',
     voice_host_voice: '',
+    pron_engine: 'browser', pron_azure_key: '', pron_azure_region: '',
+    pron_stt_model: '', pron_advice: false, pron_advice_model: '',
     voice_el_key: '', voice_el_voice: '', voice_el_model: '',
     voice_gg_key: '', voice_gg_voice: '',
     voice_oa_key: '', voice_oa_voice: '', voice_oa_model: '', voice_oa_url: '',
     voice_fish_key: '', voice_fish_voice: '', voice_fish_model: '',
     dialogue_only: false,
+    para_translate: 'button',
+    para_translate_wishes: '',
     mark_saved_words: true,
     line_voice: true,
     voice_cast: {},
@@ -93,6 +97,7 @@ export function getSettings() {
 }
 /** Back-fills keys added since and migrates old values (on first use, and after a backup's settings are restored). */
 export function prepareSettings(s) {
+    migrateVoiceOpenAi(s);
     backfillDefaults(s);
     migrateLegacyProvider(s);
     migrateFurigana(s);
@@ -158,6 +163,21 @@ function migrateFurigana(s) {
     delete s.furigana_dict;
     delete s.furigana_source;
 }
+/**
+ * One OpenAI connection for voice: a key entered for pronunciation alone (a
+ * development build) moves to the voice key, which reading aloud already uses.
+ */
+function migrateVoiceOpenAi(s) {
+    const old = s;
+    // Only to the address it was used with: a key must not start going to another server
+    const sameAddress = !s.voice_oa_url || s.voice_oa_url === old.pron_oa_url;
+    if (old.pron_oa_key && !s.voice_oa_key && sameAddress) {
+        s.voice_oa_key = old.pron_oa_key;
+        s.voice_oa_url ||= old.pron_oa_url ?? '';
+    }
+    delete old.pron_oa_key;
+    delete old.pron_oa_url;
+}
 /** The text-to-speech engines removed in March 2026 left their settings behind, API keys included. */
 function dropRemovedTts(s) {
     for (const key of Object.keys(s))
@@ -170,6 +190,8 @@ export { getContext };
 export const getLang = () => getLangFromSettings(getSettings());
 export const getNativeLang = () => getNativeLangFromSettings(getSettings());
 const client = createAiClient((system, user, signal) => complete(getSettings(), system, user, signal));
+/** One plain request (no JSON, no retry) to the provider chosen in settings. */
+export const completeText = (system, user, signal = null) => complete(getSettings(), system, user, signal);
 /**
  * The shared AI client, bound to the current provider settings.
  * A result recovered from a cut-off reply, or still missing fields after the

@@ -1,4 +1,6 @@
-// Playback and pronunciation scoring (Web Speech API).
+// Playback and pronunciation checks: the browser's recognition (Web Speech
+// API), or a recording sent to Azure for scores (azure-pron.ts) or to an
+// OpenAI-compatible transcription (openai-speech.ts), with optional advice.
 //
 // The building blocks voice.ts reads aloud with: playing a sound file, the
 // browser's voice, and stopping both. Which voice reads a word is voice.ts's.
@@ -9,7 +11,12 @@
 //   • Only one recognition session is tracked at a time so closing the panel
 //     can stop the microphone (abortActiveRecognition).
 import { similarityScore } from './utils.js';
-import { missedWords } from './missed-words.js';
+import { missedWords, scoredWords } from './missed-words.js';
+import { assessPronunciation, toWav16k } from './azure-pron.js';
+import { transcribe, advise } from './openai-speech.js';
+import { PronServiceError } from './pron-error.js';
+import { startRecording, canRecord } from './mic-record.js';
+import { recordProblem } from './diagnostics.js';
 import { notify } from './ui.manager.js';
 import { html, setHtml } from './html.js';
 import { t } from './i18n.js';
@@ -240,18 +247,25 @@ function setResult(el, state, text = '') {
  * alone where the drill handles data-action "say-word".
  */
 function showScore(el, score, heard, target, code) {
+    showResult(el, score, heard, missedWords(target, heard, code));
+}
+/** A word to tap and hear: one not heard (dotted underline) or said differently (wavy). */
+const markedWord = (p, mark, title) => html `<span class="pg-pronun-${mark}" role="button" tabindex="0" data-action="say-word" data-word="${p.text}" title="${title}">${p.text}</span>`;
+function showResult(el, score, heard, parts, details) {
     const { grade, label } = gradeFor(score);
-    const parts = missedWords(target, heard, code);
     const sentence = parts.filter(p => p.word).length > 1;
     el.className = `pg-pronun-result pg-pronun-${grade}`;
     setHtml(el, html `
         <span class="pg-pronun-score">${score}</span>
         <span class="pg-pronun-label">${t(label)}</span>
         ${sentence
-        ? html `<span class="pg-pronun-words" title="${heard}">${parts.map(p => p.missed
-            ? html `<span class="pg-pronun-missed" role="button" tabindex="0" data-action="say-word" data-word="${p.text}" title="${t('speak.missed')}">${p.text}</span>`
-            : p.text)}</span>`
-        : html `<span class="pg-pronun-heard">"${heard}"</span>`}`);
+        ? html `<span class="pg-pronun-words" title="${heard}">${parts.map(p => p.missed ? markedWord(p, 'missed', t('speak.missed'))
+            : p.wrong ? markedWord(p, 'wrong', t('pron.wrong', { n: p.score ?? 0 }))
+                : p.text)}</span>`
+        : html `<span class="pg-pronun-heard">"${heard}"</span>`}
+        ${details && html `<span class="pg-pronun-sub">${t('pron.sub', {
+        a: Math.round(details.accuracy), f: Math.round(details.fluency), c: Math.round(details.completeness)
+    })}</span>`}`);
 }
 function setMicState(btn, listening) {
     btn.dataset.active = String(listening);
@@ -332,4 +346,122 @@ export function runPronunciationCheck(target, lang, micBtn, resultEl, onSettled)
     };
     recognition.start();
     return recognition;
+}
+export const canRecordCheck = canRecord;
+const SERVICE_ERRORS = {
+    key: 'pron.errKey', network: 'pron.errNetwork', language: 'pron.errLang', nothing: 'tts.noSpeech', other: 'pron.errOther',
+};
+const errorMessage = (e) => {
+    if (e instanceof PronServiceError)
+        return t(SERVICE_ERRORS[e.kind], { msg: e.message });
+    if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'NotFoundError'))
+        return t('tts.noMic');
+    return t('pron.errOther', { msg: String(e.message ?? e) });
+};
+const noteProblem = (e) => {
+    const quiet = (e instanceof PronServiceError && e.kind === 'nothing') || (e instanceof DOMException && e.name === 'NotAllowedError');
+    if (!quiet)
+        recordProblem('voice', `pronunciation check: ${String(e.message ?? e)}`);
+};
+/** Puts the advice button under a result; the recording is converted and sent only when it is pressed. */
+function addAdvice(resultEl, recording, target, advice, signal) {
+    const box = document.createElement('span');
+    box.className = 'pg-pronun-advice';
+    const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'pg-pronun-advice-btn', textContent: `🗣 ${t('pron.advice')}` });
+    box.append(btn);
+    resultEl.append(box);
+    btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        btn.remove();
+        box.textContent = t('pron.adviceWait');
+        try {
+            const tips = await advise(advice.cfg, await toWav16k(recording), target, advice.studyLang, advice.nativeLang, signal);
+            box.textContent = tips;
+        }
+        catch (err) {
+            if (signal.aborted)
+                return;
+            noteProblem(err);
+            box.textContent = errorMessage(err);
+        }
+    });
+}
+/**
+ * Records one utterance and has a service check it against `target`:
+ * Azure scores it (overall, accuracy · fluency · completeness, and for a
+ * sentence the words not said and said differently); an OpenAI-compatible
+ * transcription is compared like the browser's recognition. With `advice`, a
+ * button under the result asks an audio model for tips on the same recording.
+ * The mic button ends the recording early (it also ends a moment after the
+ * speaker stops). Same contract as runPronunciationCheck: `onSettled` after a
+ * result or an error, not on cancel.
+ */
+export function runRecordedCheck(target, lang, engine, micBtn, resultEl, onSettled, advice) {
+    const locale = knownLangCode(lang);
+    // Azure needs the language; a transcription tells it from the recording when Polyglot has no code for it
+    if (!locale && engine.kind === 'azure') {
+        setResult(resultEl, 'error', t('pron.errLang'));
+        return null;
+    }
+    const alive = () => document.contains(resultEl);
+    const request = new AbortController();
+    let cancelled = false;
+    let recording = null;
+    setMicState(micBtn, true);
+    setResult(resultEl, 'listening', t('tts.listening'));
+    // While recording, a tap ends it (and checks what was said); it must not reach the feature's own listener
+    const stop = (e) => { e.stopPropagation(); recording?.stop(); };
+    micBtn.onclick = stop;
+    const finish = () => { if (micBtn.onclick === stop)
+        micBtn.onclick = null; if (alive())
+        setMicState(micBtn, false); };
+    void (async () => {
+        try {
+            recording = await startRecording();
+            if (cancelled) {
+                recording.abort();
+                return;
+            }
+            const said = await recording.done;
+            finish();
+            if (cancelled)
+                return;
+            if (!said) {
+                if (alive())
+                    setResult(resultEl, 'idle');
+                return;
+            }
+            setResult(resultEl, 'listening', t('pron.assessing'));
+            if (engine.kind === 'azure') {
+                const result = await assessPronunciation(engine.cfg, await toWav16k(said), target, locale ?? '', request.signal);
+                if (!alive() || cancelled)
+                    return;
+                showResult(resultEl, Math.round(result.score), result.text, scoredWords(target, result.words, locale ?? ''), result);
+            }
+            else {
+                const heard = await transcribe(engine.cfg, said, locale ?? '', request.signal);
+                if (!alive() || cancelled)
+                    return;
+                showScore(resultEl, pronunciationScore(target, heard), heard, target, locale ?? speechLangCode(lang));
+            }
+            if (advice)
+                addAdvice(resultEl, said, target, advice, request.signal);
+            onSettled?.();
+        }
+        catch (e) {
+            // Stopped: abort() already reset the mic, which may belong to the next check by now
+            if (cancelled)
+                return;
+            finish();
+            if (!alive())
+                return;
+            noteProblem(e);
+            setResult(resultEl, 'error', errorMessage(e));
+            onSettled?.();
+        }
+    })();
+    return {
+        abort: () => { cancelled = true; recording?.abort(); request.abort(); finish(); if (alive())
+            setResult(resultEl, 'idle'); },
+    };
 }

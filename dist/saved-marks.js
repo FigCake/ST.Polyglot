@@ -28,7 +28,7 @@ import { wordStatus } from './srs.js';
 import { formsOf, FormIndex, withSeenForm } from './word-forms.js';
 import { getAllConjEntries, conjCacheVersion } from './conj-cache.js';
 import { skippedNodes, wordSkipper } from './study-scope.js';
-import { plainText } from './plain-text.js';
+import { plainText, notMessageText } from './plain-text.js';
 import { getSettings, getLang } from './runtime.js';
 import { fnv1a } from './hash.js';
 let openPanel = () => { };
@@ -90,7 +90,7 @@ const statusOf = (ix, word) => {
 // ── Drawing ───────────────────────────────────────────────────────────────────
 function textNodesIn(root, skipped) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
-        acceptNode: n => n instanceof Element && (SKIP_TAGS.has(n.tagName) || n.classList.contains('pg-clickable-word') || n.matches('.pg-tap-bubble'))
+        acceptNode: n => n instanceof Element && (SKIP_TAGS.has(n.tagName) || n.classList.contains('pg-clickable-word') || notMessageText(n))
             ? NodeFilter.FILTER_REJECT
             : NodeFilter.FILTER_ACCEPT,
     });

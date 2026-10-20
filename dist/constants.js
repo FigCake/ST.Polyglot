@@ -11,6 +11,7 @@ export const KEY = {
     wordbook: 'pg_wordbook',
     annotations: 'pg_annotations',
     furigana: 'pg_furigana',
+    translations: 'pg_translations',
     // localStorage — media uploads no save has accounted for yet (media-files.ts)
     mediaPending: 'pg_media_pending',
     // IndexedDB — conjugation cache

@@ -17,15 +17,16 @@
 //     what study-scope.ts skips (status windows, names) is neither sent nor highlighted.
 import { KEY } from './constants.js';
 import { ST_SEL, mesSelector, mesIdOf, mesTextOf } from './st-dom.js';
-import { levelClass, findWord, entryList, withEntryFor, relocateEntries } from './utils.js';
+import { levelClass, findWord, entryList, withEntryFor } from './utils.js';
+import { relocateSaves } from './message-saves.js';
 import { annotatorPrompt } from './prompts.js';
 import { notify } from './ui.manager.js';
 import { t } from './i18n.js';
 import { addToWordbook } from './wordbook.js';
 import { chatValue, currentChatId } from './storage.js';
-import { getSettings, getLang, getNativeLang, ai, getContext } from './runtime.js';
+import { getSettings, getLang, getNativeLang, ai } from './runtime.js';
 import { isRecord, unionBy, withEmptyFields } from './ai/client.js';
-import { plainText, shownTextHashes } from './plain-text.js';
+import { plainText, notMessageText } from './plain-text.js';
 import { studiedText, skippedNodes, skippedNames, wordSkipper } from './study-scope.js';
 import { drawDialogue, stripDialogue, LINE_CLASS } from './ui/dialogue-layer.js';
 import { showFuriganaFor, hideFuriganaFor, clearChatFurigana } from './furigana/messages.js';
@@ -133,7 +134,8 @@ function highlightTextNode(node, tokens) {
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'CODE', 'PRE', 'RUBY']);
 function textNodesIn(root) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
-        acceptNode: n => n instanceof Element && (SKIP_TAGS.has(n.tagName) || n.classList.contains('pg-clickable-word'))
+        // Translations under paragraphs are not the message: never highlighted
+        acceptNode: n => n instanceof Element && (SKIP_TAGS.has(n.tagName) || n.classList.contains('pg-clickable-word') || notMessageText(n))
             ? NodeFilter.FILTER_REJECT
             : NodeFilter.FILTER_ACCEPT,
     });
@@ -229,13 +231,7 @@ export function restoreAnnotations() {
     syncButtons();
 }
 /** Messages were deleted and ST renumbered the rest: saved analyses follow their messages. */
-export function relocateAnnotations() {
-    const saved = store.get();
-    const length = getContext().chat?.length;
-    const moved = saved && typeof length === 'number' && relocateEntries(saved, shownTextHashes(), length);
-    if (moved)
-        store.set(moved);
-}
+export const relocateAnnotations = () => relocateSaves(store);
 /** ST renders messages asynchronously after a load — keep restoring until they all exist (or time runs out). */
 export function restoreWithRetry() {
     untilRendered('annotation', Object.keys(store.get() ?? {}), restoreAnnotations);

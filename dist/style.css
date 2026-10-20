@@ -1089,8 +1089,9 @@
     opacity: 0.35 !important;
     pointer-events: none;
 }
-/* 🌍 Open-panel button — highlighted while the panel is open */
-.mes_button.pg-open-btn.pg-btn-active {
+/* 🌍 Open-panel button while the panel is open; 🌐 while the message shows its translation */
+.mes_button.pg-open-btn.pg-btn-active,
+.mes_button.pg-para-btn.pg-btn-active {
     color: var(--pg-t1) !important;
     opacity: 1 !important;
 }
@@ -2066,6 +2067,35 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     background: rgba(255,255,255,0.18);
 }
 .pg-sel-btn:active { transform: scale(0.96); }
+
+
+/* ── 🌐 Paragraph translation (para-translate.ts): under its paragraph, quieter than the original ── */
+
+.pg-para-trans {
+    display: block;
+    margin: 0.15em 0 0.9em;
+    padding: 0.1em 0 0.1em 0.7em;
+    border-left: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+    opacity: 0.72;
+    font-size: 0.92em;
+    font-style: normal;
+    font-weight: normal;
+}
+.pg-para-note {
+    margin-top: 0.3em;
+    font-size: 0.88em;
+    opacity: 0.85;
+}
+.pg-para-note::before { content: '※ '; }
+.pg-para-redo {
+    margin-left: 0.3em;
+    padding: 0.4em 0.5em;
+    font-size: 0.8em;
+    cursor: pointer;
+    opacity: 0.6;
+}
+.pg-para-redo:hover { opacity: 1; }
+.pg-para-redo:focus-visible { opacity: 1; outline: 2px solid currentColor; outline-offset: 1px; }
 
 
 /* ── 💬 Tap-to-translate bubble ── */
@@ -4430,3 +4460,23 @@ input.pg-typed-input.pg-typed-bad { background: rgba(220, 60, 60, 0.22); }
     opacity: 0.6;
 }
 .pg-flash-example-speak:hover { opacity: 1; }
+/* Azure scores: words said differently (wavy), and accuracy · fluency · completeness under the sentence */
+.pg-pronun-wrong {
+    cursor: pointer;
+    text-decoration: underline wavy;
+    text-decoration-color: #e0a040;
+    text-underline-offset: 0.2em;
+    outline: none;
+}
+.pg-pronun-wrong:hover,
+.pg-pronun-wrong:focus-visible { color: #e0a040; }
+.pg-pronun-wrong:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.pg-pronun-sub { display: block; margin-top: 4px; font-size: 0.85em; color: var(--pg-t2); }
+/* The AI advice under a recorded check: a plain text button, then the tips */
+.pg-pronun-advice { display: block; margin-top: 6px; font-size: 0.92em; color: var(--pg-t1); white-space: pre-line; text-align: start; }
+.pg-pronun-advice-btn { border: 0; background: none; color: var(--pg-t2); cursor: pointer; font: inherit; padding: 2px 4px; }
+.pg-pronun-advice-btn:hover, .pg-pronun-advice-btn:focus-visible { text-decoration: underline; }
+/* Voice settings: each connection the choices need, once */
+.pg-voice-conn-block { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--pg-border-0); }
+.pg-voice-conn-title { display: block; margin-bottom: 4px; font-weight: 600; }
+.pg-voice-adv > summary { cursor: pointer; font-size: 0.85em; color: var(--pg-t2); margin: 4px 0; }

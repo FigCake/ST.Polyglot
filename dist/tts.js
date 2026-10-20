@@ -5,6 +5,8 @@
 //             ─▶ MP3 bytes ─▶ played, kept for the session, and (setting
 //             voice_save) stored as the word's or its example's sound file, so a
 //             word is paid for once and its sound reaches flashcards and exports
+//             OpenAI's comes through the voice settings' one OpenAI connection
+//             (openai-speech.ts): in SillyTavern by default its saved key, through its server
 //   host      the app's own voice service (Marinara's Text to Speech, HOST.ai):
 //             its sound comes back, so it is kept like a direct service's
 //   st        ST's own TTS extension through its /speak command (the voice
@@ -17,6 +19,7 @@
 // does not answer browsers.
 import { withTimeout } from './utils.js';
 import { HOST } from './host.js';
+import { openAiRoute, OPENAI_URL } from './openai-speech.js';
 /** Services Polyglot calls itself (their sound can be kept). */
 export const DIRECT_PROVIDERS = ['host', 'elevenlabs', 'google', 'openai', 'fish'];
 /** A voice request (answer included) gives up after this long. */
@@ -42,7 +45,14 @@ export function ttsConfig(s) {
     switch (provider) {
         case 'elevenlabs': return pick(s.voice_el_key, s.voice_el_voice, s.voice_el_model);
         case 'google': return pick(s.voice_gg_key, s.voice_gg_voice);
-        case 'openai': return pick(s.voice_oa_key, s.voice_oa_voice, s.voice_oa_model, s.voice_oa_url);
+        case 'openai': {
+            // The voice settings' one OpenAI connection (openai-speech.ts): SillyTavern's saved key, or a key and address
+            const route = openAiRoute(s);
+            if (route?.via === 'st')
+                return { ...pick('', s.voice_oa_voice, s.voice_oa_model), viaSt: true };
+            return route ? pick(route.key, s.voice_oa_voice, s.voice_oa_model, route.url === OPENAI_URL ? '' : route.url)
+                : pick('', s.voice_oa_voice, s.voice_oa_model, s.voice_oa_url);
+        }
         case 'fish': return pick(s.voice_fish_key, s.voice_fish_voice, s.voice_fish_model);
         case 'host': return pick('', s.voice_host_voice);
         default: return pick('', s.voice_st_voice);
@@ -54,7 +64,7 @@ export function ttsConfig(s) {
  * ElevenLabs voice id (it has no default voice).
  */
 export function missingFor(c) {
-    if (!DIRECT_PROVIDERS.includes(c.provider) || c.provider === 'host')
+    if (!DIRECT_PROVIDERS.includes(c.provider) || c.provider === 'host' || c.viaSt)
         return '';
     const custom = c.provider === 'openai' && c.baseUrl && !c.baseUrl.startsWith(DEFAULTS.openaiUrl);
     if (!c.key && !custom)
@@ -208,6 +218,17 @@ export async function synthesize(c, text, langCode, stHeaders = {}, signal) {
         if (!HOST.ai)
             throw new TtsError('no voice service here');
         const bytes = await HOST.ai.speak(text, c.voice, withTimeout(signal, VOICE_TIMEOUT_MS));
+        if (!soundFormat(bytes))
+            throw new TtsError('not a sound');
+        return bytes;
+    }
+    if (c.viaSt) {
+        // SillyTavern's own OpenAI voice route, with its saved key
+        const res = await ttsFetch({ ...c, proxy: false }, '/api/openai/generate-voice', {
+            method: 'POST', signal, headers: { ...stHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, voice: c.voice || DEFAULTS.openaiVoice, model: c.model || DEFAULTS.openaiModel, speed: clamp(c.speed, 0.25, 4) }),
+        }, stHeaders);
+        const bytes = new Uint8Array(await res.arrayBuffer());
         if (!soundFormat(bytes))
             throw new TtsError('not a sound');
         return bytes;

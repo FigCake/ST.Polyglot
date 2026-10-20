@@ -1,15 +1,17 @@
-// The settings tab's voice section: which voice reads words aloud (tts.ts).
+// The settings tab's voice section: everything spoken and heard, in one place.
 //
-//   service ─┬─ browser / SillyTavern (its TTS extension, by voice name)
-//            └─ ElevenLabs · Google · OpenAI-compatible · Fish Audio:
-//               key, voice (with a list where the service has one), model,
-//               speed, keep the sound on the word, send through ST's proxy
-//   character voices   a voice per character of the open chat, for the lines' ▶
-//                      (voice-cast.ts); with ST's TTS, its own voice map is used
-//   [Try]    reads a greeting in the study language
+//   reads aloud ─┬─ browser / SillyTavern (its TTS extension) / the app's own (Marinara)
+//                └─ ElevenLabs · Google · OpenAI · Fish Audio: voice, model, speed,
+//                   keep the sound on the word, send through ST's proxy
+//      character voices   a voice per character of the open chat (voice-cast.ts)
+//      [Try]              reads a greeting in the study language
+//   hears you     the browser's recognition / Azure scores / OpenAI transcription (speech.ts)
+//   AI advice     a button under a recorded check's result
+//   connections   only those the choices need, each once: OpenAI (shared by all three;
+//                 empty key = SillyTavern's saved one, or the AI connection's) and Azure
 //
-// Fields write settings through the tab's data-setting handler; changing the
-// service redraws the rows below it.
+// Fields write settings through the tab's data-setting handler; a choice
+// redraws the rows that depend on it.
 import { html, setHtml } from '../../html.js';
 import { t } from '../../i18n.js';
 import { getSettings, getLang } from '../../runtime.js';
@@ -19,6 +21,8 @@ import { castVoice, setCastVoice, castNames, chatCharacters } from '../../voice-
 import { browserVoices, speechLangCode } from '../../speech.js';
 import { DEFAULTS, DIRECT_PROVIDERS, VOICE_SPEEDS, DEFAULT_VOICE_SPEED } from '../../tts.js';
 import { HOST } from '../../host.js';
+import { OPENAI_URL, STT_MODEL, ADVICE_MODEL } from '../../openai-speech.js';
+import { secret_state, SECRET_KEYS } from '../../st.js';
 /** Services: a translated name (`key`) or a brand name (`name`). */
 const PROVIDERS = [
     { value: 'browser', key: 'tts.pBrowser' },
@@ -79,12 +83,9 @@ function serviceRows(s) {
         google: html `
             ${keyField('voice_gg_key')}
             ${voiceField('voice_gg_voice', s.voice_gg_voice ?? '', t('tts.voiceDefaultPh'), true)}`,
+        // Its key, address and model are in the OpenAI connection below (shared with transcription and advice)
         openai: html `
-            ${field('voice_oa_url', t('tts.url'), s.voice_oa_url ?? '', DEFAULTS.openaiUrl)}
-            ${keyField('voice_oa_key')}
-            ${voiceField('voice_oa_voice', s.voice_oa_voice ?? '', DEFAULTS.openaiVoice, false)}
-            ${field('voice_oa_model', t('tts.model'), s.voice_oa_model ?? '', DEFAULTS.openaiModel)}
-            <span class="pg-pset-hint">${t('tts.hintOpenai')}</span>`,
+            ${voiceField('voice_oa_voice', s.voice_oa_voice ?? '', DEFAULTS.openaiVoice, false)}`,
         fish: html `
             ${keyField('voice_fish_key')}
             ${voiceField('voice_fish_voice', s.voice_fish_voice ?? '', t('tts.fishVoicePh'), false)}
@@ -133,16 +134,70 @@ function castRows(s) {
         ${p === 'browser' && html `<datalist id="pg-cast-voices">${browserVoices(speechLangCode(getLang())).map(v => html `<option value="${v}"></option>`)}</datalist>`}
         <span class="pg-pset-hint">${t('cast.hint')}</span>`;
 }
-/** The section's body: the service picker and its rows. */
+const PRON_ENGINES = [
+    { value: 'browser', key: 'pron.engineBrowser' },
+    { value: 'azure', key: 'pron.engineAzure' },
+    { value: 'openai', key: 'pron.engineOpenai' },
+];
+const selectRow = (setting, label, value, options) => html `
+    <label class="pg-pset-row">
+        <span class="pg-pset-label">${label}</span>
+        <select class="text_pole pg-pset-select" data-setting="${setting}">${options.map(o => html `
+            <option value="${o.value}" ${o.value === value && html `selected`}>${o.label}</option>`)}
+        </select>
+    </label>`;
+const checkRow = (setting, label, on) => html `
+    <label class="pg-pset-row">
+        <span class="pg-pset-label">${label}</span>
+        <input type="checkbox" class="pg-pset-check" data-setting="${setting}" ${on && html `checked`}>
+    </label>`;
+/**
+ * The connections the choices above need, each asked for once: OpenAI (reading
+ * aloud, transcription and advice share it; an empty key means SillyTavern's
+ * saved one or the AI connection's; models and address folded under
+ * "Advanced") and Azure (scores).
+ */
+function connectionRows(s) {
+    const engine = s.pron_engine ?? 'browser';
+    const readsOpenAi = s.voice_provider === 'openai', hearsOpenAi = engine === 'openai', advice = !!s.pron_advice;
+    // An empty key means SillyTavern's saved one (or the AI connection's): say when there is none
+    const stNoKey = HOST.stConnection && !(s.voice_oa_key ?? '').trim() && !(s.voice_oa_url ?? '').trim() && !secret_state[SECRET_KEYS.OPENAI];
+    return html `
+        ${advice && engine === 'browser' && html `<span class="pg-pset-hint">${t('pron.adviceNeedsRec')}</span>`}
+        ${(readsOpenAi || hearsOpenAi || advice) && html `
+        <div class="pg-voice-conn-block">
+            <span class="pg-pset-label pg-voice-conn-title">OpenAI</span>
+            ${keyField('voice_oa_key')}
+            <span class="pg-pset-hint">${t(HOST.stConnection ? 'voice.keyFallbackSt' : 'voice.keyFallback')}</span>
+            ${stNoKey && html `<span class="pg-pset-hint">${t('voice.useStNone')}</span>`}
+            <details class="pg-voice-adv">
+                <summary>${t('voice.advanced')}</summary>
+                ${field('voice_oa_url', t('tts.url'), s.voice_oa_url ?? '', OPENAI_URL)}
+                ${readsOpenAi && field('voice_oa_model', t('voice.ttsModel'), s.voice_oa_model ?? '', DEFAULTS.openaiModel)}
+                ${hearsOpenAi && field('pron_stt_model', t('pron.sttModel'), s.pron_stt_model ?? '', STT_MODEL)}
+                ${advice && field('pron_advice_model', t('pron.adviceModel'), s.pron_advice_model ?? '', ADVICE_MODEL)}
+                <span class="pg-pset-hint">${t('pron.hintOpenai')}</span>
+            </details>
+        </div>`}
+        ${engine === 'azure' && html `
+        <div class="pg-voice-conn-block">
+            <span class="pg-pset-label pg-voice-conn-title">Azure</span>
+            ${keyField('pron_azure_key')}
+            ${field('pron_azure_region', t('pron.region'), s.pron_azure_region ?? '', t('pron.regionPh'))}
+            <span class="pg-pset-hint">${t('pron.hint')}</span>
+        </div>`}`;
+}
+/**
+ * The section's body: what reads aloud (and its rows), what hears you, the
+ * advice switch, then the connections those choices need.
+ */
 export function voiceSection(s) {
     return html `
-        <label class="pg-pset-row">
-            <span class="pg-pset-label">${t('tts.service')}</span>
-            <select class="text_pole pg-pset-select" data-setting="voice_provider">${PROVIDERS.map(o => html `
-                <option value="${o.value}" ${o.value === (s.voice_provider ?? 'browser') && html `selected`}>${'key' in o ? t(o.key, { name: HOST.ai?.name ?? '' }) : o.name}</option>`)}
-            </select>
-        </label>
-        <div class="pg-voice-rows">${serviceRows(s)}</div>`;
+        ${selectRow('voice_provider', t('tts.service'), s.voice_provider ?? 'browser', PROVIDERS.map(o => ({ value: o.value, label: 'key' in o ? t(o.key, { name: HOST.ai?.name ?? '' }) : o.name })))}
+        <div class="pg-voice-rows">${serviceRows(s)}</div>
+        ${selectRow('pron_engine', t('pron.engine'), s.pron_engine ?? 'browser', PRON_ENGINES.map(o => ({ value: o.value, label: t(o.key) })))}
+        ${checkRow('pron_advice', t('pron.adviceToggle'), !!s.pron_advice)}
+        <div class="pg-voice-conn">${connectionRows(s)}</div>`;
 }
 /** Fills the voice suggestions from the service's list. */
 async function fillVoiceList(root, btn) {
@@ -163,15 +218,25 @@ async function fillVoiceList(root, btn) {
         btn.disabled = false;
     }
 }
-/** Wires the section: the saved keys, redraw on a service change, the voice list, the try button. Call after the tab's own handlers. */
+/** Wires the section: the saved keys, redraw on a service change, the voice list, the try button, the pronunciation rows. Call after the tab's own handlers. */
 export function bindVoiceSettings(root) {
+    // A choice redraws what depends on it: the service's rows, and the connections the choices need
+    const REDRAWS_CONNECTIONS = new Set(['voice_provider', 'pron_engine', 'pron_advice']);
     root.addEventListener('change', e => {
-        if (e.target.dataset?.setting !== 'voice_provider')
-            return;
-        const rows = root.querySelector('.pg-voice-rows');
-        if (rows) {
-            setHtml(rows, serviceRows(getSettings()));
-            fillKeys(rows);
+        const setting = e.target.dataset?.setting ?? '';
+        if (setting === 'voice_provider') {
+            const rows = root.querySelector('.pg-voice-rows');
+            if (rows) {
+                setHtml(rows, serviceRows(getSettings()));
+                fillKeys(rows);
+            }
+        }
+        if (REDRAWS_CONNECTIONS.has(setting)) {
+            const conn = root.querySelector('.pg-voice-conn');
+            if (conn) {
+                setHtml(conn, connectionRows(getSettings()));
+                fillKeys(conn);
+            }
         }
     });
     fillKeys(root);

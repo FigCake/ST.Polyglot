@@ -10,6 +10,7 @@
 //   ai/client.ts          every AI request: JSON repair, one strict retry, partial results
 //   export/pdf.ts         printable flashcard deck
 import { setupTapToTranslate, removeTapBubbles, abortAllTapTranslate } from './ui/tap-translate.js';
+import { injectTranslateButtons, autoTranslate, restoreTranslations, restoreTranslationsWithRetry, relocateTranslations, forgetTranslation, resetTranslationState, hideAllTranslations, } from './para-translate.js';
 import { buildSettingsPanel } from './ui/settings-ui.js';
 import { openLearningPanel, lookUpWord, cancelLookup, PANEL_TABS } from './ui/learning-panel.js';
 import { getSettings, getLang, getNativeLang, ai, getContext } from './runtime.js';
@@ -84,6 +85,7 @@ function injectExtensionsMenuEntry() {
 function injectChatButtons() {
     injectWandButton();
     injectAnnotateButtons();
+    injectTranslateButtons();
 }
 // ── Chat lifecycle ────────────────────────────────────────────────────────────
 /** Moves an old per-chat wordbook into the shared one (once per chat), then shows the open chat's words. */
@@ -98,6 +100,7 @@ async function adoptChatWordbook() {
 /** Cancels in-flight work and clears per-chat state when the user switches chat. */
 function onChatChanged() {
     resetChatState();
+    resetTranslationState();
     resetFuriganaState();
     resetSavedMarks();
     resetLineVoice();
@@ -109,6 +112,7 @@ function onChatChanged() {
     setTimeout(() => {
         injectChatButtons();
         restoreAnnotations();
+        restoreTranslationsWithRetry();
         restoreFuriganaWithRetry();
         refreshMessageMarks();
         void adoptChatWordbook();
@@ -118,6 +122,18 @@ function onChatChanged() {
 function refreshMessageMarks(mesIds) {
     refreshSavedMarks(mesIds);
     refreshLineVoice(mesIds);
+}
+/** The layers saved per message in the chat (annotations, translations, furigana), shown on the messages that are in the page. */
+function restoreSavedLayers() {
+    restoreAnnotations();
+    restoreTranslations();
+    restoreFurigana();
+}
+/** Messages were deleted and ST renumbered the rest: every saved layer follows its messages. */
+function relocateSavedLayers() {
+    relocateAnnotations();
+    relocateTranslations();
+    relocateFurigana();
 }
 /** Subscribes to a `pg:*-toggle` event dispatched by the settings UI. */
 function onToggle(name, handler) {
@@ -149,37 +165,41 @@ function onToggle(name, handler) {
         setupReadingEditor();
         applyFuriganaDisplay();
         restoreWithRetry();
+        restoreTranslationsWithRetry();
         restoreFuriganaWithRetry();
     });
-    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (mesId) => {
+    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (mesId, type) => {
         injectAnnotateButtons();
-        restoreAnnotations();
-        restoreFurigana();
+        injectTranslateButtons();
+        restoreSavedLayers();
         if (mesId !== undefined) {
             autoFurigana(String(mesId));
+            autoTranslate(String(mesId), type);
             refreshMessageMarks([String(mesId)]);
             countEncounters(String(mesId));
         }
     });
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.MESSAGE_SWIPED, (id) => {
+        // The web app and Marinara draw the message anew: it needs its buttons again (no-op in ST)
+        injectChatButtons();
         forgetMessage(String(id));
+        forgetTranslation(String(id));
         forgetFurigana(String(id));
         // Back to a swipe that was analysed: ST has already drawn its text, so its analysis shows again
-        restoreAnnotations();
-        restoreFurigana();
+        restoreSavedLayers();
         refreshMessageMarks([String(id)]);
     });
     // An edited or deleted message: highlights whose text no longer matches go
     if (event_types.MESSAGE_UPDATED)
-        eventSource.on(event_types.MESSAGE_UPDATED, () => { restoreAnnotations(); restoreFurigana(); refreshMessageMarks(); });
+        eventSource.on(event_types.MESSAGE_UPDATED, () => { injectChatButtons(); restoreSavedLayers(); refreshMessageMarks(); });
     // After a deletion ST renumbers the later messages: their saved analyses move along
     if (event_types.MESSAGE_DELETED) {
         eventSource.on(event_types.MESSAGE_DELETED, () => {
-            relocateAnnotations();
-            relocateFurigana();
-            restoreAnnotations();
-            restoreFurigana();
+            // The web app redraws every message after a deletion: buttons first, then the saved layers
+            injectChatButtons();
+            relocateSavedLayers();
+            restoreSavedLayers();
             refreshMessageMarks();
         });
     }
@@ -187,11 +207,10 @@ function onToggle(name, handler) {
     if (event_types.MORE_MESSAGES_LOADED) {
         eventSource.on(event_types.MORE_MESSAGES_LOADED, () => {
             injectAnnotateButtons();
+            injectTranslateButtons();
             // Older messages renumbered by a deletion while they were not rendered find their saves again
-            relocateAnnotations();
-            relocateFurigana();
-            restoreAnnotations();
-            restoreFurigana();
+            relocateSavedLayers();
+            restoreSavedLayers();
             refreshMessageMarks();
         });
     }
@@ -209,6 +228,13 @@ function onToggle(name, handler) {
     document.addEventListener('pg:study-scope-change', () => { redrawAnnotations(); refreshMessageMarks(); });
     onToggle('pg:saved-marks-toggle', on => (on ? refreshSavedMarks() : clearSavedMarks()));
     onToggle('pg:line-voice-toggle', on => (on ? refreshLineVoice() : clearLineVoice()));
+    document.addEventListener('pg:para-translate-change', () => {
+        injectTranslateButtons();
+        if (getSettings().para_translate === 'off')
+            hideAllTranslations();
+        else
+            restoreTranslations();
+    });
     onToggle('pg:annotator-toggle', on => {
         if (on)
             injectAnnotateButtons();

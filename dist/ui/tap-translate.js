@@ -16,7 +16,7 @@ import { ai, getLang, getNativeLang } from '../runtime.js';
 import { isRecord } from '../ai/client.js';
 import { messageTextOf, sentenceAround } from './tap/sentence.js';
 import { ST_SEL, mesSelector, mesIdOf } from '../st-dom.js';
-import { plainText, plainOffsetIn } from '../plain-text.js';
+import { plainText, plainOffsetIn, ADDED } from '../plain-text.js';
 import { showBubble, closeBubble } from './tap/bubble.js';
 import { removeSelectionTooltip, setupTextSelectionTooltip } from './tap/lookup.js';
 import { LINE_CLASS } from './dialogue-layer.js';
@@ -46,7 +46,7 @@ function caretAt(x, y) {
     const el = node instanceof Element ? node : node?.parentElement;
     const message = el?.closest(ST_SEL.aiMes);
     // A double-click in a bubble selects its text; it is not a tap on the message
-    if (!node || !message || el?.closest('.pg-clickable-word, .pg-tap-bubble'))
+    if (!node || !message || el?.closest(`.pg-clickable-word, ${ADDED}`))
         return null;
     return { node, offset, mesId: mesIdOf(message) ?? '' };
 }
@@ -156,7 +156,7 @@ export function setupTapToTranslate() {
     document.addEventListener('touchstart', () => { lastTouch = performance.now(); }, { passive: true, capture: true });
     document.addEventListener('dblclick', onDoubleClick);
     document.addEventListener('click', onOutsideClick);
-    const inBubble = (n) => !!(n instanceof Element ? n : n.parentElement)?.closest('.pg-tap-bubble');
+    const inBubble = (n) => !!(n instanceof Element ? n : n.parentElement)?.closest(ADDED);
     setupTextSelectionTooltip({
         translate: translateSelection,
         canTranslate: range => !inBubble(range.startContainer) && !!messageTextOf(range.startContainer)?.closest(ST_SEL.aiMes),

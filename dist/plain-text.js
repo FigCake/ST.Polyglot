@@ -1,17 +1,20 @@
 // The text a reader sees in a message, without what Polyglot added to it:
-// furigana readings (<rt>, <rp>) and translation bubbles. Every feature that
-// reads message text — tap translation, look-up, annotation, furigana —
-// goes through here, so a ruby reading never leaks into a prompt or the
-// clipboard.
+// furigana readings (<rt>, <rp>), translation bubbles and paragraph
+// translations. Every feature that reads message text — tap translation,
+// look-up, annotation, furigana — goes through here, so a ruby reading or a
+// translation never leaks into a prompt or the clipboard.
 import { ST_SEL, mesIdOf } from './st-dom.js';
 import { textHash } from './furigana/model.js';
 /** Elements whose text is not part of the message's own text. */
 const NOT_TEXT = new Set(['SCRIPT', 'STYLE', 'RT', 'RP']);
-const ADDED = '.pg-tap-bubble';
+/** What Polyglot adds inside a message: the tap bubble and the paragraph translations (para-translate.ts). */
+export const ADDED = '.pg-tap-bubble, .pg-para-trans';
+/** Whether an element holds no text of the message's own (a reading, a translation Polyglot added). */
+export const notMessageText = (el) => NOT_TEXT.has(el.tagName) || el.matches(ADDED);
 /** Text nodes of the message's own text, in document order. */
 export function plainTextNodes(root) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
-        acceptNode: n => n instanceof Element && (NOT_TEXT.has(n.tagName) || n.matches(ADDED))
+        acceptNode: n => n instanceof Element && notMessageText(n)
             ? NodeFilter.FILTER_REJECT
             : NodeFilter.FILTER_ACCEPT,
     });
@@ -23,7 +26,13 @@ export function plainTextNodes(root) {
 }
 /** The concatenated plain text (offsets in it match plainOffsetIn). */
 export const plainText = (root) => plainTextNodes(root).map(n => n.data).join('');
-const BLOCK = 'p, div, li, blockquote, h1, h2, h3, h4, h5, h6, pre, td, th, dd, dt';
+/** Elements that start a block of their own on the page (paragraphs, lists, tables…). */
+export const BLOCK_TAGS = new Set([
+    'P', 'DIV', 'LI', 'UL', 'OL', 'DL', 'DT', 'DD', 'BLOCKQUOTE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+    'PRE', 'TABLE', 'THEAD', 'TBODY', 'TR', 'TD', 'TH', 'SECTION', 'ARTICLE', 'ASIDE', 'HEADER', 'FOOTER',
+    'MAIN', 'NAV', 'CENTER', 'FIGURE', 'FIGCAPTION', 'DETAILS', 'SUMMARY', 'HR',
+]);
+export const BLOCK_SELECTOR = [...BLOCK_TAGS].map(tag => tag.toLowerCase()).join(', ');
 /**
  * Plain-text offsets where a paragraph begins on the page: the first text of
  * each block element (<p>, <div>, <li>…) and the text after a <br>. The plain
@@ -32,7 +41,7 @@ const BLOCK = 'p, div, li, blockquote, h1, h2, h3, h4, h5, h6, pre, td, th, dd, 
 export function blockStarts(root) {
     const starts = new Set([0]);
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, {
-        acceptNode: n => n instanceof Element && (NOT_TEXT.has(n.tagName) || n.matches(ADDED))
+        acceptNode: n => n instanceof Element && notMessageText(n)
             ? NodeFilter.FILTER_REJECT
             : NodeFilter.FILTER_ACCEPT,
     });
@@ -45,7 +54,7 @@ export function blockStarts(root) {
         }
         if (!(n instanceof Text))
             continue;
-        const own = n.parentElement?.closest(BLOCK) ?? null;
+        const own = n.parentElement?.closest(BLOCK_SELECTOR) ?? null;
         if (afterBreak || (block !== undefined && own !== block))
             starts.add(offset);
         afterBreak = false;
@@ -96,13 +105,13 @@ export function selectionText(sel) {
         ? range.commonAncestorContainer
         : range.commonAncestorContainer.parentElement;
     // Plain selections keep the browser's own text (line breaks between paragraphs)
-    if (!host?.closest('ruby') && !host?.querySelector('ruby, .pg-tap-bubble'))
+    if (!host?.closest('ruby') && !host?.querySelector(`ruby, ${ADDED}`))
         return sel.toString();
     return fragmentText(range.cloneContents());
 }
 /** The readable text of a message element (line breaks kept), without readings. */
 export function readableText(el) {
-    if (!el.querySelector('ruby, .pg-tap-bubble'))
+    if (!el.querySelector(`ruby, ${ADDED}`))
         return el.innerText;
     const copy = el.cloneNode(true);
     copy.querySelectorAll(`rt, rp, ${ADDED}`).forEach(e => e.remove());

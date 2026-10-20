@@ -8,7 +8,7 @@
 // adding one is a single table entry.
 import { getSettings, getLang, getNativeLang, ai, getContext } from '../../runtime.js';
 import { speak } from '../../voice.js';
-import { hasSpeechRecognition, runPronunciationCheck, setActiveRecognition, getActiveRecognition, abortActiveRecognition, } from '../../speech.js';
+import { hasSpeechRecognition, runPronunciationCheck, runRecordedCheck, canRecordCheck, setActiveRecognition, getActiveRecognition, abortActiveRecognition, } from '../../speech.js';
 import { html, setHtml } from '../../html.js';
 import { askConfirm, notify } from '../../ui.manager.js';
 import { t } from '../../i18n.js';
@@ -26,13 +26,38 @@ import { renderMatchSetup } from '../../features/match.js';
 import { runMiniQuiz, runClozeQuiz, runReadingExam, runConjDrill, runTargetedExam, } from '../../features/quiz.js';
 import { runTypedGrammar } from '../../features/typed-quiz.js';
 import { renderWriting, leaveWriting } from '../../features/writing.js';
+import { azureConfig } from '../../azure-pron.js';
+import { transcriptionConfig, adviceConfig } from '../../openai-speech.js';
 // ── Feature wiring ────────────────────────────────────────────────────────────
-/** Starts a mic session and tracks it, so leaving the mode or closing the panel stops the microphone. */
+/** The recorded check chosen in settings (pronunciation) and set up, or null for the browser's recognition. */
+function recordedEngine() {
+    if (!canRecordCheck())
+        return null;
+    const s = getSettings();
+    const azure = azureConfig(s);
+    if (azure)
+        return { kind: 'azure', cfg: azure };
+    const openai = transcriptionConfig(s);
+    return openai ? { kind: 'openai', cfg: openai } : null;
+}
+/**
+ * Starts a mic session and tracks it, so leaving the mode or closing the panel stops the microphone.
+ * With Azure or a transcription set up (settings: pronunciation), the recording is checked by it
+ * instead of the browser's recognition, with the AI advice button when that is on.
+ */
 function pronounce(target, micBtn, resultEl, onSettled) {
-    const session = runPronunciationCheck(target, getLang(), micBtn, resultEl, onSettled);
+    // A check still waiting for its answer is dropped: its result must not land over the new one
+    abortActiveRecognition();
+    const engine = recordedEngine();
+    const advice = adviceConfig(getSettings());
+    const session = engine
+        ? runRecordedCheck(target, getLang(), engine, micBtn, resultEl, onSettled, advice && { cfg: advice, studyLang: getLang(), nativeLang: getNativeLang() })
+        : runPronunciationCheck(target, getLang(), micBtn, resultEl, onSettled);
     setActiveRecognition(session);
     return session;
 }
+/** Whether pronunciation can be checked here: the browser's recognition, or a recorded check (any browser that records). */
+const canCheckSpeech = () => hasSpeechRecognition() || !!recordedEngine();
 const quizDeps = {
     ai, getContext, getSettings, getLang, getNativeLang, askConfirm,
     wrongAnswers: wrongAnswersData,
@@ -95,7 +120,7 @@ const MODES = [
         id: 'flash', icon: '🃏', key: 'pnl.learn.flash',
         render: (c, opts) => renderFlashcard(c, {
             ai, getLang, getNativeLang, getSettings, speak,
-            hasSpeechRecog: hasSpeechRecognition,
+            hasSpeechRecog: canCheckSpeech,
             runPronunCheck: pronounce,
             setActiveRecog: setActiveRecognition,
             getActiveRecog: getActiveRecognition,
@@ -107,7 +132,7 @@ const MODES = [
     {
         id: 'speak', icon: '🎤', key: 'pnl.learn.speak',
         render: c => renderSpeaking(c, {
-            speak, getLang, hasSpeechRecognition, runPronunciationCheck: pronounce, logStudy: () => logStudy(),
+            speak, getLang, hasSpeechRecognition: canCheckSpeech, runPronunciationCheck: pronounce, logStudy: () => logStudy(),
         }),
     },
 ];

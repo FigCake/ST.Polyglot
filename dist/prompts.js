@@ -36,9 +36,9 @@ Instructions:
 - Detect the language of the input text.
 - If the input IS already in ${lang}:
   - "grammar": fix ONLY grammar and spelling mistakes. Do not change the wording, word choice or style; leave what is correct exactly as it is.
-  - "natural": the same message said more naturally, the way a native speaker would, at CEFR ${level} level.
+  - "natural": the same message as people who speak ${lang} from birth would put it, at CEFR ${level} level.
 - If the input is in ANY OTHER language:
-  - "grammar": a faithful translation into ${lang}, close to the original wording.
+  - "grammar": a faithful translation into ${lang} that keeps the original wording where it can.
   - "natural": a natural ${lang} way to say it at CEFR ${level} level.
 - Both must always be in ${lang}. When the text needs no change, both equal the input.
 
@@ -183,8 +183,8 @@ Return ONLY valid JSON:
 }`;
 }
 /**
- * Half-length mock reading exam at the CEFR level, modelled on DELE, DALF, JLPT,
- * Goethe, etc. 25 questions in two sections; no chat history.
+ * Half-length mock reading exam at the CEFR level, modelled on standardised
+ * language exams in general. 25 questions in two sections; no chat history.
  */
 export function readingExamPrompt(lang, level, nativeLang) {
     return `You are an expert ${lang} language examiner. Create a half-length mock reading exam for a CEFR ${level} learner whose native language is ${nativeLang}.
@@ -648,4 +648,44 @@ Rules:
 ${vocabulary}
 Return ONLY:
 { "questions": [{ "sentence": "", "hint": "", "answers": [""], "point": "", "explanation": "", "word": "" }] }`;
+}
+/**
+ * Every paragraph of a chat message, translated for a learner who reads the
+ * original with the translation under each paragraph (para-translate.ts).
+ * One request, no retry: the answer is tagged like the paragraphs it was
+ * given (<t i>, an optional <n i> note), so quotation marks in dialogue need
+ * no escaping and each translation finds its paragraph.
+ */
+export function paragraphTranslatePrompt(paragraphs, lang, nativeLang, ctx = {}) {
+    const names = [ctx.charName && `Character: ${ctx.charName}`, ctx.userName && `User: ${ctx.userName}`].filter(Boolean).join('\n');
+    const before = ctx.before?.length ? `<previous_messages>\n${ctx.before.join('\n\n')}\n</previous_messages>` : '';
+    const last = ctx.lastTranslation?.trim() ? `<last_translation>\n${ctx.lastTranslation.trim()}\n</last_translation>` : '';
+    const context = [names, before, last].filter(Boolean).join('\n');
+    // Address words only the reader's language has, named for the languages Polyglot explains in
+    const ownWords = /korean|한국어/i.test(nativeLang) ? ' (언니, 오빠, 형, 누나, 선배 and the like)'
+        : /japanese|日本語/i.test(nativeLang) ? ' (先輩, お兄ちゃん, -さん, -くん and the like)' : '';
+    const wishes = ctx.wishes?.trim() ? `\n\n## The reader's wishes\nWhere they differ from the guidelines above, these win; the answer format stays as given.\n${ctx.wishes.trim()}` : '';
+    const system = `You translate ${lang} chat messages into ${nativeLang} for a ${nativeLang} speaker who is learning ${lang}.
+
+## How the translation is used
+The messages are a story the reader writes together with an AI. Each paragraph's translation is shown under it: the reader works through the ${lang} and looks down when they get stuck, then back up. Inside a paragraph, sentences may take whatever shape ${nativeLang} needs; between paragraphs nothing moves.
+
+## What the reader needs from it
+- To find the ${lang} in it. Whatever part of the ${lang} they look up must be there in the ${nativeLang}, and nothing should be there that the ${lang} leaves unsaid.
+- To trust its tone. Learners read how a line feels from its translation, so the translation has to carry that feeling as it is: any shift would teach them the wrong thing about the ${lang}. That includes what a line means without saying it (a tease, a jab, a double meaning): it should stay implied in the translation too.
+- To learn what the words really say. The reader is studying the ${lang}, so crude, explicit or sexual words get their real meaning in the translation; a cleaned-up rendering would teach them a meaning the words do not have.
+- To know who is talking to whom. When ${nativeLang} has to choose between levels of politeness or forms of "you", choose from the characters' relationship as the background shows it, keep that choice, and change it only where the ${lang} changes its own. Characters call each other what the ${lang} has them call each other: a name stays a name, and no address word that exists only in ${nativeLang}${ownWords} is brought in for them.
+- To stay in the story's world. Everything in the story keeps its own identity, and each name keeps one spelling, the one ${nativeLang} normally uses for names from that language.
+- To read it without effort. It should read as ${nativeLang} prose in its own right: ${nativeLang} word order, punctuation and quotation marks, set phrases rendered by meaning.
+
+## Notes
+Add a note (in ${nativeLang}, one or two sentences) only where someone reading the translation alone would misunderstand the ${lang} line. Most paragraphs have none.${wishes}`;
+    const blocks = paragraphs.map((p, i) => `<p i="${i}">${p}</p>`).join('\n');
+    const user = `${context ? `Background for the scene (read it, leave it untranslated):\n${context}\n\n` : ''}The message: ${paragraphs.length} paragraph${paragraphs.length === 1 ? '' : 's'}. The <p> blocks are the message to translate.
+${blocks}
+
+Answer with one <t> per paragraph, in order, with the same i, and a <n> only when a note is needed. Nothing else:
+<t i="0">translation</t>
+<n i="0">note</n>`;
+    return { system, user };
 }

@@ -237,6 +237,13 @@ function panel(s) {
                 ${field(t('set.cefrLevel'), html `<select class="text_pole" data-setting="cefr_level">${options(CEFR_LEVELS.map(l => [l, l]), s.cefr_level)}</select>`)}
 
                 <hr class="pg-set-divider">
+                ${field(t('set.paraTranslate'), html `<select class="text_pole" data-setting="para_translate" title="${t('set.paraTranslateHint')}">${options([['off', t('set.paraOff')], ['button', t('set.paraButton')], ['auto', t('set.paraAuto')]], s.para_translate ?? 'button')}</select>`)}
+                <div class="pg-set-field pg-para-wishes" ${s.para_translate === 'off' && html `hidden`}>
+                    <label>${t('set.paraWishes')}</label>
+                    <textarea class="text_pole" rows="3" data-setting="para_translate_wishes" placeholder="${t('set.paraWishesPh')}">${s.para_translate_wishes ?? ''}</textarea>
+                </div>
+
+                <hr class="pg-set-divider">
                 ${skipRows(s)}
 
                 <hr class="pg-set-divider">
@@ -278,6 +285,10 @@ const SETTING_EFFECTS = {
     enabled_annotator: (_, on) => document.dispatchEvent(new CustomEvent('pg:annotator-toggle', { detail: { on } })),
     mark_saved_words: (_, on) => document.dispatchEvent(new CustomEvent('pg:saved-marks-toggle', { detail: { on } })),
     line_voice: (_, on) => document.dispatchEvent(new CustomEvent('pg:line-voice-toggle', { detail: { on } })),
+    para_translate: (root, value) => {
+        show(root, '.pg-para-wishes', value !== 'off');
+        document.dispatchEvent(new CustomEvent('pg:para-translate-change'));
+    },
     language: (root, value, previous) => {
         show(root, '.pg-lang-custom', value === 'Custom');
         languageChanged(root);
@@ -382,7 +393,7 @@ function bind(root) {
         const el = e.target;
         if (el.matches('.pg-tokens[type="range"]'))
             setTokens(root, el.value);
-        else if (el.type === 'text' || el.type === 'password')
+        else if (el.type === 'text' || el.type === 'password' || el.type === 'textarea')
             handle(e);
     });
     root.querySelector('.pg-skip-preview-btn')?.addEventListener('click', () => previewSkip(root));
@@ -399,7 +410,7 @@ function bind(root) {
         const el = e.target;
         if (el.matches('.pg-tokens[type="number"]'))
             setTokens(root, el.value);
-        else if (el.type !== 'text' && el.type !== 'password')
+        else if (el.type !== 'text' && el.type !== 'password' && el.type !== 'textarea')
             handle(e);
     });
 }
