@@ -8,8 +8,8 @@
 //   delete  POST /api/files/delete  { path: 'user/files/<name>' }
 //   exists  POST /api/files/verify  { urls }                 — many at once; HEAD each on an ST without it
 //
-// This module is the only one that knows where files live: the web app and the
-// Marinara extension build swap it for one keeping files in the browser (hosts/common).
+// This module is the only one that knows where files live: the web app's build
+// swaps it for one keeping files in the browser (hosts/common).
 //
 // Every call reports an outcome instead of throwing, so callers can tell a
 // missing file or an old ST without the API from a passing network error.

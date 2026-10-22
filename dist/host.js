@@ -1,7 +1,6 @@
 // Where Polyglot is running, for the few things only SillyTavern has. This is
-// SillyTavern's; the web app and the Marinara extension build swap in
-// hosts/common/host.ts (hosts/vite-host.ts), so code asks HOST instead of
-// assuming SillyTavern.
+// SillyTavern's; the web app's build swaps in hosts/common/host.ts
+// (hosts/vite-host.ts), so code asks HOST instead of assuming SillyTavern.
 //
 //   stConnection   SillyTavern's own connection, its connection profiles and Vertex AI (requests through its server)
 //   stVoice        SillyTavern's TTS extension and its CORS proxy
