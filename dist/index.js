@@ -28,6 +28,7 @@ import { notify } from './ui.manager.js';
 import { setOpenPanelFn, injectAnnotateButtons, runAnnotator, isAnnotated, restoreAnnotations, restoreWithRetry, resetChatState, forgetMessage, redrawAnnotations, relocateAnnotations, } from './annotator.js';
 import { t } from './i18n.js';
 import { setupPlainCopy } from './plain-text.js';
+import { applyPanelTheme } from './ui/panel/chrome.js';
 import { restoreFurigana, restoreFuriganaWithRetry, autoFurigana, relocateFurigana, forgetFurigana, resetFuriganaState, applyFuriganaDisplay, onFuriganaSettingChange, setupReadingEditor, } from './furigana/messages.js';
 import { eventSource, event_types, SlashCommandParser, SlashCommand, ARGUMENT_TYPE, SlashCommandNamedArgument } from './st.js';
 // ── Chat-UI entry points ──────────────────────────────────────────────────────
@@ -164,6 +165,8 @@ function onToggle(name, handler) {
         setupPlainCopy();
         setupReadingEditor();
         applyFuriganaDisplay();
+        // The app's theme reaches what Polyglot shows outside the panel too, before the panel ever opens
+        applyPanelTheme();
         restoreWithRetry();
         restoreTranslationsWithRetry();
         restoreFuriganaWithRetry();

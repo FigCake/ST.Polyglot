@@ -1,5 +1,6 @@
 // Learning-panel window chrome: theme, background image, floating + drag.
 import { getSettings } from '../../runtime.js';
+import { HOST } from '../../host.js';
 export const PANEL_ID = 'pg-learning-panel';
 /** PgPanel prefixes its box element id with "pg-box-". */
 export const PANEL_BOX_ID = `pg-box-${PANEL_ID}`;
@@ -10,15 +11,28 @@ export function findPanelEl() {
 /** Small-screen touch devices always use the docked layout. */
 const isCompactTouch = () => window.matchMedia('(pointer: coarse) and (max-width: 600px)').matches;
 // ── Theme ─────────────────────────────────────────────────────────────────────
-/** Applies the saved theme and background image to the open panel. */
+let watchingApp = false;
+/**
+ * Applies the saved theme and background image to the open panel. The app's
+ * theme ('app') is light or dark as the app is now, with the app's colours:
+ * the host's stylesheet maps them under <html data-pg-app>, which also reaches
+ * what Polyglot shows outside the panel (bubbles, notices).
+ */
 export function applyPanelTheme() {
+    const { panel_theme, panel_bg_image } = getSettings();
+    const app = panel_theme === 'app' ? HOST.theme : null;
+    document.documentElement.toggleAttribute('data-pg-app', !!app);
+    if (app && !watchingApp) {
+        watchingApp = true;
+        app.watch(applyPanelTheme);
+    }
     const panel = findPanelEl();
     if (!panel)
         return;
-    const { panel_theme, panel_bg_image } = getSettings();
     // Dark is the stylesheet default, so it is expressed by the attribute's absence
-    if (panel_theme && panel_theme !== 'dark')
-        panel.dataset.pgTheme = panel_theme;
+    const theme = app ? app.mode() : panel_theme;
+    if (theme && theme !== 'dark')
+        panel.dataset.pgTheme = theme;
     else
         delete panel.dataset.pgTheme;
     // Strip embedded quotes so the value cannot break out of url("…")

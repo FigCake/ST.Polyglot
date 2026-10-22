@@ -42,7 +42,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     ext_base_url: '',
     max_tokens: 30000,
     dict_url_custom: '',
-    panel_theme: 'dark',
+    // Where the app has its own look (Marinara), Polyglot wears it unless told otherwise
+    panel_theme: (HOST.theme ? 'app' : 'dark'),
     panel_bg_image: '',
     panel_floating: false,
     auto_save_idioms: true,
@@ -120,6 +121,14 @@ function leaveStOnlyChoices(s) {
         s.voice_provider = HOST.ai ? 'host' : 'browser';
     if (!HOST.ai && s.voice_provider === 'host')
         s.voice_provider = 'browser';
+    if (!HOST.theme && s.panel_theme === 'app')
+        s.panel_theme = 'dark';
+    // Once, in an app with its own look: the old default (dark) becomes the app's theme; a theme chosen later stays
+    if (HOST.theme && !s._app_theme_offered) {
+        if (s.panel_theme === 'dark')
+            s.panel_theme = 'app';
+        s._app_theme_offered = true;
+    }
 }
 export function saveSettings() { saveSettingsDebounced(); }
 /** Applies a partial update to the live settings and schedules a save. */

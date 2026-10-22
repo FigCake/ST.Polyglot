@@ -483,8 +483,8 @@
     border-radius: 0 !important;
     border-left: var(--pg-glass-border);
     background: var(--pg-glass-panel) !important;
-    backdrop-filter: var(--pg-blur);
     -webkit-backdrop-filter: var(--pg-blur);
+    backdrop-filter: var(--pg-blur);
     box-shadow:
         -1px 0 0 rgba(255,255,255,0.06),
         -4px 0 24px rgba(0,0,0,0.20),
@@ -623,8 +623,8 @@
 .pg-box {
     position: relative;
     background: var(--pg-glass-panel);
-    backdrop-filter: var(--pg-blur);
     -webkit-backdrop-filter: var(--pg-blur);
+    backdrop-filter: var(--pg-blur);
     border: none;
     border-radius: var(--pg-radius);
     box-shadow: 0 12px 48px rgba(0,0,0,0.45), 0 0 0 0.5px rgba(255,255,255,0.05);
@@ -754,8 +754,8 @@
 
 /* ── Layer 1: stronger backdrop refraction over the blurred image ── */
 .pg-sidebar[data-has-bg] {
-    backdrop-filter: blur(20px) saturate(160%) !important;
     -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+    backdrop-filter: blur(20px) saturate(160%) !important;
 }
 
 /* ── Layer 2: lift all direct children above ::before ── */
@@ -774,8 +774,8 @@
 .pg-sidebar[data-has-bg] .pg-conj-modal,
 .pg-sidebar[data-has-bg] .pg-speak-card {
     background: rgba(255, 255, 255, 0.07) !important;
-    backdrop-filter: blur(12px) saturate(160%);
     -webkit-backdrop-filter: blur(12px) saturate(160%);
+    backdrop-filter: blur(12px) saturate(160%);
     box-shadow:
         inset 0 1.5px 1px rgba(255, 255, 255, 0.18),
         inset 0 -1px 1px rgba(0, 0, 0, 0.14),
@@ -1106,8 +1106,8 @@ ruby.pg-ruby {
 ruby.pg-ruby rt {
     font-size: var(--pg-furi-size, 0.65em);
     opacity: 0.85;
-    user-select: none;
     -webkit-user-select: none;
+    user-select: none;
 }
 ruby.pg-ruby rp { display: none; }
 .mes_text ruby.pg-ruby[data-pg-span] rt { cursor: pointer; }
@@ -1668,8 +1668,8 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     align-items: center;
     gap: 12px;
     background: var(--pg-layer-0);
-    backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
     border: none;
     border-radius: var(--pg-radius-pill);
     padding: 8px 8px 8px 16px;
@@ -1752,8 +1752,8 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 .mes_text .pg-dlg {
     background: rgba(140, 170, 255, 0.10);
     border-radius: 3px;
-    box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
 }
 
 /* ── 🗂️ Anki import · word pictures ── */
@@ -2037,8 +2037,8 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
     display: flex;
     gap: 3px;
     background: var(--pg-layer-0);
-    backdrop-filter: var(--pg-blur-light);
     -webkit-backdrop-filter: var(--pg-blur-light);
+    backdrop-filter: var(--pg-blur-light);
     border: 0.5px solid var(--pg-border-0);
     border-radius: var(--pg-radius-pill);
     padding: 3px;
@@ -2113,8 +2113,8 @@ body.pg-furi-off   ruby.pg-ruby rt       { display: none; }
 
 .pg-tap-bubble-inner {
     background: var(--pg-layer-0);
-    backdrop-filter: var(--pg-blur);
     -webkit-backdrop-filter: var(--pg-blur);
+    backdrop-filter: var(--pg-blur);
     border: 0.5px solid rgba(255,255,255,0.13);
     border-radius: var(--pg-radius);
     padding: 12px 32px 12px 16px;

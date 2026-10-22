@@ -18,6 +18,7 @@ import { clearCurrentChatAnnotations } from '../../annotator.js';
 import { triggerImport, reanalyseAll, refreshWordbook } from '../wordbook-ui.js';
 import { saveBackup } from '../backup-ui.js';
 import { applyPanelTheme, findPanelEl, setFloating } from './chrome.js';
+import { HOST } from '../../host.js';
 import { mountChatsSection } from './chats-section.js';
 import { voiceSection, bindVoiceSettings } from './voice-settings.js';
 import { showLicenses } from '../licenses.js';
@@ -57,6 +58,7 @@ const THEMES = [
     { value: 'breeze', label: 'set.themeBreeze' },
     { value: 'milk', label: 'set.themeMilk' },
 ];
+const themeLabel = (o) => o.value === 'app' ? t('set.themeApp', { app: HOST.theme?.name ?? '' }) : t(o.label);
 const section = (title, body) => html `
     <section class="pg-pset-section">
         <h3 class="pg-pset-section-title">${title}</h3>
@@ -136,8 +138,8 @@ function render(s) {
         ${section(t('set.panelSection'), html `
             <label class="pg-pset-row">
                 <span class="pg-pset-label">${t('pnl.set.theme')}</span>
-                <select class="text_pole pg-pset-select" data-setting="panel_theme">${THEMES.map(o => html `
-                    <option value="${o.value}" ${o.value === theme && html `selected`}>${t(o.label)}</option>`)}
+                <select class="text_pole pg-pset-select" data-setting="panel_theme">${(HOST.theme ? [{ value: 'app', label: 'set.themeApp' }, ...THEMES] : THEMES).map(o => html `
+                    <option value="${o.value}" ${o.value === theme && html `selected`}>${themeLabel(o)}</option>`)}
                 </select>
             </label>
             ${toggleRow('panel_floating', t('pnl.set.floating'), !!s.panel_floating)}

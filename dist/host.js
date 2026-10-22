@@ -10,12 +10,14 @@
 //   version()      Polyglot's version (here: the manifest next to the extension)
 //   notices()      the third-party notices (here: the copy in dist/)
 //   ai             the app's own AI connections and voice service Polyglot can use (Marinara's); none here
+//   theme          the app's own look, which the panel can follow (Marinara's themes); none here
 export const HOST = {
     id: 'sillytavern',
     stConnection: true,
     stVoice: true,
     ownKeys: false,
     ai: null,
+    theme: null,
     // dist/host.js sits in dist/, the manifest one folder up
     version: async () => String((await (await fetch(new URL('../manifest.json', import.meta.url), { cache: 'no-store' })).json()).version ?? '?'),
     notices: async () => {
